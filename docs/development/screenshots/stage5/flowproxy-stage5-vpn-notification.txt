@@ -1,0 +1,454 @@
+Current Notification Manager state:
+  Notification List:
+    NotificationRecord(0x0688e46a: pkg=android user=UserHandle{-1} id=26 tag=null importance=2 key=-1|android|26|null|1000 channel=DEVELOPER: Notification(channel=DEVELOPER pri=0 contentView=null vibrate=null sound=null tick defaults=0x0 flags=0x2 color=0xff607d8b vis=PUBLIC))
+      uid=1000 userId=-1
+      icon=Icon(typ=RESOURCE pkg=android id=0x01080704) / android:drawable/stat_sys_adb
+      pri=0
+      key=-1|android|26|null|1000
+      seen=true
+      groupKey=-1|android|26|null|1000
+      fullscreenIntent=null
+      contentIntent=PendingIntent{1ddbd5b: PendingIntentRecord{c9ff2e0 android startActivity}}
+      deleteIntent=null
+      tickerText=USB debugging connected
+      contentView=null
+      bigContentView=null
+      headsUpContentView=null
+      color=0xff607d8b      timeout=unknown
+      extras={
+          android.title=String (USB debugging connected)
+          android.text=String (Tap to disable USB debugging.)
+          android.appInfo=ApplicationInfo (ApplicationInfo{a7d89f8 android})
+          android.tv.EXTENSIONS=Bundle (Bundle[{channel_id=usbdevicemanager.adb.tv, flags=1}])
+      }
+      stats=SingleNotificationStats{posttimeElapsedMs=145493, posttimeToFirstClickMs=-1, posttimeToDismissMs=-1, airtimeCount=2, airtimeMs=368775, currentAirtimeStartElapsedMs=-1, airtimeExpandedMs=368775, posttimeToFirstVisibleExpansionMs=865823, currentAirtimeExpandedStartElapsedMs=-1, requestedImportance=3, naturalImportance=2, isNoisy=true}
+      mContactAffinity=0.0
+      mRecentlyIntrusive=false
+      mPackagePriority=0
+      mPackageVisibility=-1000
+      mUserImportance=LOW
+      mImportance=LOW
+      mImportanceExplanation=You set the importance of these notifications.
+      mIntercept=false
+      mGlobalSortKey=intrsv=1:grnk=0x0000:gsmry=1:nsk:rnk=0x0000
+      mRankingTimeMs=1794018781199
+      mCreationTimeMs=1794018781199
+      mVisibleSinceMs=1794021145330
+      mUpdateTimeMs=1794018781199
+      mSuppressedVisualEffects= 0
+      mSound= content://settings/system/notification_sound
+      mVibration= null
+      mAttributes= AudioAttributes: usage=5 content=4 flags=0x0 tags= bundle=null
+      mLight= null
+      mShowBadge=false
+      effectiveNotificationChannel=NotificationChannel{mId='DEVELOPER', mName=Developer messages, mDescription=, mImportance=2, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=content://settings/system/notification_sound, mLights=false, mLightColor=0, mVibration=null, mUserLockedFields=0, mVibrationEnabled=false, mShowBadge=true, mDeleted=false, mGroup='null', mAudioAttributes=AudioAttributes: usage=5 content=4 flags=0x0 tags= bundle=null, mBlockableSystem=false}
+    NotificationRecord(0x0dd0d7fb: pkg=com.flowproxy.android user=UserHandle{0} id=4105 tag=null importance=2 key=0|com.flowproxy.android|4105|null|10076 channel=flowproxy_vpn: Notification(channel=flowproxy_vpn pri=-1 contentView=null vibrate=null sound=null defaults=0x0 flags=0x6a color=0x00000000 category=service actions=1 vis=PRIVATE))
+      uid=10076 userId=0
+      icon=Icon(typ=RESOURCE pkg=com.flowproxy.android id=0x7f040007) / com.flowproxy.android:drawable/ic_flowproxy_notification
+      pri=-1
+      key=0|com.flowproxy.android|4105|null|10076
+      seen=false
+      groupKey=0|com.flowproxy.android|4105|null|10076
+      fullscreenIntent=null
+      contentIntent=PendingIntent{adca018: PendingIntentRecord{9131482 com.flowproxy.android startActivity (whitelist: 322bf62:+30s0ms)}}
+      deleteIntent=null
+      tickerText=null
+      contentView=null
+      bigContentView=null
+      headsUpContentView=null
+      color=0x00000000      timeout=unknown
+      actions={
+          [0] "Stop" -> PendingIntent{347aa71: PendingIntentRecord{beb8793 com.flowproxy.android startService (whitelist: 322bf62:+30s0ms)}}
+        }
+      extras={
+          android.title=String (FlowProxy)
+          android.subText=null
+          android.showChronometer=Boolean (false)
+          android.text=String (VPN interface ready · proxy core unavailable)
+          android.progress=Integer (0)
+          android.progressMax=Integer (0)
+          android.appInfo=ApplicationInfo (ApplicationInfo{fd83056 com.flowproxy.android})
+          android.showWhen=Boolean (true)
+          android.largeIcon=null
+          android.infoText=null
+          android.progressIndeterminate=Boolean (false)
+          android.remoteInputHistory=null
+      }
+      stats=SingleNotificationStats{posttimeElapsedMs=5233029, posttimeToFirstClickMs=-1, posttimeToDismissMs=-1, airtimeCount=0, airtimeMs=0, currentAirtimeStartElapsedMs=-1, airtimeExpandedMs=0, posttimeToFirstVisibleExpansionMs=-1, currentAirtimeExpandedStartElapsedMs=-1, requestedImportance=2, naturalImportance=2, isNoisy=true}
+      mContactAffinity=0.0
+      mRecentlyIntrusive=false
+      mPackagePriority=0
+      mPackageVisibility=-1000
+      mUserImportance=LOW
+      mImportance=LOW
+      mImportanceExplanation=You set the importance of these notifications.
+      mIntercept=false
+      mGlobalSortKey=intrsv=1:grnk=0x0001:gsmry=1:nsk:rnk=0x0001
+      mRankingTimeMs=1794023883329
+      mCreationTimeMs=1794023883343
+      mVisibleSinceMs=0
+      mUpdateTimeMs=1794023883343
+      mSuppressedVisualEffects= 0
+      mSound= content://settings/system/notification_sound
+      mVibration= null
+      mAttributes= AudioAttributes: usage=5 content=4 flags=0x0 tags= bundle=null
+      mLight= null
+      mShowBadge=false
+      effectiveNotificationChannel=NotificationChannel{mId='flowproxy_vpn', mName=FlowProxy VPN, mDescription=hasDescription , mImportance=2, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=content://settings/system/notification_sound, mLights=false, mLightColor=0, mVibration=null, mUserLockedFields=0, mVibrationEnabled=false, mShowBadge=false, mDeleted=false, mGroup='null', mAudioAttributes=AudioAttributes: usage=5 content=4 flags=0x0 tags= bundle=null, mBlockableSystem=false}
+    NotificationRecord(0x0bfd4da4: pkg=android user=UserHandle{-1} id=32 tag=null importance=1 key=-1|android|32|null|1000 channel=USB: Notification(channel=USB pri=0 contentView=null vibrate=null sound=null tick defaults=0x0 flags=0x2 color=0xff607d8b vis=PUBLIC))
+      uid=1000 userId=-1
+      icon=Icon(typ=RESOURCE pkg=android id=0x01080704) / android:drawable/stat_sys_adb
+      pri=0
+      key=-1|android|32|null|1000
+      seen=true
+      groupKey=-1|android|32|null|1000
+      fullscreenIntent=null
+      contentIntent=PendingIntent{95a370d: PendingIntentRecord{55ad999 android startActivity}}
+      deleteIntent=null
+      tickerText=USB charging this device
+      contentView=null
+      bigContentView=null
+      headsUpContentView=null
+      color=0xff607d8b      timeout=unknown
+      extras={
+          android.title=String (USB charging this device)
+          android.text=String (Tap for more options.)
+          android.appInfo=ApplicationInfo (ApplicationInfo{a7d89f8 android})
+      }
+      stats=SingleNotificationStats{posttimeElapsedMs=145452, posttimeToFirstClickMs=-1, posttimeToDismissMs=-1, airtimeCount=2, airtimeMs=368777, currentAirtimeStartElapsedMs=-1, airtimeExpandedMs=0, posttimeToFirstVisibleExpansionMs=-1, currentAirtimeExpandedStartElapsedMs=-1, requestedImportance=3, naturalImportance=1, isNoisy=true}
+      mContactAffinity=0.0
+      mRecentlyIntrusive=false
+      mPackagePriority=0
+      mPackageVisibility=-1000
+      mUserImportance=MIN
+      mImportance=MIN
+      mImportanceExplanation=You set the importance of these notifications.
+      mIntercept=false
+      mGlobalSortKey=intrsv=1:grnk=0x0002:gsmry=1:nsk:rnk=0x0002
+      mRankingTimeMs=1794018781102
+      mCreationTimeMs=1794018781102
+      mVisibleSinceMs=1794021145331
+      mUpdateTimeMs=1794018781102
+      mSuppressedVisualEffects= 0
+      mSound= content://settings/system/notification_sound
+      mVibration= null
+      mAttributes= AudioAttributes: usage=5 content=4 flags=0x0 tags= bundle=null
+      mLight= null
+      mShowBadge=false
+      effectiveNotificationChannel=NotificationChannel{mId='USB', mName=USB connection, mDescription=, mImportance=1, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=content://settings/system/notification_sound, mLights=false, mLightColor=0, mVibration=null, mUserLockedFields=0, mVibrationEnabled=false, mShowBadge=true, mDeleted=false, mGroup='null', mAudioAttributes=AudioAttributes: usage=5 content=4 flags=0x0 tags= bundle=null, mBlockableSystem=false}
+  
+  mUseAttentionLight=false
+  mNotificationPulseEnabled=true
+  mSoundNotificationKey=null
+  mVibrateNotificationKey=null
+  mDisableNotificationEffects=true
+  mCallState=CALL_STATE_IDLE
+  mSystemReady=true
+  mMaxPackageEnqueueRate=10.0
+  mArchive=Archive (7 notifications)
+    StatusBarNotification(pkg=com.flowproxy.android user=UserHandle{0} id=4105 tag=null key=0|com.flowproxy.android|4105|null|10070: Notification(channel=flowproxy_vpn pri=-1 contentView=null vibrate=null sound=null defaults=0x0 flags=0x6a color=0x00000000 category=service actions=1 vis=PRIVATE))
+    StatusBarNotification(pkg=android user=UserHandle{0} id=40 tag=null key=0|android|40|null|1000: Notification(channel=FOREGROUND_SERVICE pri=0 contentView=null vibrate=null sound=null defaults=0x0 flags=0x2 color=0xff607d8b vis=PRIVATE))
+    StatusBarNotification(pkg=android user=UserHandle{0} id=40 tag=null key=0|android|40|null|1000: Notification(channel=FOREGROUND_SERVICE pri=0 contentView=null vibrate=null sound=null defaults=0x0 flags=0x2 color=0xff607d8b vis=PRIVATE))
+    StatusBarNotification(pkg=com.flowproxy.android user=UserHandle{0} id=4105 tag=null key=0|com.flowproxy.android|4105|null|10070: Notification(channel=flowproxy_vpn pri=-1 contentView=null vibrate=null sound=null defaults=0x0 flags=0x6a color=0x00000000 category=service actions=1 vis=PRIVATE))
+    StatusBarNotification(pkg=com.flowproxy.android user=UserHandle{0} id=4105 tag=null key=0|com.flowproxy.android|4105|null|10070: Notification(channel=flowproxy_vpn pri=-1 contentView=null vibrate=null sound=null defaults=0x0 flags=0x6a color=0x00000000 category=service actions=1 vis=PRIVATE))
+    ...
+
+  Snoozed notifications:
+
+  Ranking Config:
+Records:
+      AppSettings: android (1000) showBadge=true
+        NotificationChannel{mId='DEVICE_ADMIN', mName=Device administration, mDescription=, mImportance=2, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=content://settings/system/notification_sound, mLights=false, mLightColor=0, mVibration=null, mUserLockedFields=0, mVibrationEnabled=false, mShowBadge=true, mDeleted=false, mGroup='null', mAudioAttributes=AudioAttributes: usage=5 content=4 flags=0x0 tags= bundle=null, mBlockableSystem=false}
+        NotificationChannel{mId='NETWORK_ALERTS', mName=Network alerts, mDescription=, mImportance=4, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=content://settings/system/notification_sound, mLights=false, mLightColor=0, mVibration=null, mUserLockedFields=0, mVibrationEnabled=false, mShowBadge=true, mDeleted=false, mGroup='null', mAudioAttributes=AudioAttributes: usage=5 content=4 flags=0x0 tags= bundle=null, mBlockableSystem=false}
+        NotificationChannel{mId='DEVELOPER', mName=Developer messages, mDescription=, mImportance=2, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=content://settings/system/notification_sound, mLights=false, mLightColor=0, mVibration=null, mUserLockedFields=0, mVibrationEnabled=false, mShowBadge=true, mDeleted=false, mGroup='null', mAudioAttributes=AudioAttributes: usage=5 content=4 flags=0x0 tags= bundle=null, mBlockableSystem=false}
+        NotificationChannel{mId='NETWORK_STATUS', mName=Network status, mDescription=, mImportance=2, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=content://settings/system/notification_sound, mLights=false, mLightColor=0, mVibration=null, mUserLockedFields=0, mVibrationEnabled=false, mShowBadge=true, mDeleted=false, mGroup='null', mAudioAttributes=AudioAttributes: usage=5 content=4 flags=0x0 tags= bundle=null, mBlockableSystem=false}
+        NotificationChannel{mId='PHYSICAL_KEYBOARD', mName=Physical keyboard, mDescription=, mImportance=3, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=content://settings/system/notification_sound, mLights=false, mLightColor=0, mVibration=null, mUserLockedFields=0, mVibrationEnabled=false, mShowBadge=true, mDeleted=false, mGroup='null', mAudioAttributes=AudioAttributes: usage=5 content=4 flags=0x0 tags= bundle=null, mBlockableSystem=false}
+        NotificationChannel{mId='ACCOUNT', mName=Account status, mDescription=, mImportance=2, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=content://settings/system/notification_sound, mLights=false, mLightColor=0, mVibration=null, mUserLockedFields=0, mVibrationEnabled=false, mShowBadge=true, mDeleted=false, mGroup='null', mAudioAttributes=AudioAttributes: usage=5 content=4 flags=0x0 tags= bundle=null, mBlockableSystem=false}
+        NotificationChannel{mId='FOREGROUND_SERVICE', mName=Apps running in background, mDescription=, mImportance=2, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=content://settings/system/notification_sound, mLights=false, mLightColor=0, mVibration=null, mUserLockedFields=0, mVibrationEnabled=false, mShowBadge=true, mDeleted=false, mGroup='null', mAudioAttributes=AudioAttributes: usage=5 content=4 flags=0x0 tags= bundle=null, mBlockableSystem=false}
+        NotificationChannel{mId='USB', mName=USB connection, mDescription=, mImportance=1, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=content://settings/system/notification_sound, mLights=false, mLightColor=0, mVibration=null, mUserLockedFields=0, mVibrationEnabled=false, mShowBadge=true, mDeleted=false, mGroup='null', mAudioAttributes=AudioAttributes: usage=5 content=4 flags=0x0 tags= bundle=null, mBlockableSystem=false}
+        NotificationChannel{mId='VPN', mName=VPN status, mDescription=, mImportance=2, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=content://settings/system/notification_sound, mLights=false, mLightColor=0, mVibration=null, mUserLockedFields=0, mVibrationEnabled=false, mShowBadge=true, mDeleted=false, mGroup='null', mAudioAttributes=AudioAttributes: usage=5 content=4 flags=0x0 tags= bundle=null, mBlockableSystem=false}
+        NotificationChannel{mId='UPDATES', mName=Updates, mDescription=, mImportance=2, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=content://settings/system/notification_sound, mLights=false, mLightColor=0, mVibration=null, mUserLockedFields=0, mVibrationEnabled=false, mShowBadge=true, mDeleted=false, mGroup='null', mAudioAttributes=AudioAttributes: usage=5 content=4 flags=0x0 tags= bundle=null, mBlockableSystem=false}
+        NotificationChannel{mId='RETAIL_MODE', mName=Retail demo, mDescription=, mImportance=2, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=content://settings/system/notification_sound, mLights=false, mLightColor=0, mVibration=null, mUserLockedFields=0, mVibrationEnabled=false, mShowBadge=true, mDeleted=false, mGroup='null', mAudioAttributes=AudioAttributes: usage=5 content=4 flags=0x0 tags= bundle=null, mBlockableSystem=false}
+        NotificationChannel{mId='CAR_MODE', mName=Car mode, mDescription=, mImportance=2, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=content://settings/system/notification_sound, mLights=false, mLightColor=0, mVibration=null, mUserLockedFields=0, mVibrationEnabled=false, mShowBadge=true, mDeleted=false, mGroup='null', mAudioAttributes=AudioAttributes: usage=5 content=4 flags=0x0 tags= bundle=null, mBlockableSystem=false}
+        NotificationChannel{mId='VIRTUAL_KEYBOARD', mName=Virtual keyboard, mDescription=, mImportance=2, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=content://settings/system/notification_sound, mLights=false, mLightColor=0, mVibration=null, mUserLockedFields=0, mVibrationEnabled=false, mShowBadge=true, mDeleted=false, mGroup='null', mAudioAttributes=AudioAttributes: usage=5 content=4 flags=0x0 tags= bundle=null, mBlockableSystem=false}
+        NotificationChannel{mId='SECURITY', mName=Security, mDescription=, mImportance=2, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=content://settings/system/notification_sound, mLights=false, mLightColor=0, mVibration=null, mUserLockedFields=0, mVibrationEnabled=false, mShowBadge=true, mDeleted=false, mGroup='null', mAudioAttributes=AudioAttributes: usage=5 content=4 flags=0x0 tags= bundle=null, mBlockableSystem=false}
+        NotificationChannel{mId='NETWORK_AVAILABLE', mName=Network available, mDescription=, mImportance=2, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=content://settings/system/notification_sound, mLights=false, mLightColor=0, mVibration=null, mUserLockedFields=0, mVibrationEnabled=false, mShowBadge=true, mDeleted=false, mGroup='null', mAudioAttributes=AudioAttributes: usage=5 content=4 flags=0x0 tags= bundle=null, mBlockableSystem=false}
+        NotificationChannel{mId='ALERTS', mName=Alerts, mDescription=, mImportance=3, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=content://settings/system/notification_sound, mLights=false, mLightColor=0, mVibration=null, mUserLockedFields=0, mVibrationEnabled=false, mShowBadge=true, mDeleted=false, mGroup='null', mAudioAttributes=AudioAttributes: usage=5 content=4 flags=0x0 tags= bundle=null, mBlockableSystem=false}
+      AppSettings: com.android.contacts (10007) showBadge=true
+        NotificationChannel{mId='miscellaneous', mName=Uncategorized, mDescription=, mImportance=-1000, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=content://settings/system/notification_sound, mLights=false, mLightColor=0, mVibration=null, mUserLockedFields=0, mVibrationEnabled=false, mShowBadge=true, mDeleted=false, mGroup='null', mAudioAttributes=AudioAttributes: usage=5 content=4 flags=0x0 tags= bundle=null, mBlockableSystem=false}
+        NotificationChannel{mId='DEFAULT_CHANNEL', mName=Notifications, mDescription=, mImportance=2, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=content://settings/system/notification_sound, mLights=false, mLightColor=0, mVibration=null, mUserLockedFields=0, mVibrationEnabled=false, mShowBadge=true, mDeleted=false, mGroup='null', mAudioAttributes=AudioAttributes: usage=5 content=4 flags=0x0 tags= bundle=null, mBlockableSystem=false}
+      AppSettings: com.android.server.telecom (1000) showBadge=true
+        NotificationChannel{mId='TelecomMissedCalls', mName=Missed calls, mDescription=, mImportance=3, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=, mLights=true, mLightColor=0, mVibration=null, mUserLockedFields=0, mVibrationEnabled=true, mShowBadge=true, mDeleted=false, mGroup='null', mAudioAttributes=AudioAttributes: usage=5 content=0 flags=0x0 tags= bundle=null, mBlockableSystem=false}
+        NotificationChannel{mId='TelecomIncomingCalls', mName=Incoming calls, mDescription=, mImportance=5, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=, mLights=true, mLightColor=0, mVibration=null, mUserLockedFields=0, mVibrationEnabled=false, mShowBadge=false, mDeleted=false, mGroup='null', mAudioAttributes=AudioAttributes: usage=5 content=0 flags=0x0 tags= bundle=null, mBlockableSystem=false}
+      AppSettings: com.android.mtp (10008) showBadge=true
+        NotificationChannel{mId='device_notification_channel', mName=Uncategorized, mDescription=, mImportance=2, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=content://settings/system/notification_sound, mLights=false, mLightColor=0, mVibration=null, mUserLockedFields=0, mVibrationEnabled=false, mShowBadge=true, mDeleted=false, mGroup='null', mAudioAttributes=AudioAttributes: usage=5 content=4 flags=0x0 tags= bundle=null, mBlockableSystem=false}
+      AppSettings: com.android.printspooler (10052) showBadge=true
+        NotificationChannel{mId='PRINT_PROGRESS', mName=Running print jobs, mDescription=, mImportance=2, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=content://settings/system/notification_sound, mLights=false, mLightColor=0, mVibration=null, mUserLockedFields=0, mVibrationEnabled=false, mShowBadge=true, mDeleted=false, mGroup='null', mAudioAttributes=AudioAttributes: usage=5 content=4 flags=0x0 tags= bundle=null, mBlockableSystem=false}
+        NotificationChannel{mId='PRINT_FAILURES', mName=Failed print jobs, mDescription=, mImportance=3, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=content://settings/system/notification_sound, mLights=false, mLightColor=0, mVibration=null, mUserLockedFields=0, mVibrationEnabled=false, mShowBadge=true, mDeleted=false, mGroup='null', mAudioAttributes=AudioAttributes: usage=5 content=4 flags=0x0 tags= bundle=null, mBlockableSystem=false}
+      AppSettings: com.flowproxy.android (10076) showBadge=true
+        NotificationChannel{mId='flowproxy_vpn', mName=FlowProxy VPN, mDescription=hasDescription , mImportance=2, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=content://settings/system/notification_sound, mLights=false, mLightColor=0, mVibration=null, mUserLockedFields=0, mVibrationEnabled=false, mShowBadge=false, mDeleted=false, mGroup='null', mAudioAttributes=AudioAttributes: usage=5 content=4 flags=0x0 tags= bundle=null, mBlockableSystem=false}
+      AppSettings: com.android.dialer (10011) showBadge=true
+        NotificationChannel{mId='incomingCall:E', mName=Incoming calls, mDescription=, mImportance=5, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=null, mLights=true, mLightColor=0, mVibration=null, mUserLockedFields=0, mVibrationEnabled=false, mShowBadge=false, mDeleted=false, mGroup='null', mAudioAttributes=AudioAttributes: usage=5 content=0 flags=0x0 tags= bundle=null, mBlockableSystem=false}
+        NotificationChannel{mId='missedCall', mName=Missed calls, mDescription=, mImportance=3, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=null, mLights=true, mLightColor=0, mVibration=null, mUserLockedFields=0, mVibrationEnabled=true, mShowBadge=true, mDeleted=false, mGroup='null', mAudioAttributes=AudioAttributes: usage=5 content=0 flags=0x0 tags= bundle=null, mBlockableSystem=false}
+        NotificationChannel{mId='voicemail:E', mName=Voicemails, mDescription=, mImportance=3, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=content://settings/system/notification_sound, mLights=true, mLightColor=0, mVibration=null, mUserLockedFields=0, mVibrationEnabled=false, mShowBadge=true, mDeleted=false, mGroup='null', mAudioAttributes=AudioAttributes: usage=5 content=0 flags=0x0 tags= bundle=null, mBlockableSystem=false}
+        NotificationChannel{mId='ongoingCall2:E', mName=Ongoing calls, mDescription=, mImportance=3, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=null, mLights=false, mLightColor=0, mVibration=null, mUserLockedFields=0, mVibrationEnabled=false, mShowBadge=false, mDeleted=false, mGroup='null', mAudioAttributes=AudioAttributes: usage=5 content=0 flags=0x0 tags= bundle=null, mBlockableSystem=false}
+        NotificationChannel{mId='default', mName=Default, mDescription=, mImportance=3, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=content://settings/system/notification_sound, mLights=true, mLightColor=0, mVibration=null, mUserLockedFields=0, mVibrationEnabled=true, mShowBadge=false, mDeleted=false, mGroup='null', mAudioAttributes=AudioAttributes: usage=5 content=4 flags=0x0 tags= bundle=null, mBlockableSystem=false}
+        NotificationChannelGroup{mId='E', mName=Emergency calls, mChannels=[]}
+      AppSettings: com.android.systemui (10023) showBadge=true
+        NotificationChannel{mId='ALR', mName=Alerts, mDescription=, mImportance=4, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=content://settings/system/notification_sound, mLights=false, mLightColor=0, mVibration=null, mUserLockedFields=0, mVibrationEnabled=false, mShowBadge=true, mDeleted=false, mGroup='null', mAudioAttributes=AudioAttributes: usage=5 content=4 flags=0x0 tags= bundle=null, mBlockableSystem=false}
+        NotificationChannel{mId='DSK', mName=Storage, mDescription=, mImportance=2, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=content://settings/system/notification_sound, mLights=false, mLightColor=0, mVibration=null, mUserLockedFields=0, mVibrationEnabled=false, mShowBadge=true, mDeleted=false, mGroup='null', mAudioAttributes=AudioAttributes: usage=5 content=4 flags=0x0 tags= bundle=null, mBlockableSystem=false}
+        NotificationChannel{mId='GEN', mName=General Messages, mDescription=, mImportance=1, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=content://settings/system/notification_sound, mLights=false, mLightColor=0, mVibration=null, mUserLockedFields=0, mVibrationEnabled=false, mShowBadge=true, mDeleted=false, mGroup='null', mAudioAttributes=AudioAttributes: usage=5 content=4 flags=0x0 tags= bundle=null, mBlockableSystem=false}
+        NotificationChannel{mId='SCN', mName=Screenshots, mDescription=, mImportance=2, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=content://settings/system/notification_sound, mLights=false, mLightColor=0, mVibration=null, mUserLockedFields=0, mVibrationEnabled=false, mShowBadge=true, mDeleted=false, mGroup='null', mAudioAttributes=AudioAttributes: usage=5 content=4 flags=0x0 tags= bundle=null, mBlockableSystem=false}
+      AppSettings: com.android.phone (1001) showBadge=true
+        NotificationChannel{mId='callForward', mName=Call forwarding, mDescription=, mImportance=2, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=content://settings/system/notification_sound, mLights=false, mLightColor=0, mVibration=null, mUserLockedFields=0, mVibrationEnabled=false, mShowBadge=true, mDeleted=false, mGroup='null', mAudioAttributes=AudioAttributes: usage=5 content=4 flags=0x0 tags= bundle=null, mBlockableSystem=false}
+        NotificationChannel{mId='voiceMail', mName=Voicemail messages, mDescription=, mImportance=3, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=content://settings/system/notification_sound, mLights=false, mLightColor=0, mVibration=null, mUserLockedFields=0, mVibrationEnabled=false, mShowBadge=true, mDeleted=false, mGroup='null', mAudioAttributes=AudioAttributes: usage=5 content=0 flags=0x0 tags= bundle=null, mBlockableSystem=false}
+        NotificationChannel{mId='sms', mName=SMS messages, mDescription=, mImportance=4, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=content://settings/system/notification_sound, mLights=false, mLightColor=0, mVibration=null, mUserLockedFields=0, mVibrationEnabled=false, mShowBadge=true, mDeleted=false, mGroup='null', mAudioAttributes=AudioAttributes: usage=5 content=4 flags=0x0 tags= bundle=null, mBlockableSystem=false}
+        NotificationChannel{mId='wfc', mName=Wi-Fi calling, mDescription=, mImportance=2, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=content://settings/system/notification_sound, mLights=false, mLightColor=0, mVibration=null, mUserLockedFields=0, mVibrationEnabled=false, mShowBadge=true, mDeleted=false, mGroup='null', mAudioAttributes=AudioAttributes: usage=5 content=4 flags=0x0 tags= bundle=null, mBlockableSystem=false}
+        NotificationChannel{mId='alert', mName=Alerts, mDescription=, mImportance=3, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=content://settings/system/notification_sound, mLights=false, mLightColor=0, mVibration=null, mUserLockedFields=0, mVibrationEnabled=false, mShowBadge=true, mDeleted=false, mGroup='null', mAudioAttributes=AudioAttributes: usage=5 content=0 flags=0x0 tags= bundle=null, mBlockableSystem=false}
+        NotificationChannel{mId='mobileDataAlert', mName=Mobile data alerts, mDescription=, mImportance=3, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=content://settings/system/notification_sound, mLights=false, mLightColor=0, mVibration=null, mUserLockedFields=0, mVibrationEnabled=false, mShowBadge=true, mDeleted=false, mGroup='null', mAudioAttributes=AudioAttributes: usage=5 content=4 flags=0x0 tags= bundle=null, mBlockableSystem=false}
+        NotificationChannel{mId='miscellaneous', mName=Uncategorized, mDescription=, mImportance=-1000, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=content://settings/system/notification_sound, mLights=false, mLightColor=0, mVibration=null, mUserLockedFields=0, mVibrationEnabled=false, mShowBadge=true, mDeleted=false, mGroup='null', mAudioAttributes=AudioAttributes: usage=5 content=4 flags=0x0 tags= bundle=null, mBlockableSystem=false}
+      AppSettings: com.android.providers.downloads (10008) showBadge=true
+        NotificationChannel{mId='active', mName=In progress, mDescription=, mImportance=2, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=content://settings/system/notification_sound, mLights=false, mLightColor=0, mVibration=null, mUserLockedFields=0, mVibrationEnabled=false, mShowBadge=true, mDeleted=false, mGroup='null', mAudioAttributes=AudioAttributes: usage=5 content=4 flags=0x0 tags= bundle=null, mBlockableSystem=false}
+        NotificationChannel{mId='complete', mName=Done, mDescription=, mImportance=3, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=content://settings/system/notification_sound, mLights=false, mLightColor=0, mVibration=null, mUserLockedFields=0, mVibrationEnabled=false, mShowBadge=true, mDeleted=false, mGroup='null', mAudioAttributes=AudioAttributes: usage=5 content=4 flags=0x0 tags= bundle=null, mBlockableSystem=false}
+        NotificationChannel{mId='waiting', mName=Queued, mDescription=, mImportance=3, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=content://settings/system/notification_sound, mLights=false, mLightColor=0, mVibration=null, mUserLockedFields=0, mVibrationEnabled=false, mShowBadge=true, mDeleted=false, mGroup='null', mAudioAttributes=AudioAttributes: usage=5 content=4 flags=0x0 tags= bundle=null, mBlockableSystem=false}
+Restored without uid:
+
+  Notification listeners:
+    All notification listeners (0) enabled for current profiles:
+    Live notification listeners (1):
+      ComponentInfo{com.android.systemui/com.android.systemui.statusbar.phone.StatusBar} (user -1): android.service.notification.INotificationListener$Stub$Proxy@93d96c2 SYSTEM
+    Snoozed notification listeners (0):
+    mListenerHints: 0
+    mListenersDisablingEffects: ()
+
+  Notification assistant services:
+    All notification assistant services (0) enabled for current profiles:
+    Live notification assistant services (0):
+    Snoozed notification assistant services (0):
+
+  Zen Mode:
+    mInterruptionFilter=1
+    mZenMode=ZEN_MODE_OFF
+    mConfigs[u=0]=allow(calls=true,callsFrom=contacts,repeatCallers=false,messages=false,messagesFrom=contacts,events=true,reminders=true,whenScreenOff=true,whenScreenOn=true)
+      manualRule=null
+      automaticRules=ZenRule[enabled=false,snoozing=false,name=Weeknight,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/schedule?days=1.2.3.4.5&start=22.0&end=7.0&exitAtAlarm=false,condition=Condition[id=condition://android/schedule?days=1.2.3.4.5&start=22.0&end=7.0&exitAtAlarm=false,summary=...,line1=...,line2=...,icon=0,state=STATE_FALSE,flags=2],component=ComponentInfo{android/com.android.server.notification.ScheduleConditionProvider},id=3f0e60fe6e334704973c6134d1d7f786,creationTime=1794018776417,enabler=null]
+                     ZenRule[enabled=false,snoozing=false,name=Weekend,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/schedule?days=6.7&start=23.30&end=10.0&exitAtAlarm=false,condition=Condition[id=condition://android/schedule?days=6.7&start=23.30&end=10.0&exitAtAlarm=false,summary=...,line1=...,line2=...,icon=0,state=STATE_TRUE,flags=2],component=ComponentInfo{android/com.android.server.notification.ScheduleConditionProvider},id=776d09fb8e9247d69b2df614a34b5c69,creationTime=1794018776417,enabler=null]
+                     ZenRule[enabled=false,snoozing=false,name=Event,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/event?userId=-10000&calendar=&reply=1,condition=Condition[id=condition://android/event?userId=-10000&calendar=&reply=1,summary=...,line1=...,line2=...,icon=0,state=STATE_FALSE,flags=2],component=ComponentInfo{android/com.android.server.notification.EventConditionProvider},id=ba2cb9869ec042a993dd23bd2cb01e70,creationTime=1794018776419,enabler=null]
+    mUser=0
+    mConfig=allow(calls=true,callsFrom=contacts,repeatCallers=false,messages=false,messagesFrom=contacts,events=true,reminders=true,whenScreenOff=true,whenScreenOn=true)
+      manualRule=null
+      automaticRules=ZenRule[enabled=false,snoozing=false,name=Weeknight,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/schedule?days=1.2.3.4.5&start=22.0&end=7.0&exitAtAlarm=false,condition=Condition[id=condition://android/schedule?days=1.2.3.4.5&start=22.0&end=7.0&exitAtAlarm=false,summary=...,line1=...,line2=...,icon=0,state=STATE_FALSE,flags=2],component=ComponentInfo{android/com.android.server.notification.ScheduleConditionProvider},id=3f0e60fe6e334704973c6134d1d7f786,creationTime=1794018776417,enabler=null]
+                     ZenRule[enabled=false,snoozing=false,name=Weekend,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/schedule?days=6.7&start=23.30&end=10.0&exitAtAlarm=false,condition=Condition[id=condition://android/schedule?days=6.7&start=23.30&end=10.0&exitAtAlarm=false,summary=...,line1=...,line2=...,icon=0,state=STATE_TRUE,flags=2],component=ComponentInfo{android/com.android.server.notification.ScheduleConditionProvider},id=776d09fb8e9247d69b2df614a34b5c69,creationTime=1794018776417,enabler=null]
+                     ZenRule[enabled=false,snoozing=false,name=Event,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/event?userId=-10000&calendar=&reply=1,condition=Condition[id=condition://android/event?userId=-10000&calendar=&reply=1,summary=...,line1=...,line2=...,icon=0,state=STATE_FALSE,flags=2],component=ComponentInfo{android/com.android.server.notification.EventConditionProvider},id=ba2cb9869ec042a993dd23bd2cb01e70,creationTime=1794018776419,enabler=null]
+    mSuppressedEffects=0
+    mDefaultPhoneApp=ComponentInfo{com.android.dialer/com.android.dialer.DialtactsActivity}
+    RepeatCallers.mThresholdMinutes=0
+    mSubscriptions={condition://android/schedule?days=6.7&start=23.30&end=10.0&exitAtAlarm=false=ComponentInfo{android/com.android.server.notification.ScheduleConditionProvider}, condition://android/schedule?days=1.2.3.4.5&start=22.0&end=7.0&exitAtAlarm=false=ComponentInfo{android/com.android.server.notification.ScheduleConditionProvider}, condition://android/event?userId=-10000&calendar=&reply=1=ComponentInfo{android/com.android.server.notification.EventConditionProvider}}
+
+  Zen Log:
+    11-07 02:32:56.440 set_zen_mode: off,init
+    11-07 02:32:58.346 config: cleanUpZenRules,ZenModeConfig[user=0,allowCalls=true,allowRepeatCallers=false,allowMessages=false,allowCallsFrom=contacts,allowMessagesFrom=contacts,allowReminders=true,allowEvents=true,allowWhenScreenOff=true,allowWhenScreenOn=true,automaticRules={3f0e60fe6e334704973c6134d1d7f786=ZenRule[enabled=false,snoozing=false,name=Weeknight,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/schedule?days=1.2.3.4.5&start=22.0&end=7.0&exitAtAlarm=false,condition=null,component=ComponentInfo{android/com.android.server.notification.ScheduleConditionProvider},id=3f0e60fe6e334704973c6134d1d7f786,creationTime=1794018776417,enabler=null], 776d09fb8e9247d69b2df614a34b5c69=ZenRule[enabled=false,snoozing=false,name=Weekend,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/schedule?days=6.7&start=23.30&end=10.0&exitAtAlarm=false,condition=null,component=ComponentInfo{android/com.android.server.notification.ScheduleConditionProvider},id=776d09fb8e9247d69b2df614a34b5c69,creationTime=1794018776417,enabler=null], ba2cb9869ec042a993dd23bd2cb01e70=ZenRule[enabled=false,snoozing=false,name=Event,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/event?userId=-10000&calendar=&reply=1,condition=null,component=ComponentInfo{android/com.android.server.notification.EventConditionProvider},id=ba2cb9869ec042a993dd23bd2cb01e70,creationTime=1794018776419,enabler=null]},manualRule=null],Diff[]
+    11-07 02:32:58.361 set_zen_mode: off,onSystemReady
+    11-07 02:33:05.115 set_zen_mode: off,cleanUpZenRules
+    11-07 02:33:05.167 subscribe: condition://android/schedule?days=1.2.3.4.5&start=22.0&end=7.0&exitAtAlarm=false,ok
+    11-07 02:33:05.167 subscribe: condition://android/schedule?days=6.7&start=23.30&end=10.0&exitAtAlarm=false,ok
+    11-07 02:33:05.168 subscribe: condition://android/event?userId=-10000&calendar=&reply=1,ok
+    11-07 02:33:15.474 disable_effects: -1|android|32|null|1000,booleanState
+    11-07 02:33:15.494 disable_effects: -1|android|26|null|1000,booleanState
+    11-07 02:33:16.079 config: conditionChanged,ZenModeConfig[user=0,allowCalls=true,allowRepeatCallers=false,allowMessages=false,allowCallsFrom=contacts,allowMessagesFrom=contacts,allowReminders=true,allowEvents=true,allowWhenScreenOff=true,allowWhenScreenOn=true,automaticRules={3f0e60fe6e334704973c6134d1d7f786=ZenRule[enabled=false,snoozing=false,name=Weeknight,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/schedule?days=1.2.3.4.5&start=22.0&end=7.0&exitAtAlarm=false,condition=Condition[id=condition://android/schedule?days=1.2.3.4.5&start=22.0&end=7.0&exitAtAlarm=false,summary=...,line1=...,line2=...,icon=0,state=STATE_FALSE,flags=2],component=ComponentInfo{android/com.android.server.notification.ScheduleConditionProvider},id=3f0e60fe6e334704973c6134d1d7f786,creationTime=1794018776417,enabler=null], 776d09fb8e9247d69b2df614a34b5c69=ZenRule[enabled=false,snoozing=false,name=Weekend,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/schedule?days=6.7&start=23.30&end=10.0&exitAtAlarm=false,condition=null,component=ComponentInfo{android/com.android.server.notification.ScheduleConditionProvider},id=776d09fb8e9247d69b2df614a34b5c69,creationTime=1794018776417,enabler=null], ba2cb9869ec042a993dd23bd2cb01e70=ZenRule[enabled=false,snoozing=false,name=Event,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/event?userId=-10000&calendar=&reply=1,condition=null,component=ComponentInfo{android/com.android.server.notification.EventConditionProvider},id=ba2cb9869ec042a993dd23bd2cb01e70,creationTime=1794018776419,enabler=null]},manualRule=null],Diff[automaticRule[3f0e60fe6e334704973c6134d1d7f786].condition:null->Condition[id=condition://android/schedule?days=1.2.3.4.5&start=22.0&end=7.0&exitAtAlarm=false,summary=...,line1=...,line2=...,icon=0,state=STATE_FALSE,flags=2]]
+    11-07 02:33:16.090 config: conditionChanged,ZenModeConfig[user=0,allowCalls=true,allowRepeatCallers=false,allowMessages=false,allowCallsFrom=contacts,allowMessagesFrom=contacts,allowReminders=true,allowEvents=true,allowWhenScreenOff=true,allowWhenScreenOn=true,automaticRules={3f0e60fe6e334704973c6134d1d7f786=ZenRule[enabled=false,snoozing=false,name=Weeknight,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/schedule?days=1.2.3.4.5&start=22.0&end=7.0&exitAtAlarm=false,condition=Condition[id=condition://android/schedule?days=1.2.3.4.5&start=22.0&end=7.0&exitAtAlarm=false,summary=...,line1=...,line2=...,icon=0,state=STATE_FALSE,flags=2],component=ComponentInfo{android/com.android.server.notification.ScheduleConditionProvider},id=3f0e60fe6e334704973c6134d1d7f786,creationTime=1794018776417,enabler=null], 776d09fb8e9247d69b2df614a34b5c69=ZenRule[enabled=false,snoozing=false,name=Weekend,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/schedule?days=6.7&start=23.30&end=10.0&exitAtAlarm=false,condition=Condition[id=condition://android/schedule?days=6.7&start=23.30&end=10.0&exitAtAlarm=false,summary=...,line1=...,line2=...,icon=0,state=STATE_TRUE,flags=2],component=ComponentInfo{android/com.android.server.notification.ScheduleConditionProvider},id=776d09fb8e9247d69b2df614a34b5c69,creationTime=1794018776417,enabler=null], ba2cb9869ec042a993dd23bd2cb01e70=ZenRule[enabled=false,snoozing=false,name=Event,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/event?userId=-10000&calendar=&reply=1,condition=null,component=ComponentInfo{android/com.android.server.notification.EventConditionProvider},id=ba2cb9869ec042a993dd23bd2cb01e70,creationTime=1794018776419,enabler=null]},manualRule=null],Diff[automaticRule[776d09fb8e9247d69b2df614a34b5c69].condition:null->Condition[id=condition://android/schedule?days=6.7&start=23.30&end=10.0&exitAtAlarm=false,summary=...,line1=...,line2=...,icon=0,state=STATE_TRUE,flags=2]]
+    11-07 02:33:16.642 config: conditionChanged,ZenModeConfig[user=0,allowCalls=true,allowRepeatCallers=false,allowMessages=false,allowCallsFrom=contacts,allowMessagesFrom=contacts,allowReminders=true,allowEvents=true,allowWhenScreenOff=true,allowWhenScreenOn=true,automaticRules={3f0e60fe6e334704973c6134d1d7f786=ZenRule[enabled=false,snoozing=false,name=Weeknight,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/schedule?days=1.2.3.4.5&start=22.0&end=7.0&exitAtAlarm=false,condition=Condition[id=condition://android/schedule?days=1.2.3.4.5&start=22.0&end=7.0&exitAtAlarm=false,summary=...,line1=...,line2=...,icon=0,state=STATE_FALSE,flags=2],component=ComponentInfo{android/com.android.server.notification.ScheduleConditionProvider},id=3f0e60fe6e334704973c6134d1d7f786,creationTime=1794018776417,enabler=null], 776d09fb8e9247d69b2df614a34b5c69=ZenRule[enabled=false,snoozing=false,name=Weekend,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/schedule?days=6.7&start=23.30&end=10.0&exitAtAlarm=false,condition=Condition[id=condition://android/schedule?days=6.7&start=23.30&end=10.0&exitAtAlarm=false,summary=...,line1=...,line2=...,icon=0,state=STATE_TRUE,flags=2],component=ComponentInfo{android/com.android.server.notification.ScheduleConditionProvider},id=776d09fb8e9247d69b2df614a34b5c69,creationTime=1794018776417,enabler=null], ba2cb9869ec042a993dd23bd2cb01e70=ZenRule[enabled=false,snoozing=false,name=Event,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/event?userId=-10000&calendar=&reply=1,condition=Condition[id=condition://android/event?userId=-10000&calendar=&reply=1,summary=...,line1=...,line2=...,icon=0,state=STATE_FALSE,flags=2],component=ComponentInfo{android/com.android.server.notification.EventConditionProvider},id=ba2cb9869ec042a993dd23bd2cb01e70,creationTime=1794018776419,enabler=null]},manualRule=null],Diff[automaticRule[ba2cb9869ec042a993dd23bd2cb01e70].condition:null->Condition[id=condition://android/event?userId=-10000&calendar=&reply=1,summary=...,line1=...,line2=...,icon=0,state=STATE_FALSE,flags=2]]
+    11-07 02:33:16.724 set_zen_mode: off,conditionChanged
+    11-07 02:33:16.730 set_zen_mode: off,conditionChanged
+    11-07 02:33:16.786 set_zen_mode: off,conditionChanged
+    11-07 02:32:07.617 disable_effects: 0|android|13|PreBootBroadcaster|1000,booleanState
+    11-07 02:34:39.772 disable_effects: 0|android|13|PreBootBroadcaster|1000,booleanState
+    11-07 02:35:25.548 disable_effects: 0|android|13|PreBootBroadcaster|1000,booleanState
+    11-07 02:35:26.530 disable_effects: 0|android|13|PreBootBroadcaster|1000,booleanState
+    11-07 02:35:28.378 disable_effects: 0|android|13|PreBootBroadcaster|1000,booleanState
+    11-07 02:46:50.883 disable_effects: 0|com.flowproxy.android|4105|null|10065,booleanState
+    11-07 02:46:51.318 disable_effects: 0|com.flowproxy.android|4105|null|10065,booleanState
+    11-07 02:59:51.662 config: removeAutomaticZenRules,ZenModeConfig[user=0,allowCalls=true,allowRepeatCallers=false,allowMessages=false,allowCallsFrom=contacts,allowMessagesFrom=contacts,allowReminders=true,allowEvents=true,allowWhenScreenOff=true,allowWhenScreenOn=true,automaticRules={3f0e60fe6e334704973c6134d1d7f786=ZenRule[enabled=false,snoozing=false,name=Weeknight,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/schedule?days=1.2.3.4.5&start=22.0&end=7.0&exitAtAlarm=false,condition=Condition[id=condition://android/schedule?days=1.2.3.4.5&start=22.0&end=7.0&exitAtAlarm=false,summary=...,line1=...,line2=...,icon=0,state=STATE_FALSE,flags=2],component=ComponentInfo{android/com.android.server.notification.ScheduleConditionProvider},id=3f0e60fe6e334704973c6134d1d7f786,creationTime=1794018776417,enabler=null], 776d09fb8e9247d69b2df614a34b5c69=ZenRule[enabled=false,snoozing=false,name=Weekend,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/schedule?days=6.7&start=23.30&end=10.0&exitAtAlarm=false,condition=Condition[id=condition://android/schedule?days=6.7&start=23.30&end=10.0&exitAtAlarm=false,summary=...,line1=...,line2=...,icon=0,state=STATE_TRUE,flags=2],component=ComponentInfo{android/com.android.server.notification.ScheduleConditionProvider},id=776d09fb8e9247d69b2df614a34b5c69,creationTime=1794018776417,enabler=null], ba2cb9869ec042a993dd23bd2cb01e70=ZenRule[enabled=false,snoozing=false,name=Event,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/event?userId=-10000&calendar=&reply=1,condition=Condition[id=condition://android/event?userId=-10000&calendar=&reply=1,summary=...,line1=...,line2=...,icon=0,state=STATE_FALSE,flags=2],component=ComponentInfo{android/com.android.server.notification.EventConditionProvider},id=ba2cb9869ec042a993dd23bd2cb01e70,creationTime=1794018776419,enabler=null]},manualRule=null],Diff[]
+    11-07 02:59:51.839 set_zen_mode: off,removeAutomaticZenRules
+    11-07 03:03:15.721 config: removeAutomaticZenRules,ZenModeConfig[user=0,allowCalls=true,allowRepeatCallers=false,allowMessages=false,allowCallsFrom=contacts,allowMessagesFrom=contacts,allowReminders=true,allowEvents=true,allowWhenScreenOff=true,allowWhenScreenOn=true,automaticRules={3f0e60fe6e334704973c6134d1d7f786=ZenRule[enabled=false,snoozing=false,name=Weeknight,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/schedule?days=1.2.3.4.5&start=22.0&end=7.0&exitAtAlarm=false,condition=Condition[id=condition://android/schedule?days=1.2.3.4.5&start=22.0&end=7.0&exitAtAlarm=false,summary=...,line1=...,line2=...,icon=0,state=STATE_FALSE,flags=2],component=ComponentInfo{android/com.android.server.notification.ScheduleConditionProvider},id=3f0e60fe6e334704973c6134d1d7f786,creationTime=1794018776417,enabler=null], 776d09fb8e9247d69b2df614a34b5c69=ZenRule[enabled=false,snoozing=false,name=Weekend,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/schedule?days=6.7&start=23.30&end=10.0&exitAtAlarm=false,condition=Condition[id=condition://android/schedule?days=6.7&start=23.30&end=10.0&exitAtAlarm=false,summary=...,line1=...,line2=...,icon=0,state=STATE_TRUE,flags=2],component=ComponentInfo{android/com.android.server.notification.ScheduleConditionProvider},id=776d09fb8e9247d69b2df614a34b5c69,creationTime=1794018776417,enabler=null], ba2cb9869ec042a993dd23bd2cb01e70=ZenRule[enabled=false,snoozing=false,name=Event,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/event?userId=-10000&calendar=&reply=1,condition=Condition[id=condition://android/event?userId=-10000&calendar=&reply=1,summary=...,line1=...,line2=...,icon=0,state=STATE_FALSE,flags=2],component=ComponentInfo{android/com.android.server.notification.EventConditionProvider},id=ba2cb9869ec042a993dd23bd2cb01e70,creationTime=1794018776419,enabler=null]},manualRule=null],Diff[]
+    11-07 03:03:15.815 set_zen_mode: off,removeAutomaticZenRules
+    11-07 03:03:21.312 config: removeAutomaticZenRules,ZenModeConfig[user=0,allowCalls=true,allowRepeatCallers=false,allowMessages=false,allowCallsFrom=contacts,allowMessagesFrom=contacts,allowReminders=true,allowEvents=true,allowWhenScreenOff=true,allowWhenScreenOn=true,automaticRules={3f0e60fe6e334704973c6134d1d7f786=ZenRule[enabled=false,snoozing=false,name=Weeknight,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/schedule?days=1.2.3.4.5&start=22.0&end=7.0&exitAtAlarm=false,condition=Condition[id=condition://android/schedule?days=1.2.3.4.5&start=22.0&end=7.0&exitAtAlarm=false,summary=...,line1=...,line2=...,icon=0,state=STATE_FALSE,flags=2],component=ComponentInfo{android/com.android.server.notification.ScheduleConditionProvider},id=3f0e60fe6e334704973c6134d1d7f786,creationTime=1794018776417,enabler=null], 776d09fb8e9247d69b2df614a34b5c69=ZenRule[enabled=false,snoozing=false,name=Weekend,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/schedule?days=6.7&start=23.30&end=10.0&exitAtAlarm=false,condition=Condition[id=condition://android/schedule?days=6.7&start=23.30&end=10.0&exitAtAlarm=false,summary=...,line1=...,line2=...,icon=0,state=STATE_TRUE,flags=2],component=ComponentInfo{android/com.android.server.notification.ScheduleConditionProvider},id=776d09fb8e9247d69b2df614a34b5c69,creationTime=1794018776417,enabler=null], ba2cb9869ec042a993dd23bd2cb01e70=ZenRule[enabled=false,snoozing=false,name=Event,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/event?userId=-10000&calendar=&reply=1,condition=Condition[id=condition://android/event?userId=-10000&calendar=&reply=1,summary=...,line1=...,line2=...,icon=0,state=STATE_FALSE,flags=2],component=ComponentInfo{android/com.android.server.notification.EventConditionProvider},id=ba2cb9869ec042a993dd23bd2cb01e70,creationTime=1794018776419,enabler=null]},manualRule=null],Diff[]
+    11-07 03:03:22.031 set_zen_mode: off,removeAutomaticZenRules
+    11-07 03:06:12.132 config: removeAutomaticZenRules,ZenModeConfig[user=0,allowCalls=true,allowRepeatCallers=false,allowMessages=false,allowCallsFrom=contacts,allowMessagesFrom=contacts,allowReminders=true,allowEvents=true,allowWhenScreenOff=true,allowWhenScreenOn=true,automaticRules={3f0e60fe6e334704973c6134d1d7f786=ZenRule[enabled=false,snoozing=false,name=Weeknight,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/schedule?days=1.2.3.4.5&start=22.0&end=7.0&exitAtAlarm=false,condition=Condition[id=condition://android/schedule?days=1.2.3.4.5&start=22.0&end=7.0&exitAtAlarm=false,summary=...,line1=...,line2=...,icon=0,state=STATE_FALSE,flags=2],component=ComponentInfo{android/com.android.server.notification.ScheduleConditionProvider},id=3f0e60fe6e334704973c6134d1d7f786,creationTime=1794018776417,enabler=null], 776d09fb8e9247d69b2df614a34b5c69=ZenRule[enabled=false,snoozing=false,name=Weekend,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/schedule?days=6.7&start=23.30&end=10.0&exitAtAlarm=false,condition=Condition[id=condition://android/schedule?days=6.7&start=23.30&end=10.0&exitAtAlarm=false,summary=...,line1=...,line2=...,icon=0,state=STATE_TRUE,flags=2],component=ComponentInfo{android/com.android.server.notification.ScheduleConditionProvider},id=776d09fb8e9247d69b2df614a34b5c69,creationTime=1794018776417,enabler=null], ba2cb9869ec042a993dd23bd2cb01e70=ZenRule[enabled=false,snoozing=false,name=Event,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/event?userId=-10000&calendar=&reply=1,condition=Condition[id=condition://android/event?userId=-10000&calendar=&reply=1,summary=...,line1=...,line2=...,icon=0,state=STATE_FALSE,flags=2],component=ComponentInfo{android/com.android.server.notification.EventConditionProvider},id=ba2cb9869ec042a993dd23bd2cb01e70,creationTime=1794018776419,enabler=null]},manualRule=null],Diff[]
+    11-07 03:06:12.442 set_zen_mode: off,removeAutomaticZenRules
+    11-07 03:06:20.936 config: removeAutomaticZenRules,ZenModeConfig[user=0,allowCalls=true,allowRepeatCallers=false,allowMessages=false,allowCallsFrom=contacts,allowMessagesFrom=contacts,allowReminders=true,allowEvents=true,allowWhenScreenOff=true,allowWhenScreenOn=true,automaticRules={3f0e60fe6e334704973c6134d1d7f786=ZenRule[enabled=false,snoozing=false,name=Weeknight,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/schedule?days=1.2.3.4.5&start=22.0&end=7.0&exitAtAlarm=false,condition=Condition[id=condition://android/schedule?days=1.2.3.4.5&start=22.0&end=7.0&exitAtAlarm=false,summary=...,line1=...,line2=...,icon=0,state=STATE_FALSE,flags=2],component=ComponentInfo{android/com.android.server.notification.ScheduleConditionProvider},id=3f0e60fe6e334704973c6134d1d7f786,creationTime=1794018776417,enabler=null], 776d09fb8e9247d69b2df614a34b5c69=ZenRule[enabled=false,snoozing=false,name=Weekend,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/schedule?days=6.7&start=23.30&end=10.0&exitAtAlarm=false,condition=Condition[id=condition://android/schedule?days=6.7&start=23.30&end=10.0&exitAtAlarm=false,summary=...,line1=...,line2=...,icon=0,state=STATE_TRUE,flags=2],component=ComponentInfo{android/com.android.server.notification.ScheduleConditionProvider},id=776d09fb8e9247d69b2df614a34b5c69,creationTime=1794018776417,enabler=null], ba2cb9869ec042a993dd23bd2cb01e70=ZenRule[enabled=false,snoozing=false,name=Event,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/event?userId=-10000&calendar=&reply=1,condition=Condition[id=condition://android/event?userId=-10000&calendar=&reply=1,summary=...,line1=...,line2=...,icon=0,state=STATE_FALSE,flags=2],component=ComponentInfo{android/com.android.server.notification.EventConditionProvider},id=ba2cb9869ec042a993dd23bd2cb01e70,creationTime=1794018776419,enabler=null]},manualRule=null],Diff[]
+    11-07 03:06:21.338 set_zen_mode: off,removeAutomaticZenRules
+    11-07 03:11:10.992 disable_effects: 0|com.flowproxy.android|4105|null|10070,booleanState
+    11-07 03:11:11.071 disable_effects: 0|com.flowproxy.android|4105|null|10070,booleanState
+    11-07 03:12:16.777 disable_effects: 0|com.flowproxy.android|4105|null|10070,booleanState
+    11-07 03:12:16.948 disable_effects: 0|com.flowproxy.android|4105|null|10070,booleanState
+    11-07 03:14:18.146 disable_effects: 0|com.flowproxy.android|4105|null|10070,booleanState
+    11-07 03:14:18.209 disable_effects: 0|com.flowproxy.android|4105|null|10070,booleanState
+    11-07 03:14:30.143 disable_effects: 0|android|40|null|1000,booleanState
+    11-07 03:15:04.853 disable_effects: 0|android|40|null|1000,booleanState
+    11-07 03:29:51.993 config: removeAutomaticZenRules,ZenModeConfig[user=0,allowCalls=true,allowRepeatCallers=false,allowMessages=false,allowCallsFrom=contacts,allowMessagesFrom=contacts,allowReminders=true,allowEvents=true,allowWhenScreenOff=true,allowWhenScreenOn=true,automaticRules={3f0e60fe6e334704973c6134d1d7f786=ZenRule[enabled=false,snoozing=false,name=Weeknight,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/schedule?days=1.2.3.4.5&start=22.0&end=7.0&exitAtAlarm=false,condition=Condition[id=condition://android/schedule?days=1.2.3.4.5&start=22.0&end=7.0&exitAtAlarm=false,summary=...,line1=...,line2=...,icon=0,state=STATE_FALSE,flags=2],component=ComponentInfo{android/com.android.server.notification.ScheduleConditionProvider},id=3f0e60fe6e334704973c6134d1d7f786,creationTime=1794018776417,enabler=null], 776d09fb8e9247d69b2df614a34b5c69=ZenRule[enabled=false,snoozing=false,name=Weekend,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/schedule?days=6.7&start=23.30&end=10.0&exitAtAlarm=false,condition=Condition[id=condition://android/schedule?days=6.7&start=23.30&end=10.0&exitAtAlarm=false,summary=...,line1=...,line2=...,icon=0,state=STATE_TRUE,flags=2],component=ComponentInfo{android/com.android.server.notification.ScheduleConditionProvider},id=776d09fb8e9247d69b2df614a34b5c69,creationTime=1794018776417,enabler=null], ba2cb9869ec042a993dd23bd2cb01e70=ZenRule[enabled=false,snoozing=false,name=Event,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/event?userId=-10000&calendar=&reply=1,condition=Condition[id=condition://android/event?userId=-10000&calendar=&reply=1,summary=...,line1=...,line2=...,icon=0,state=STATE_FALSE,flags=2],component=ComponentInfo{android/com.android.server.notification.EventConditionProvider},id=ba2cb9869ec042a993dd23bd2cb01e70,creationTime=1794018776419,enabler=null]},manualRule=null],Diff[]
+    11-07 03:29:52.296 set_zen_mode: off,removeAutomaticZenRules
+    11-07 03:29:57.623 config: removeAutomaticZenRules,ZenModeConfig[user=0,allowCalls=true,allowRepeatCallers=false,allowMessages=false,allowCallsFrom=contacts,allowMessagesFrom=contacts,allowReminders=true,allowEvents=true,allowWhenScreenOff=true,allowWhenScreenOn=true,automaticRules={3f0e60fe6e334704973c6134d1d7f786=ZenRule[enabled=false,snoozing=false,name=Weeknight,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/schedule?days=1.2.3.4.5&start=22.0&end=7.0&exitAtAlarm=false,condition=Condition[id=condition://android/schedule?days=1.2.3.4.5&start=22.0&end=7.0&exitAtAlarm=false,summary=...,line1=...,line2=...,icon=0,state=STATE_FALSE,flags=2],component=ComponentInfo{android/com.android.server.notification.ScheduleConditionProvider},id=3f0e60fe6e334704973c6134d1d7f786,creationTime=1794018776417,enabler=null], 776d09fb8e9247d69b2df614a34b5c69=ZenRule[enabled=false,snoozing=false,name=Weekend,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/schedule?days=6.7&start=23.30&end=10.0&exitAtAlarm=false,condition=Condition[id=condition://android/schedule?days=6.7&start=23.30&end=10.0&exitAtAlarm=false,summary=...,line1=...,line2=...,icon=0,state=STATE_TRUE,flags=2],component=ComponentInfo{android/com.android.server.notification.ScheduleConditionProvider},id=776d09fb8e9247d69b2df614a34b5c69,creationTime=1794018776417,enabler=null], ba2cb9869ec042a993dd23bd2cb01e70=ZenRule[enabled=false,snoozing=false,name=Event,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/event?userId=-10000&calendar=&reply=1,condition=Condition[id=condition://android/event?userId=-10000&calendar=&reply=1,summary=...,line1=...,line2=...,icon=0,state=STATE_FALSE,flags=2],component=ComponentInfo{android/com.android.server.notification.EventConditionProvider},id=ba2cb9869ec042a993dd23bd2cb01e70,creationTime=1794018776419,enabler=null]},manualRule=null],Diff[]
+    11-07 03:29:57.876 set_zen_mode: off,removeAutomaticZenRules
+    11-07 03:33:36.721 config: removeAutomaticZenRules,ZenModeConfig[user=0,allowCalls=true,allowRepeatCallers=false,allowMessages=false,allowCallsFrom=contacts,allowMessagesFrom=contacts,allowReminders=true,allowEvents=true,allowWhenScreenOff=true,allowWhenScreenOn=true,automaticRules={3f0e60fe6e334704973c6134d1d7f786=ZenRule[enabled=false,snoozing=false,name=Weeknight,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/schedule?days=1.2.3.4.5&start=22.0&end=7.0&exitAtAlarm=false,condition=Condition[id=condition://android/schedule?days=1.2.3.4.5&start=22.0&end=7.0&exitAtAlarm=false,summary=...,line1=...,line2=...,icon=0,state=STATE_FALSE,flags=2],component=ComponentInfo{android/com.android.server.notification.ScheduleConditionProvider},id=3f0e60fe6e334704973c6134d1d7f786,creationTime=1794018776417,enabler=null], 776d09fb8e9247d69b2df614a34b5c69=ZenRule[enabled=false,snoozing=false,name=Weekend,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/schedule?days=6.7&start=23.30&end=10.0&exitAtAlarm=false,condition=Condition[id=condition://android/schedule?days=6.7&start=23.30&end=10.0&exitAtAlarm=false,summary=...,line1=...,line2=...,icon=0,state=STATE_TRUE,flags=2],component=ComponentInfo{android/com.android.server.notification.ScheduleConditionProvider},id=776d09fb8e9247d69b2df614a34b5c69,creationTime=1794018776417,enabler=null], ba2cb9869ec042a993dd23bd2cb01e70=ZenRule[enabled=false,snoozing=false,name=Event,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/event?userId=-10000&calendar=&reply=1,condition=Condition[id=condition://android/event?userId=-10000&calendar=&reply=1,summary=...,line1=...,line2=...,icon=0,state=STATE_FALSE,flags=2],component=ComponentInfo{android/com.android.server.notification.EventConditionProvider},id=ba2cb9869ec042a993dd23bd2cb01e70,creationTime=1794018776419,enabler=null]},manualRule=null],Diff[]
+    11-07 03:33:37.382 set_zen_mode: off,removeAutomaticZenRules
+    11-07 03:33:43.067 config: removeAutomaticZenRules,ZenModeConfig[user=0,allowCalls=true,allowRepeatCallers=false,allowMessages=false,allowCallsFrom=contacts,allowMessagesFrom=contacts,allowReminders=true,allowEvents=true,allowWhenScreenOff=true,allowWhenScreenOn=true,automaticRules={3f0e60fe6e334704973c6134d1d7f786=ZenRule[enabled=false,snoozing=false,name=Weeknight,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/schedule?days=1.2.3.4.5&start=22.0&end=7.0&exitAtAlarm=false,condition=Condition[id=condition://android/schedule?days=1.2.3.4.5&start=22.0&end=7.0&exitAtAlarm=false,summary=...,line1=...,line2=...,icon=0,state=STATE_FALSE,flags=2],component=ComponentInfo{android/com.android.server.notification.ScheduleConditionProvider},id=3f0e60fe6e334704973c6134d1d7f786,creationTime=1794018776417,enabler=null], 776d09fb8e9247d69b2df614a34b5c69=ZenRule[enabled=false,snoozing=false,name=Weekend,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/schedule?days=6.7&start=23.30&end=10.0&exitAtAlarm=false,condition=Condition[id=condition://android/schedule?days=6.7&start=23.30&end=10.0&exitAtAlarm=false,summary=...,line1=...,line2=...,icon=0,state=STATE_TRUE,flags=2],component=ComponentInfo{android/com.android.server.notification.ScheduleConditionProvider},id=776d09fb8e9247d69b2df614a34b5c69,creationTime=1794018776417,enabler=null], ba2cb9869ec042a993dd23bd2cb01e70=ZenRule[enabled=false,snoozing=false,name=Event,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/event?userId=-10000&calendar=&reply=1,condition=Condition[id=condition://android/event?userId=-10000&calendar=&reply=1,summary=...,line1=...,line2=...,icon=0,state=STATE_FALSE,flags=2],component=ComponentInfo{android/com.android.server.notification.EventConditionProvider},id=ba2cb9869ec042a993dd23bd2cb01e70,creationTime=1794018776419,enabler=null]},manualRule=null],Diff[]
+    11-07 03:33:43.528 set_zen_mode: off,removeAutomaticZenRules
+    11-07 03:53:21.248 config: removeAutomaticZenRules,ZenModeConfig[user=0,allowCalls=true,allowRepeatCallers=false,allowMessages=false,allowCallsFrom=contacts,allowMessagesFrom=contacts,allowReminders=true,allowEvents=true,allowWhenScreenOff=true,allowWhenScreenOn=true,automaticRules={3f0e60fe6e334704973c6134d1d7f786=ZenRule[enabled=false,snoozing=false,name=Weeknight,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/schedule?days=1.2.3.4.5&start=22.0&end=7.0&exitAtAlarm=false,condition=Condition[id=condition://android/schedule?days=1.2.3.4.5&start=22.0&end=7.0&exitAtAlarm=false,summary=...,line1=...,line2=...,icon=0,state=STATE_FALSE,flags=2],component=ComponentInfo{android/com.android.server.notification.ScheduleConditionProvider},id=3f0e60fe6e334704973c6134d1d7f786,creationTime=1794018776417,enabler=null], 776d09fb8e9247d69b2df614a34b5c69=ZenRule[enabled=false,snoozing=false,name=Weekend,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/schedule?days=6.7&start=23.30&end=10.0&exitAtAlarm=false,condition=Condition[id=condition://android/schedule?days=6.7&start=23.30&end=10.0&exitAtAlarm=false,summary=...,line1=...,line2=...,icon=0,state=STATE_TRUE,flags=2],component=ComponentInfo{android/com.android.server.notification.ScheduleConditionProvider},id=776d09fb8e9247d69b2df614a34b5c69,creationTime=1794018776417,enabler=null], ba2cb9869ec042a993dd23bd2cb01e70=ZenRule[enabled=false,snoozing=false,name=Event,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/event?userId=-10000&calendar=&reply=1,condition=Condition[id=condition://android/event?userId=-10000&calendar=&reply=1,summary=...,line1=...,line2=...,icon=0,state=STATE_FALSE,flags=2],component=ComponentInfo{android/com.android.server.notification.EventConditionProvider},id=ba2cb9869ec042a993dd23bd2cb01e70,creationTime=1794018776419,enabler=null]},manualRule=null],Diff[]
+    11-07 03:53:21.375 set_zen_mode: off,removeAutomaticZenRules
+    11-07 03:53:28.280 config: removeAutomaticZenRules,ZenModeConfig[user=0,allowCalls=true,allowRepeatCallers=false,allowMessages=false,allowCallsFrom=contacts,allowMessagesFrom=contacts,allowReminders=true,allowEvents=true,allowWhenScreenOff=true,allowWhenScreenOn=true,automaticRules={3f0e60fe6e334704973c6134d1d7f786=ZenRule[enabled=false,snoozing=false,name=Weeknight,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/schedule?days=1.2.3.4.5&start=22.0&end=7.0&exitAtAlarm=false,condition=Condition[id=condition://android/schedule?days=1.2.3.4.5&start=22.0&end=7.0&exitAtAlarm=false,summary=...,line1=...,line2=...,icon=0,state=STATE_FALSE,flags=2],component=ComponentInfo{android/com.android.server.notification.ScheduleConditionProvider},id=3f0e60fe6e334704973c6134d1d7f786,creationTime=1794018776417,enabler=null], 776d09fb8e9247d69b2df614a34b5c69=ZenRule[enabled=false,snoozing=false,name=Weekend,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/schedule?days=6.7&start=23.30&end=10.0&exitAtAlarm=false,condition=Condition[id=condition://android/schedule?days=6.7&start=23.30&end=10.0&exitAtAlarm=false,summary=...,line1=...,line2=...,icon=0,state=STATE_TRUE,flags=2],component=ComponentInfo{android/com.android.server.notification.ScheduleConditionProvider},id=776d09fb8e9247d69b2df614a34b5c69,creationTime=1794018776417,enabler=null], ba2cb9869ec042a993dd23bd2cb01e70=ZenRule[enabled=false,snoozing=false,name=Event,zenMode=ZEN_MODE_ALARMS,conditionId=condition://android/event?userId=-10000&calendar=&reply=1,condition=Condition[id=condition://android/event?userId=-10000&calendar=&reply=1,summary=...,line1=...,line2=...,icon=0,state=STATE_FALSE,flags=2],component=ComponentInfo{android/com.android.server.notification.EventConditionProvider},id=ba2cb9869ec042a993dd23bd2cb01e70,creationTime=1794018776419,enabler=null]},manualRule=null],Diff[]
+    11-07 03:53:28.560 set_zen_mode: off,removeAutomaticZenRules
+    11-07 03:58:03.802 disable_effects: 0|com.flowproxy.android|4105|null|10076,booleanState
+    11-07 03:58:03.822 disable_effects: 0|com.flowproxy.android|4105|null|10076,booleanState
+
+  Policy access:
+    mPolicyAccess: com.android.server.notification.NotificationManagerService$PolicyAccess@f347cd3
+
+  Condition providers:
+    All condition providers (0) enabled for current profiles:
+    Live condition providers (3):
+      ComponentInfo{android/com.android.server.notification.CountdownConditionProvider} (user 0): android.service.notification.ConditionProviderService$Provider@593a010 SYSTEM
+      ComponentInfo{android/com.android.server.notification.ScheduleConditionProvider} (user 0): android.service.notification.ConditionProviderService$Provider@7003709 SYSTEM
+      ComponentInfo{android/com.android.server.notification.EventConditionProvider} (user 0): android.service.notification.ConditionProviderService$Provider@5d25d0e SYSTEM
+    Snoozed condition providers (0):
+    mRecords(3):
+      ConditionRecord[id=condition://android/schedule?days=1.2.3.4.5&start=22.0&end=7.0&exitAtAlarm=false,component=ComponentInfo{android/com.android.server.notification.ScheduleConditionProvider},subscribed=true]
+      ConditionRecord[id=condition://android/schedule?days=6.7&start=23.30&end=10.0&exitAtAlarm=false,component=ComponentInfo{android/com.android.server.notification.ScheduleConditionProvider},subscribed=true]
+      ConditionRecord[id=condition://android/event?userId=-10000&calendar=&reply=1,component=ComponentInfo{android/com.android.server.notification.EventConditionProvider},subscribed=true]
+    mSystemConditionProviders: {schedule, event, countdown}
+    EventConditionProvider:
+      mConnected=true
+      mRegistered=true
+      mBootComplete=true
+      mNextAlarmTime=Sun Nov 08 02:34:33 GMT+00:00 2026 (1794105273569), in +22h36m2s45ms, now=Sat Nov 07 03:58:31 GMT+00:00 2026 (1794023911524)
+      mSubscriptions=
+        condition://android/event?userId=-10000&calendar=&reply=1
+      mTrackers=
+        user=0
+          mCallback=com.android.server.notification.EventConditionProvider$1@9c0132f
+          mRegistered=true
+          u=0
+    CountdownConditionProvider:
+      mConnected=true
+      mTime=0
+    ScheduleConditionProvider:
+      mConnected=true
+      mRegistered=true
+      mSubscriptions=
+        * condition://android/schedule?days=6.7&start=23.30&end=10.0&exitAtAlarm=false
+            ScheduleCalendar[mDays={6, 7}, mSchedule=ScheduleInfo{days=[6, 7], startHour=23, startMinute=30, endHour=10, endMinute=0, exitAtAlarm=false, nextAlarm=Thu Jan 01 00:00:00 GMT+00:00 1970 (0)}]
+          condition://android/schedule?days=1.2.3.4.5&start=22.0&end=7.0&exitAtAlarm=false
+            ScheduleCalendar[mDays={1, 2, 3, 4, 5}, mSchedule=ScheduleInfo{days=[1, 2, 3, 4, 5], startHour=22, startMinute=0, endHour=7, endMinute=0, exitAtAlarm=false, nextAlarm=Thu Jan 01 00:00:00 GMT+00:00 1970 (0)}]
+      snoozed due to alarm: 
+      mNextAlarmTime=Sat Nov 07 07:00:00 GMT+00:00 2026 (1794034800000), in +3h1m28s458ms, now=Sat Nov 07 03:58:31 GMT+00:00 2026 (1794023911542)
+
+  Group summaries:
+
+  Usage Stats:
+    AggregatedStats{
+      key='com.flowproxy.android',
+      numEnqueuedByApp=10,
+      numPostedByApp=5,
+      numUpdatedByApp=5,
+      numRemovedByApp=4,
+      numPeopleCacheHit=10,
+      numWithStaredPeople=0,
+      numWithValidPeople=0,
+      numPeopleCacheMiss=0,
+      numBlocked=0,
+      numSuspendedByAdmin=0,
+      numWithActions=10,
+      numPrivate=10,
+      numSecret=0,
+      numInterrupt=0,
+      numWithBigText=0,
+      numWithBigPicture=0
+      numForegroundService=5
+      numOngoing=10
+      numAutoCancel=0
+      numWithLargeIcon=10
+      numWithInbox=0
+      numWithMediaSession=0
+      numWithTitle=10
+      numWithText=10
+      numWithSubText=0
+      numWithInfoText=0
+numRateViolations=0
+numQuotaViolations=0
+      note_imp_noisy_: [0, 0, 10, 0, 0, 0]
+      note_imp_quiet_: [0, 0, 0, 0, 0, 0]
+      note_importance_: [0, 0, 10, 0, 0, 0]
+    }
+    AggregatedStats{
+      key='android',
+      numEnqueuedByApp=9,
+      numPostedByApp=5,
+      numUpdatedByApp=4,
+      numRemovedByApp=3,
+      numPeopleCacheHit=20,
+      numWithStaredPeople=0,
+      numWithValidPeople=0,
+      numPeopleCacheMiss=0,
+      numBlocked=0,
+      numSuspendedByAdmin=0,
+      numWithActions=0,
+      numPrivate=2,
+      numSecret=0,
+      numInterrupt=0,
+      numWithBigText=0,
+      numWithBigPicture=0
+      numForegroundService=0
+      numOngoing=9
+      numAutoCancel=0
+      numWithLargeIcon=0
+      numWithInbox=0
+      numWithMediaSession=0
+      numWithTitle=9
+      numWithText=4
+      numWithSubText=0
+      numWithInfoText=0
+numRateViolations=0
+numQuotaViolations=0
+      note_imp_noisy_: [0, 0, 0, 9, 0, 0]
+      note_imp_quiet_: [0, 0, 0, 0, 0, 0]
+      note_importance_: [0, 1, 8, 0, 0, 0]
+    }
+    AggregatedStats{
+      key='__global',
+      numEnqueuedByApp=19,
+      numPostedByApp=10,
+      numUpdatedByApp=9,
+      numRemovedByApp=7,
+      numPeopleCacheHit=30,
+      numWithStaredPeople=0,
+      numWithValidPeople=0,
+      numPeopleCacheMiss=0,
+      numBlocked=0,
+      numSuspendedByAdmin=0,
+      numWithActions=10,
+      numPrivate=12,
+      numSecret=0,
+      numInterrupt=0,
+      numWithBigText=0,
+      numWithBigPicture=0
+      numForegroundService=5
+      numOngoing=19
+      numAutoCancel=0
+      numWithLargeIcon=10
+      numWithInbox=0
+      numWithMediaSession=0
+      numWithTitle=19
+      numWithText=14
+      numWithSubText=0
+      numWithInfoText=0
+numRateViolations=0
+numQuotaViolations=0
+      note_imp_noisy_: [0, 0, 10, 9, 0, 0]
+      note_imp_quiet_: [0, 0, 0, 0, 0, 0]
+      note_importance_: [0, 1, 18, 0, 0, 0]
+    }
+    mStatsArrays.size(): 1
+    mStats.size(): 3
+    post_frequency{user_id=-1,pkg=android,day=0,count=2,muted=2/2,demoted=2}
+    post_frequency{user_id=0,pkg=android,day=0,count=7,muted=7/7,demoted=7}
+    post_frequency{user_id=0,pkg=com.flowproxy.android,day=0,count=10,muted=10/10,demoted=0}

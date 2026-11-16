@@ -1,0 +1,20 @@
+node_modules/
+.pnpm/
+dist/
+target/
+*.log
+*.tsbuildinfo
+.DS_Store
+Thumbs.db
+
+# Local verification output
+coverage/
+playwright-report/
+test-results/
+artifacts/
+
+# Build caches and outputs
+.gradle/
+build/
+.gradle-user-home*/
+.gradle-dlp-probe/

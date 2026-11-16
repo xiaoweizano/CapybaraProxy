@@ -1,0 +1,49 @@
+Applications Memory Usage (in Kilobytes):
+Uptime: 5559239 Realtime: 5559239
+
+** MEMINFO in pid 8816 [com.flowproxy.android] **
+                   Pss  Private  Private  SwapPss     Heap     Heap     Heap
+                 Total    Dirty    Clean    Dirty     Size    Alloc     Free
+                ------   ------   ------   ------   ------   ------   ------
+  Native Heap     6306     5996        0        0    20480    14978     5501
+  Dalvik Heap     2320     2280        0        0     3227     2421      806
+ Dalvik Other     3448     3448        0        0                           
+        Stack      776      776        0        0                           
+       Ashmem        2        0        0        0                           
+    Other dev       14        0       12        0                           
+     .so mmap     2798      244       88        0                           
+    .apk mmap      476        0       32        0                           
+    .ttf mmap      185        0       80        0                           
+    .dex mmap    16843        4    15100        0                           
+    .oat mmap      869        0        0        0                           
+    .art mmap     4431     3968       24        0                           
+   Other mmap       51        4        0        0                           
+      Unknown     1276     1240        0        0                           
+        TOTAL    39795    17960    15336        0    23707    17399     6307
+ 
+ App Summary
+                       Pss(KB)
+                        ------
+           Java Heap:     6272
+         Native Heap:     5996
+                Code:    15548
+               Stack:      776
+            Graphics:        0
+       Private Other:     4704
+              System:     6499
+ 
+               TOTAL:    39795       TOTAL SWAP PSS:        0
+ 
+ Objects
+               Views:       10         ViewRootImpl:        1
+         AppContexts:        4           Activities:        1
+              Assets:        2        AssetManagers:        3
+       Local Binders:       12        Proxy Binders:       19
+       Parcel memory:        5         Parcel count:       20
+    Death Recipients:        0      OpenSSL Sockets:        0
+            WebViews:        0
+ 
+ SQL
+         MEMORY_USED:        0
+  PAGECACHE_OVERFLOW:        0          MALLOC_SIZE:        0
+ 

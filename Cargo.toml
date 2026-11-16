@@ -1,0 +1,10 @@
+[workspace]
+resolver = "2"
+members = [
+  "apps/desktop/src-tauri",
+  "crates/flowproxy-contracts",
+  "crates/flowproxy-platform",
+  "crates/mihomo-manager",
+  "crates/flowproxy-runtime",
+]
+

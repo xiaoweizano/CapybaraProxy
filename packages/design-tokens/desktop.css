@@ -1,0 +1,102 @@
+:root {
+  --font-display: "Sora Variable", sans-serif;
+  --font-body: "Manrope Variable", sans-serif;
+  --sidebar-width: 226px;
+  --titlebar-height: 54px;
+  --radius-xs: 7px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 22px;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+:root,
+:root[data-theme="cyber_flow"] {
+  --canvas: #070d25;
+  --canvas-soft: #0a1230;
+  --canvas-deep: #050a1d;
+  --sidebar: #0b1435;
+  --sidebar-border: rgba(132, 159, 255, 0.12);
+  --panel: rgba(14, 27, 64, 0.88);
+  --panel-strong: #12214d;
+  --panel-soft: rgba(22, 40, 88, 0.66);
+  --panel-highlight: rgba(44, 109, 255, 0.14);
+  --text-primary: #f4f7ff;
+  --text-secondary: #9dacd4;
+  --text-faint: #68789f;
+  --accent: #168cff;
+  --accent-rgb: 22, 140, 255;
+  --accent-cyan: #32d9ff;
+  --accent-cyan-rgb: 50, 217, 255;
+  --accent-violet: #765cff;
+  --accent-violet-rgb: 118, 92, 255;
+  --success: #22dda2;
+  --success-rgb: 34, 221, 162;
+  --warning: #ffb547;
+  --danger: #ff5e7d;
+  --border: rgba(132, 159, 255, 0.15);
+  --border-strong: rgba(144, 176, 255, 0.28);
+  --shadow-card: 0 18px 48px rgba(0, 4, 24, 0.34);
+  --shadow-soft: 0 10px 30px rgba(0, 4, 24, 0.2);
+  --nav-active: rgba(42, 104, 255, 0.24);
+  --nav-active-text: #f5f8ff;
+  --nav-icon: #7e8fb8;
+  --titlebar: rgba(7, 13, 37, 0.64);
+  --chart-grid: rgba(125, 158, 255, 0.1);
+  --chart-upload: #35d7ff;
+  --chart-download: #7c65ff;
+  --map-water: rgba(9, 23, 59, 0.72);
+  --map-land: rgba(45, 85, 160, 0.48);
+  --map-land-secondary: rgba(36, 65, 128, 0.34);
+  --map-line: rgba(85, 128, 255, 0.22);
+  --map-label: #a9bbeb;
+  --input-bg: rgba(8, 18, 49, 0.68);
+  --backdrop: #05091a;
+  --theme-card-radius: 14px;
+  --hero-grid: rgba(121, 158, 255, 0.08);
+}
+
+:root[data-theme="warm_flow"] {
+  --canvas: #f3efed;
+  --canvas-soft: #f8f5f3;
+  --canvas-deep: #e9e3df;
+  --sidebar: #fbf8f6;
+  --sidebar-border: rgba(90, 103, 135, 0.1);
+  --panel: rgba(255, 253, 252, 0.9);
+  --panel-strong: #fffdfc;
+  --panel-soft: #f2ebe7;
+  --panel-highlight: rgba(43, 150, 243, 0.1);
+  --text-primary: #293149;
+  --text-secondary: #7b8496;
+  --text-faint: #a1a7b3;
+  --accent: #2b96f3;
+  --accent-rgb: 43, 150, 243;
+  --accent-cyan: #62d6fa;
+  --accent-cyan-rgb: 98, 214, 250;
+  --accent-violet: #446fd6;
+  --accent-violet-rgb: 68, 111, 214;
+  --success: #16b982;
+  --success-rgb: 22, 185, 130;
+  --warning: #eea23d;
+  --danger: #e85d70;
+  --border: rgba(72, 91, 129, 0.1);
+  --border-strong: rgba(72, 91, 129, 0.16);
+  --shadow-card: 0 18px 42px rgba(99, 82, 76, 0.1);
+  --shadow-soft: 0 10px 24px rgba(99, 82, 76, 0.08);
+  --nav-active: rgba(43, 150, 243, 0.12);
+  --nav-active-text: #287fcf;
+  --nav-icon: #8b92a2;
+  --titlebar: rgba(251, 248, 246, 0.74);
+  --chart-grid: rgba(73, 102, 145, 0.1);
+  --chart-upload: #62baf7;
+  --chart-download: #2b96f3;
+  --map-water: #edf5fb;
+  --map-land: #cadeef;
+  --map-land-secondary: #dce8f2;
+  --map-line: rgba(53, 119, 185, 0.2);
+  --map-label: #7c8da4;
+  --input-bg: #f6f1ee;
+  --backdrop: #e6dfda;
+  --theme-card-radius: 22px;
+  --hero-grid: rgba(60, 109, 177, 0.07);
+}
