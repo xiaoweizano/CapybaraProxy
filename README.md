@@ -120,4 +120,8 @@ pnpm tauri build --no-bundle
 
 Windows 上的 `DIRECT` 延迟测试受外部测试目标影响，可能返回 HTTP 503；这是阶段 3 已记录的已知限制，不代表控制 API 或代理进程失效。
 
+## 维护说明
+
+提交以远程仓库贡献者身份为准；文档更新与对应阶段报告的改动请一并提交，保持 README 与 `docs/` 内容同步。
+
 阶段 2 的具体测试结果、截图和残余风险见 `docs/development/stage-2-runtime-report.md`。阶段 3 的完整验收结果、截图与残余风险见 `docs/development/stage-3-mihomo-report.md`。阶段 4 的系统集成结果、A/C 截图和残余风险见 `docs/development/stage-4-system-integration-report.md`。
