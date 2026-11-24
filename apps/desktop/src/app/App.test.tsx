@@ -79,6 +79,8 @@ describe("App shell", () => {
           name: "Primary profile",
           active: true,
           updated_at_ms: 1_760_000_000_000,
+          source: null,
+          proxy_count: null,
         },
       ],
     });
@@ -148,6 +150,8 @@ describe("App shell", () => {
   it("mounts the real Runtime and renders live Overview state", async () => {
     render(<App />);
 
+    expect(await screen.findByText("Connected")).toBeInTheDocument();
+
     for (const label of [
       "Overview",
       "Proxies",
@@ -157,11 +161,10 @@ describe("App shell", () => {
       "Logs",
       "Settings",
     ]) {
-      expect(screen.getByRole("link", { name: label })).toBeInTheDocument();
+      expect(await screen.findByRole("link", { name: label })).toBeInTheDocument();
     }
 
     expect(screen.queryByText(/mock preview/i)).not.toBeInTheDocument();
-    expect(await screen.findByText("Connected")).toBeInTheDocument();
     expect(await screen.findAllByText("Tokyo 01")).toHaveLength(3);
     await waitFor(() => {
       expect(

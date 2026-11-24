@@ -11,7 +11,10 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { useRuntime } from "../../app/runtime/runtimeContext";
+import {
+  useRuntime,
+  type RuntimeAction,
+} from "../../app/runtime/runtimeContext";
 import { useTelemetry } from "../../app/runtime/telemetryStore";
 import { useTheme } from "../../app/theme/themeContext";
 import type {
@@ -38,6 +41,11 @@ const STATUS_LABELS: Record<RuntimeState, string> = {
 
 const MEBIBYTE = 1024 * 1024;
 const GIBIBYTE = 1024 * MEBIBYTE;
+
+/** States in which the core is up and the tray offers Disconnect. */
+function isActiveState(state: RuntimeState | undefined): boolean {
+  return state === "connected" || state === "running_disconnected";
+}
 
 function formatSpeed(bytesPerSecond: number | null): string {
   return bytesPerSecond === null
@@ -75,7 +83,17 @@ function formatDuration(startedAtMs: number | null): string {
     .join(":");
 }
 
-function ConnectionHero({ snapshot }: { snapshot: RuntimeSnapshot | null }) {
+function ConnectionHero({
+  snapshot,
+  pendingAction,
+  onStart,
+  onStop,
+}: {
+  snapshot: RuntimeSnapshot | null;
+  pendingAction: RuntimeAction | null;
+  onStart: () => void;
+  onStop: () => void;
+}) {
   const { theme } = useTheme();
   const connected = snapshot?.state === "connected";
   const telemetry = useTelemetry(connected);
@@ -103,8 +121,7 @@ function ConnectionHero({ snapshot }: { snapshot: RuntimeSnapshot | null }) {
 
       <div className="hero-information">
         <div className="hero-status-row">
-          <span
-            className="connection-status"
+          <span className="connection-status"
             data-status={state ?? "stopped"}
           >
             <span className="connection-status-dot" />
@@ -113,6 +130,28 @@ function ConnectionHero({ snapshot }: { snapshot: RuntimeSnapshot | null }) {
           <span className="hero-duration">
             {formatDuration(snapshot?.started_at_ms ?? null)}
           </span>
+        </div>
+
+        <div className="hero-runtime-controls">
+          {isActiveState(state) ? (
+            <button
+              type="button"
+              className="hero-runtime-button is-stop"
+              disabled={pendingAction !== null}
+              onClick={onStop}
+            >
+              {pendingAction === "stop" ? "Disconnecting..." : "Disconnect"}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="hero-runtime-button"
+              disabled={pendingAction !== null}
+              onClick={onStart}
+            >
+              {pendingAction === "start" ? "Connecting..." : "Connect"}
+            </button>
+          )}
         </div>
 
         <div className="hero-speed-grid">
@@ -496,7 +535,12 @@ export function OverviewPage() {
       ) : null}
 
       <div className="overview-dashboard">
-        <ConnectionHero snapshot={runtime.snapshot} />
+        <ConnectionHero
+          snapshot={runtime.snapshot}
+          pendingAction={runtime.pendingAction}
+          onStart={() => void runtime.start()}
+          onStop={() => void runtime.stop()}
+        />
         <div className="overview-middle-grid">
           <ProxySelectionCard
             group={selectedGroup}

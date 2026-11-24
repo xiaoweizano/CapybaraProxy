@@ -158,6 +158,43 @@
   gap: 10px;
 }
 
+.hero-runtime-controls {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.hero-runtime-button {
+  appearance: none;
+  border: 1px solid var(--border-strong, rgba(120, 160, 255, 0.45));
+  border-radius: 10px;
+  background: var(--accent-cyan, #38e1ff);
+  color: #04101f;
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  padding: 7px 16px;
+  text-transform: uppercase;
+  transition: filter 120ms ease, opacity 120ms ease;
+}
+
+.hero-runtime-button:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.hero-runtime-button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.hero-runtime-button.is-stop {
+  background: transparent;
+  border-color: rgba(255, 120, 140, 0.55);
+  color: var(--accent-rose, #ff7a8c);
+}
+
 .connection-status {
   display: inline-flex;
   align-items: center;

@@ -24,6 +24,7 @@ export type RuntimeErrorCode =
   | "permission_required"
   | "settings_io"
   | "platform_integration"
+  | "subscription_invalid"
   | "internal";
 
 export type RuntimeError = {
@@ -121,6 +122,8 @@ export type ProfileInfo = {
   name: string;
   active: boolean;
   updated_at_ms: number | null;
+  source: string | null;
+  proxy_count: number | null;
 };
 
 const runtimeStates = new Set<RuntimeState>([
@@ -146,6 +149,7 @@ const runtimeErrorCodes = new Set<RuntimeErrorCode>([
   "permission_required",
   "settings_io",
   "platform_integration",
+  "subscription_invalid",
   "internal",
 ]);
 
@@ -303,7 +307,13 @@ function isProfileInfo(value: unknown): value is ProfileInfo {
     isString(value.id) &&
     isString(value.name) &&
     typeof value.active === "boolean" &&
-    (value.updated_at_ms === null || Number.isInteger(value.updated_at_ms))
+    (value.updated_at_ms === null || Number.isInteger(value.updated_at_ms)) &&
+    (value.source === undefined ||
+      value.source === null ||
+      isString(value.source)) &&
+    (value.proxy_count === undefined ||
+      value.proxy_count === null ||
+      isNonNegativeInteger(value.proxy_count))
   );
 }
 
@@ -348,7 +358,9 @@ async function executeRuntimeCommand<T>(
     | "get_connections"
     | "close_connection"
     | "get_rules"
-    | "get_profiles",
+    | "get_profiles"
+    | "import_subscription"
+    | "clear_subscription",
   isValidData: (value: unknown) => value is T,
   args?: Record<string, unknown>,
 ): Promise<RuntimeBridgeResult<T>> {
@@ -446,6 +458,35 @@ export function getProfiles(): Promise<RuntimeBridgeResult<ProfileInfo[]>> {
     (value): value is ProfileInfo[] =>
       Array.isArray(value) && value.every(isProfileInfo),
   );
+}
+
+const isProfileList = (value: unknown): value is ProfileInfo[] =>
+  Array.isArray(value) && value.every(isProfileInfo);
+
+export function importSubscription(
+  name: string,
+  yaml: string,
+): Promise<RuntimeBridgeResult<ProfileInfo[]>> {
+  return executeRuntimeCommand("import_subscription", isProfileList, {
+    name,
+    yaml,
+  });
+}
+
+export function importSubscriptionFromUrl(
+  name: string,
+  url: string,
+): Promise<RuntimeBridgeResult<ProfileInfo[]>> {
+  return executeRuntimeCommand("import_subscription", isProfileList, {
+    name,
+    url,
+  });
+}
+
+export function clearSubscription(): Promise<
+  RuntimeBridgeResult<ProfileInfo[]>
+> {
+  return executeRuntimeCommand("clear_subscription", isProfileList);
 }
 
 export function startRuntime(): Promise<RuntimeBridgeResult<RuntimeSnapshot>> {

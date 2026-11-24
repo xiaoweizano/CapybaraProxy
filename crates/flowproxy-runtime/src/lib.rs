@@ -382,8 +382,83 @@ where
         self.adapter_data("rules", A::rules)
     }
 
+    /// Returns the stored profile metadata.
+    ///
+    /// Unlike the other adapter data calls this does not require a connected
+    /// Runtime: it reflects the configuration on disk, which is exactly what an
+    /// operator needs to see before starting the core.
     pub fn profiles(&self) -> Result<Vec<ProfileInfo>, RuntimeFailure> {
-        self.adapter_data("profiles", A::profiles)
+        let _operation = self.lock_operation();
+        let result = {
+            let mut adapter = self.lock_adapter();
+            adapter.profiles()
+        };
+        match result {
+            Ok(profiles) => Ok(profiles),
+            Err(error) => {
+                let mut inner = self.lock_inner();
+                let mut logs = Vec::new();
+                inner.last_error = Some(error.clone());
+                push_log_locked(
+                    &mut inner,
+                    &mut logs,
+                    RuntimeLogLevel::Warn,
+                    error.message.clone(),
+                    Some(error.code),
+                );
+                Err(failure_locked(&inner, error, logs))
+            }
+        }
+    }
+
+    /// Installs a subscription and makes it the active profile.
+    ///
+    /// Unlike [`Self::adapter_data`] this is allowed while the Runtime is
+    /// stopped: an operator has to import a subscription *before* the core can
+    /// start with it. It is still serialised against start/stop through the
+    /// operation lock.
+    pub fn import_subscription(
+        &self,
+        name: &str,
+        yaml: &str,
+    ) -> Result<(), RuntimeFailure> {
+        self.adapter_mutation("subscription import", |adapter| {
+            adapter.import_subscription(name, yaml)
+        })
+    }
+
+    /// Removes the imported subscription so the Runtime falls back to the
+    /// built-in direct profile.
+    pub fn clear_subscription(&self) -> Result<(), RuntimeFailure> {
+        self.adapter_mutation("subscription removal", A::clear_subscription)
+    }
+
+    fn adapter_mutation(
+        &self,
+        resource: &str,
+        operation: impl FnOnce(&mut A) -> Result<(), RuntimeError>,
+    ) -> Result<(), RuntimeFailure> {
+        let _operation = self.lock_operation();
+        let result = {
+            let mut adapter = self.lock_adapter();
+            operation(&mut adapter)
+        };
+        match result {
+            Ok(()) => Ok(()),
+            Err(error) => {
+                let mut inner = self.lock_inner();
+                let mut logs = Vec::new();
+                inner.last_error = Some(error.clone());
+                push_log_locked(
+                    &mut inner,
+                    &mut logs,
+                    RuntimeLogLevel::Warn,
+                    format!("{resource} failed: {}", error.message),
+                    Some(error.code),
+                );
+                Err(failure_locked(&inner, error, logs))
+            }
+        }
     }
 
     fn adapter_data<T>(
@@ -962,6 +1037,7 @@ mod tests {
         logs: Vec<String>,
         core_info_block: Option<(std::sync::mpsc::Sender<()>, std::sync::mpsc::Receiver<()>)>,
         proxy_endpoint: Option<String>,
+        imported_subscription: Option<(String, String)>,
     }
 
     impl RuntimeDataAdapter {
@@ -972,6 +1048,7 @@ mod tests {
                 logs: Vec::new(),
                 core_info_block: None,
                 proxy_endpoint: None,
+                imported_subscription: None,
             }
         }
     }
@@ -1112,12 +1189,64 @@ mod tests {
                 name: "FlowProxy Direct".to_owned(),
                 active: true,
                 updated_at_ms: None,
+                source: None,
+                proxy_count: None,
             }])
+        }
+
+        fn import_subscription(&mut self, name: &str, yaml: &str) -> Result<(), RuntimeError> {
+            if yaml.trim().is_empty() {
+                return Err(RuntimeError::new(
+                    RuntimeErrorCode::SubscriptionInvalid,
+                    "the test subscription is empty",
+                    false,
+                ));
+            }
+            self.imported_subscription = Some((name.to_owned(), yaml.to_owned()));
+            Ok(())
+        }
+
+        fn clear_subscription(&mut self) -> Result<(), RuntimeError> {
+            self.imported_subscription = None;
+            Ok(())
         }
 
         fn take_logs(&mut self) -> Vec<String> {
             std::mem::take(&mut self.logs)
         }
+    }
+
+    #[test]
+    fn subscription_import_works_while_the_runtime_is_stopped() {
+        let runtime = RuntimeManager::new(RuntimeBackend::Mihomo, RuntimeDataAdapter::healthy());
+
+        runtime
+            .import_subscription("My nodes", "proxies:\n  - name: A\n")
+            .unwrap_or_else(|failure| panic!("import failed: {failure:?}"));
+    }
+
+    #[test]
+    fn subscription_import_failure_is_reported_without_changing_state() {
+        let runtime = RuntimeManager::new(RuntimeBackend::Mihomo, RuntimeDataAdapter::healthy());
+
+        let failure = runtime
+            .import_subscription("Empty", "   ")
+            .expect_err("an empty subscription must fail");
+
+        assert_eq!(failure.error.code, RuntimeErrorCode::SubscriptionInvalid);
+        assert_eq!(failure.change.snapshot.state, RuntimeState::Stopped);
+    }
+
+    #[test]
+    fn subscription_can_be_cleared() {
+        let runtime = RuntimeManager::new(RuntimeBackend::Mihomo, RuntimeDataAdapter::healthy());
+
+        runtime
+            .import_subscription("My nodes", "proxies:\n  - name: A\n")
+            .expect("import should succeed");
+        runtime
+            .clear_subscription()
+            .unwrap_or_else(|failure| panic!("clear failed: {failure:?}"));
     }
 
     #[test]

@@ -6,7 +6,7 @@ import {
   ChevronRight,
   CircleX,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useRuntime } from "../../app/runtime/runtimeContext";
 import { useBridgeResource } from "../../app/runtime/useBridgeResource";
 import {
@@ -120,11 +120,9 @@ export function ConnectionsPage() {
     pageStart + CONNECTIONS_PAGE_SIZE,
   );
 
-  useEffect(() => {
-    if (page > pageCount) {
-      setPage(pageCount);
-    }
-  }, [page, pageCount]);
+  if (page > pageCount) {
+    setPage(pageCount);
+  }
 
   return (
     <WorkspacePage

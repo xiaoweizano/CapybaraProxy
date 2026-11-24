@@ -18,3 +18,10 @@ artifacts/
 build/
 .gradle-user-home*/
 .gradle-dlp-probe/
+
+# Bundled installer inputs (see scripts/prepare-bundle-resources.mjs)
+apps/desktop/src-tauri/resources/
+
+# Android release signing material
+apps/android/keystore.properties
+apps/android/*.jks

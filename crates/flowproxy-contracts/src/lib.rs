@@ -36,6 +36,7 @@ pub enum RuntimeErrorCode {
     PermissionRequired,
     SettingsIo,
     PlatformIntegration,
+    SubscriptionInvalid,
     Internal,
 }
 
@@ -164,6 +165,12 @@ pub struct ProfileInfo {
     pub name: String,
     pub active: bool,
     pub updated_at_ms: Option<i64>,
+    /// Where the active profile came from, when it was imported.
+    #[serde(default)]
+    pub source: Option<String>,
+    /// Number of proxy nodes the active profile declares.
+    #[serde(default)]
+    pub proxy_count: Option<u32>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -435,6 +442,8 @@ mod tests {
             name: "FlowProxy Direct".to_owned(),
             active: true,
             updated_at_ms: None,
+            source: None,
+            proxy_count: None,
         };
 
         assert_eq!(
@@ -473,7 +482,9 @@ mod tests {
                 "id": "flowproxy-direct",
                 "name": "FlowProxy Direct",
                 "active": true,
-                "updated_at_ms": null
+                "updated_at_ms": null,
+                "source": null,
+                "proxy_count": null
             })
         );
     }
@@ -486,6 +497,7 @@ mod tests {
             (RuntimeErrorCode::ApiUnavailable, "api_unavailable"),
             (RuntimeErrorCode::SelectionFailed, "selection_failed"),
             (RuntimeErrorCode::ConnectionNotFound, "connection_not_found"),
+            (RuntimeErrorCode::SubscriptionInvalid, "subscription_invalid"),
         ] {
             assert_eq!(
                 serde_json::to_value(code).expect("serialize error code"),

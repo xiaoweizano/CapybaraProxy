@@ -2,6 +2,8 @@ mod binary;
 mod config;
 mod control_api;
 mod core_adapter;
+pub mod subscription;
+pub mod subscription_fetch;
 
 use flowproxy_contracts::{
     ConnectionPage, CoreInfo, ProfileInfo, ProxyGroup, RuleItem, RuntimeError, RuntimeErrorCode,
@@ -104,6 +106,19 @@ pub trait MihomoAdapter: Send {
         Err(unsupported_adapter_data("profiles"))
     }
 
+    /// Installs a subscription document as the active profile.
+    ///
+    /// Adapters that cannot persist configuration keep the default
+    /// implementation, which reports the capability as unsupported.
+    fn import_subscription(&mut self, _name: &str, _yaml: &str) -> Result<(), RuntimeError> {
+        Err(unsupported_adapter_data("subscription import"))
+    }
+
+    /// Removes the imported subscription and returns to the direct profile.
+    fn clear_subscription(&mut self) -> Result<(), RuntimeError> {
+        Err(unsupported_adapter_data("subscription removal"))
+    }
+
     fn take_logs(&mut self) -> Vec<String> {
         Vec::new()
     }
@@ -171,6 +186,14 @@ where
 
     fn profiles(&mut self) -> Result<Vec<ProfileInfo>, RuntimeError> {
         self.as_mut().profiles()
+    }
+
+    fn import_subscription(&mut self, name: &str, yaml: &str) -> Result<(), RuntimeError> {
+        self.as_mut().import_subscription(name, yaml)
+    }
+
+    fn clear_subscription(&mut self) -> Result<(), RuntimeError> {
+        self.as_mut().clear_subscription()
     }
 
     fn take_logs(&mut self) -> Vec<String> {

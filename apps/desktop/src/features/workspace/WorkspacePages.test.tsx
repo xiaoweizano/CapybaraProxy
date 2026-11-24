@@ -8,11 +8,16 @@ import {
   type RuntimeContextValue,
 } from "../../app/runtime/runtimeContext";
 import {
+  clearSubscription,
   closeConnection,
   getConnections,
   getProfiles,
   getRules,
+  importSubscription,
+  importSubscriptionFromUrl,
   type ConnectionPage,
+  type ConnectionSummary,
+  type ProfileInfo,
   type ProxyGroup,
   type RuntimeSnapshot,
 } from "../../platform/runtime";
@@ -27,13 +32,19 @@ vi.mock("../../platform/runtime", async (importOriginal) => {
     await importOriginal<typeof import("../../platform/runtime")>();
   return {
     ...actual,
+    clearSubscription: vi.fn(),
     closeConnection: vi.fn(),
     getConnections: vi.fn(),
     getProfiles: vi.fn(),
     getRules: vi.fn(),
+    importSubscription: vi.fn(),
+    importSubscriptionFromUrl: vi.fn(),
   };
 });
 
+const clearSubscriptionMock = vi.mocked(clearSubscription);
+const importSubscriptionMock = vi.mocked(importSubscription);
+const importSubscriptionFromUrlMock = vi.mocked(importSubscriptionFromUrl);
 const getConnectionsMock = vi.mocked(getConnections);
 const getProfilesMock = vi.mocked(getProfiles);
 const getRulesMock = vi.mocked(getRules);
@@ -72,25 +83,43 @@ const proxyGroups: ProxyGroup[] = [
   },
 ];
 
+const sampleConnection: ConnectionSummary = {
+  id: "connection-1",
+  host: "example.com",
+  destination_ip: "203.0.113.10",
+  destination_port: 443,
+  network: "tcp",
+  rule: "DomainSuffix",
+  rule_payload: "example.com",
+  chains: ["Proxy", "Tokyo 01"],
+  upload_bytes: 1_024,
+  download_bytes: 2_048,
+  started_at_ms: 1_760_000_000_000,
+};
+
 const connectionPage: ConnectionPage = {
   upload_total_bytes: 2_048,
   download_total_bytes: 4_096,
   memory_bytes: 8_192,
-  connections: [
-    {
-      id: "connection-1",
-      host: "example.com",
-      destination_ip: "203.0.113.10",
-      destination_port: 443,
-      network: "tcp",
-      rule: "DomainSuffix",
-      rule_payload: "example.com",
-      chains: ["Proxy", "Tokyo 01"],
-      upload_bytes: 1_024,
-      download_bytes: 2_048,
-      started_at_ms: 1_760_000_000_000,
-    },
-  ],
+  connections: [sampleConnection],
+};
+
+const connectedProfile: ProfileInfo = {
+  id: "profile-1",
+  name: "Primary profile",
+  active: true,
+  updated_at_ms: 1_760_000_000_000,
+  source: null,
+  proxy_count: null,
+};
+
+const importedProfile: ProfileInfo = {
+  id: "flowproxy-subscription",
+  name: "Imported subscription",
+  active: true,
+  updated_at_ms: 1_760_000_000_000,
+  source: "subscription",
+  proxy_count: 42,
 };
 
 function runtimeValue(
@@ -145,6 +174,8 @@ describe("real data workspace pages", () => {
           name: "Primary profile",
           active: true,
           updated_at_ms: 1_760_000_000_000,
+          source: null,
+          proxy_count: null,
         },
       ],
     });
@@ -222,7 +253,7 @@ describe("real data workspace pages", () => {
       data: {
         ...connectionPage,
         connections: Array.from({ length: 160 }, (_, index) => ({
-          ...connectionPage.connections[0],
+          ...sampleConnection,
           id: `connection-${index + 1}`,
           host: `connection-${index + 1}.example.com`,
         })),
@@ -257,6 +288,99 @@ describe("real data workspace pages", () => {
     expect(await screen.findByText("Primary profile")).toBeInTheDocument();
     expect(screen.getByText("Active")).toBeInTheDocument();
     expect(getProfilesMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("imports a subscription from a pasted URL and hides the form afterwards", async () => {
+    const user = userEvent.setup();
+    renderWithRuntime(<ProfilesPage />);
+    await screen.findByText("Primary profile");
+
+    importSubscriptionFromUrlMock.mockResolvedValueOnce({
+      status: "ok",
+      data: [importedProfile],
+    });
+    getProfilesMock.mockResolvedValueOnce({ status: "ok", data: [importedProfile] });
+
+    await user.type(screen.getByLabelText("Name"), "My provider");
+    await user.type(
+      screen.getByLabelText("Subscription URL"),
+      "https://provider.example.com/sub?token=secret",
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Import subscription" }),
+    );
+
+    await waitFor(() => {
+      expect(importSubscriptionFromUrlMock).toHaveBeenCalledWith(
+        "My provider",
+        "https://provider.example.com/sub?token=secret",
+      );
+    });
+    expect(await screen.findByText("Imported subscription")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Import subscription" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("reports a subscription import failure without hiding the form", async () => {
+    const user = userEvent.setup();
+    renderWithRuntime(<ProfilesPage />);
+    await screen.findByText("Primary profile");
+
+    importSubscriptionMock.mockResolvedValueOnce({
+      status: "error",
+      error: {
+        code: "subscription_invalid",
+        message: "The subscription document has no proxies or proxy-providers section.",
+        retryable: false,
+      },
+    });
+
+    await user.type(screen.getByLabelText("Name"), "Broken");
+    await user.click(screen.getByRole("tab", { name: /Paste YAML/ }));
+    // `userEvent.type` treats `[` as a key descriptor, so paste the YAML.
+    await user.click(screen.getByLabelText("Subscription YAML"));
+    await user.paste("cHJveGllczogW10=");
+    await user.click(
+      screen.getByRole("button", { name: "Import subscription" }),
+    );
+
+    expect(
+      await screen.findByText(/has no proxies or proxy-providers section/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Import subscription" }),
+    ).toBeInTheDocument();
+  });
+
+  it("removes an imported subscription", async () => {
+    const user = userEvent.setup();
+    getProfilesMock.mockResolvedValueOnce({
+      status: "ok",
+      data: [importedProfile],
+    });
+    clearSubscriptionMock.mockResolvedValueOnce({
+      status: "ok",
+      data: [connectedProfile],
+    });
+    getProfilesMock.mockResolvedValueOnce({
+      status: "ok",
+      data: [connectedProfile],
+    });
+
+    renderWithRuntime(<ProfilesPage />);
+    await screen.findByText("Imported subscription");
+
+    await user.click(
+      screen.getByRole("button", { name: "Remove subscription" }),
+    );
+
+    await waitFor(() => {
+      expect(clearSubscriptionMock).toHaveBeenCalledTimes(1);
+    });
+    expect(
+      await screen.findByText(/direct profile is active again/),
+    ).toBeInTheDocument();
   });
 
   it("shows bounded Runtime logs from the shared provider", () => {

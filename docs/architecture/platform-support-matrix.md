@@ -1,11 +1,12 @@
 # FlowProxy 平台支持矩阵
 
-更新日期：2026-11-07
+更新日期：2026-11-24
 
 最近桌面运行验证：Windows 10 专业版 22H2，10.0.19045，x64
 
 最近 Android 运行验证：Android 8.0.0，API 26，x86_64 模拟器
-`FlowProxy_API_26`
+`FlowProxy_API_26`（2026-11-07；此后模拟器因缺少硬件加速驱动无法启动，
+签名 release APK 未做安装验证）
 
 ## 状态定义
 
@@ -25,7 +26,9 @@
 | 开机启动 | 已实现并验证 | 明确未实现 | 明确未实现 | 当前仅实现 Windows 当前用户 `Run` 路径 |
 | 系统托盘 | 已实现但仍可能受目标版本未验证影响 | 明确未实现 | 明确未实现 | Windows 托盘菜单已构建，Connect、Disconnect、Show、Exit 的真实鼠标路径仍待人工验证 |
 | TUN 激活 | 明确未实现 | 明确未实现 | 明确未实现 | Windows 只探测提权和 Wintun，没有创建 TUN、修改路由或接管流量 |
-| 订阅下载与更新 | 明确未实现 | 明确未实现 | 明确未实现 | 尚无订阅下载链路 |
+| 订阅导入（单份） | 已实现并验证 | 已实现但仍可能受目标版本未验证影响 | 已实现但仍可能受目标版本未验证影响 | 粘贴 YAML 或 URL 导入，原子写入；Windows 安装包已端到端验证导入到 Proxies 出节点。非 Windows 未运行 |
+| 订阅自动更新 / 多订阅 | 明确未实现 | 明确未实现 | 明确未实现 | 只有一份活动订阅，无定时拉取、无版本回滚。边界见 `docs/development/subscription-scope.md` |
+| 捆绑 Mihomo 核心与 geodata | 已实现并验证 | 明确未实现 | 明确未实现 | NSIS 包含核心与 geodata；安装后无需手动放置 |
 
 ## Android 能力
 
@@ -38,7 +41,8 @@
 | 前台服务通知 | 已实现但仍可能受目标版本未验证影响 | API 26 已验证通知和 Stop；API 35 通知及后台限制未测 |
 | Mihomo Native 实际集成 | 明确未实现 | 当前只有 probe-only 契约，没有加载可验证的 Native runtime |
 | TUN 路由、DNS 和流量接管 | 明确未实现 | `VpnService.Builder` 只建立未接管流量的 VPN 接口 |
-| 订阅下载与更新 | 明确未实现 | 尚无订阅下载链路 |
+| 订阅导入（单份） | 明确未实现 | Android 端尚无订阅入口，页面数据仍来自隔离 Mock |
+| 订阅自动更新 / 多订阅 | 明确未实现 | 尚无订阅下载链路 |
 
 ## Windows 当前状态
 
@@ -105,6 +109,15 @@
 - `onRevoke` 的独立运行验收。
 - 设备重启、网络切换组合和真实设备性能。
 - 真实 Mihomo Native runtime、Mihomo 配置、TUN FD 交接以及可用代理隧道。
+
+## Windows 订阅与产物状态
+
+- 安装包（NSIS，`currentUser` 模式）自带 Mihomo `v1.19.33` 与 geodata，安装后无需手动放置核心。
+- 订阅导入端到端验证通过：粘贴 YAML → 校验 → 写入 → 启动后 Proxies 页面出现订阅节点。
+- 订阅原文存于 `%APPDATA%\com.flowproxy.desktop\mihomo\config.subscription.yaml`，明文，不加密。
+- 出站流量的公网可达性**未验证**：验收时本机 DNS 与 IP 直连均超时，混合端口返回 502，只证明代理链路在工作。
+- geodata 为快照，会随规则更新过时，无自动更新。
+- 安装包约 22 MiB（LZMA solid），解包后约 28.9 MB，其中 Mihomo 核心约 61 MB（未压缩）。
 
 ## 非 Windows 边界
 

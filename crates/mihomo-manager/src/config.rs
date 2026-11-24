@@ -20,6 +20,61 @@ impl ConfigStore {
         &self.path
     }
 
+    /// Path of the imported subscription document kept next to the active
+    /// configuration. It holds the operator's original YAML.
+    pub fn subscription_path(&self) -> Option<PathBuf> {
+        let parent = self.path.parent()?;
+        let stem = self
+            .path
+            .file_stem()
+            .and_then(|name| name.to_str())
+            .unwrap_or("config");
+        Some(parent.join(format!("{stem}.subscription.yaml")))
+    }
+
+    pub fn read_subscription(&self) -> Result<Option<String>, RuntimeError> {
+        let Some(path) = self.subscription_path() else {
+            return Ok(None);
+        };
+        match fs::read_to_string(&path) {
+            Ok(contents) => Ok(Some(contents)),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(error) => Err(map_io_error(
+                "Could not read the imported Mihomo subscription",
+                error,
+            )),
+        }
+    }
+
+    /// Atomically replaces the stored subscription document.
+    pub fn write_subscription<F>(&self, contents: &str, validator: F) -> Result<(), RuntimeError>
+    where
+        F: FnOnce(&Path) -> Result<(), RuntimeError>,
+    {
+        let target = self.subscription_path().ok_or_else(|| {
+            RuntimeError::new(
+                RuntimeErrorCode::ConfigInvalid,
+                "The Mihomo configuration path has no parent directory.",
+                false,
+            )
+        })?;
+        write_atomically(&target, contents, validator)
+    }
+
+    pub fn remove_subscription(&self) -> Result<(), RuntimeError> {
+        let Some(path) = self.subscription_path() else {
+            return Ok(());
+        };
+        match fs::remove_file(&path) {
+            Ok(()) => Ok(()),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(error) => Err(map_io_error(
+                "Could not remove the imported Mihomo subscription",
+                error,
+            )),
+        }
+    }
+
     pub fn snapshot(&self) -> Result<Option<String>, RuntimeError> {
         match fs::read_to_string(&self.path) {
             Ok(contents) => Ok(Some(contents)),
@@ -49,51 +104,58 @@ impl ConfigStore {
     where
         F: FnOnce(&Path) -> Result<(), RuntimeError>,
     {
-        let parent = self.path.parent().ok_or_else(|| {
-            RuntimeError::new(
-                RuntimeErrorCode::ConfigInvalid,
-                "The Mihomo configuration path has no parent directory.",
-                false,
-            )
-        })?;
-        fs::create_dir_all(parent)
-            .map_err(|error| map_io_error("Could not create the Mihomo config directory", error))?;
-
-        let sequence = TEMP_FILE_SEQUENCE.fetch_add(1, Ordering::Relaxed);
-        let temporary_path = parent.join(format!(
-            ".{}.{}.{}.tmp",
-            self.path
-                .file_name()
-                .and_then(|name| name.to_str())
-                .unwrap_or("mihomo-config"),
-            std::process::id(),
-            sequence
-        ));
-        let mut temporary_file = OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&temporary_path)
-            .map_err(|error| map_io_error("Could not create a temporary Mihomo profile", error))?;
-        let guard = TemporaryFileGuard::new(temporary_path.clone());
-
-        temporary_file
-            .write_all(contents.as_bytes())
-            .and_then(|()| temporary_file.sync_all())
-            .map_err(|error| map_io_error("Could not flush the temporary Mihomo profile", error))?;
-        drop(temporary_file);
-
-        validator(&temporary_path).map_err(|error| {
-            RuntimeError::new(
-                RuntimeErrorCode::ConfigInvalid,
-                error.message,
-                error.retryable,
-            )
-        })?;
-
-        replace_config(&temporary_path, &self.path)?;
-        guard.commit();
-        Ok(())
+        write_atomically(&self.path, contents, validator)
     }
+}
+
+fn write_atomically<F>(target: &Path, contents: &str, validator: F) -> Result<(), RuntimeError>
+where
+    F: FnOnce(&Path) -> Result<(), RuntimeError>,
+{
+    let parent = target.parent().ok_or_else(|| {
+        RuntimeError::new(
+            RuntimeErrorCode::ConfigInvalid,
+            "The Mihomo configuration path has no parent directory.",
+            false,
+        )
+    })?;
+    fs::create_dir_all(parent)
+        .map_err(|error| map_io_error("Could not create the Mihomo config directory", error))?;
+
+    let sequence = TEMP_FILE_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+    let temporary_path = parent.join(format!(
+        ".{}.{}.{}.tmp",
+        target
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("mihomo-config"),
+        std::process::id(),
+        sequence
+    ));
+    let mut temporary_file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&temporary_path)
+        .map_err(|error| map_io_error("Could not create a temporary Mihomo profile", error))?;
+    let guard = TemporaryFileGuard::new(temporary_path.clone());
+
+    temporary_file
+        .write_all(contents.as_bytes())
+        .and_then(|()| temporary_file.sync_all())
+        .map_err(|error| map_io_error("Could not flush the temporary Mihomo profile", error))?;
+    drop(temporary_file);
+
+    validator(&temporary_path).map_err(|error| {
+        RuntimeError::new(
+            RuntimeErrorCode::ConfigInvalid,
+            error.message,
+            error.retryable,
+        )
+    })?;
+
+    replace_config(&temporary_path, target)?;
+    guard.commit();
+    Ok(())
 }
 
 fn replace_config(temporary_path: &Path, target_path: &Path) -> Result<(), RuntimeError> {

@@ -33,6 +33,8 @@ const RUNTIME_HEALTH_VISIBLE_INTERVAL: Duration = Duration::from_millis(1_500);
 const RUNTIME_HEALTH_HIDDEN_INTERVAL: Duration = Duration::from_millis(5_000);
 const MAX_IDENTIFIER_LENGTH: usize = 512;
 const MAX_DELAY_TIMEOUT_MS: u32 = 10_000;
+/// Upper bound for subscription documents pasted or downloaded into the app.
+const MAX_SUBSCRIPTION_YAML_BYTES: usize = 8 * 1024 * 1024;
 
 type DesktopAdapter = Box<dyn MihomoAdapter>;
 type DesktopIntegration = SystemIntegration<RuntimeManager<DesktopAdapter>, NativePlatform>;
@@ -559,6 +561,78 @@ fn get_profiles(
     run_data_command(&app, state.runtime.profiles())
 }
 
+/// Imports a subscription from pasted YAML or, when `url` is given, downloads
+/// it first. The download happens before the Runtime lock is taken so a slow
+/// upstream cannot block start/stop.
+#[tauri::command]
+fn import_subscription(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    name: String,
+    yaml: Option<String>,
+    url: Option<String>,
+) -> CommandResult<Vec<ProfileInfo>> {
+    let document = match (yaml, url) {
+        (Some(yaml), _) if !yaml.trim().is_empty() => yaml,
+        (_, Some(url)) => match flowproxy_mihomo_manager::subscription_fetch::fetch(&url) {
+            Ok(document) => document,
+            Err(error) => return CommandResult::failure(error),
+        },
+        _ => {
+            return CommandResult::failure(RuntimeError::new(
+                RuntimeErrorCode::SubscriptionInvalid,
+                "Provide subscription YAML or a subscription URL.",
+                false,
+            ))
+        }
+    };
+
+    if document.len() > MAX_SUBSCRIPTION_YAML_BYTES {
+        return CommandResult::failure(RuntimeError::new(
+            RuntimeErrorCode::SubscriptionInvalid,
+            format!(
+                "The subscription is larger than the {} MiB limit.",
+                MAX_SUBSCRIPTION_YAML_BYTES / (1024 * 1024)
+            ),
+            false,
+        ));
+    }
+
+    if let Err(error) = validate_identifier("subscription name", &name, RuntimeErrorCode::SubscriptionInvalid) {
+        return CommandResult::failure(error);
+    }
+
+    if let Err(failure) = state.runtime.import_subscription(&name, &document) {
+        emit_runtime_change(&app, &failure.change);
+        return CommandResult::failure(failure.error);
+    }
+
+    CommandResult::success(
+        state
+            .runtime
+            .profiles()
+            .unwrap_or_default(),
+    )
+}
+
+#[tauri::command]
+fn clear_subscription(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> CommandResult<Vec<ProfileInfo>> {
+    if let Err(failure) = state.runtime.clear_subscription() {
+        emit_runtime_change(&app, &failure.change);
+        return CommandResult::failure(failure.error);
+    }
+
+    CommandResult::success(
+        state
+            .runtime
+            .profiles()
+            .unwrap_or_default(),
+    )
+}
+
 #[tauri::command]
 fn simulate_runtime_crash(
     app: tauri::AppHandle,
@@ -684,6 +758,8 @@ pub fn run() {
             close_connection,
             get_rules,
             get_profiles,
+            import_subscription,
+            clear_subscription,
             get_runtime_logs,
             get_settings,
             save_settings,

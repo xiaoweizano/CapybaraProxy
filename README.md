@@ -48,8 +48,39 @@
 - 阶段 2：Runtime 骨架、Runtime Demo UI、原生设置和受控退出已完成。
 - 阶段 3：Windows 上的真实 Mihomo 子进程、控制 API、真实数据页面和生命周期集成已完成。
 - 阶段 4：Windows 当前用户系统代理、开机启动、恢复 Journal、能力状态和 Settings 集成面板已完成。
-- 当前边界：TUN 仅探测，不激活；订阅下载、管理员权限操作和 Android 实现尚未接入。
-- 平台验证边界：阶段 4 仅在 Windows 10 x64 上完成运行验收；macOS 和 Linux 仍为 `unverified`。
+- 阶段 5：Android Compose UI、A/C 主题、VPNService 授权与前台服务、通知 Stop、网络状态同步、33 项 JVM 测试与 2 项仪器化测试已完成。
+- 阶段 6：性能采样、视觉证据、订阅导入和可分发产物。详见 `docs/development/stage-6-performance-report.md`。
+- 当前边界：TUN 仅探测，不激活；macOS/Linux 系统集成未实现；Android 真实 Mihomo Native/TUN 未接入。
+- 平台验证边界：桌面仅在 Windows 10 x64 完成运行验收；macOS 和 Linux 仍为 `unverified`。
+
+## 安装与实测
+
+桌面端安装包自带已校验的 Mihomo 核心与 geodata，安装后无需再手动放置文件。
+
+1. 运行 `FlowProxy_<version>_x64-setup.exe`，按当前用户安装（不要求管理员权限）。
+2. 启动后进入 **Profiles** 页面，粘贴订阅 YAML 或填写订阅 URL，点击 **Import subscription**。
+3. 回到 **Overview**，点击 hero 区域下方的 **Connect**。
+4. 状态变为 `Connected` 后，Proxies 页面会列出订阅里的真实节点。
+5. 需要走系统代理时，在 **Settings → Integration** 打开 **System proxy**。
+
+订阅能力的完整边界见 `docs/development/subscription-scope.md`。
+
+安装包的内置资源：
+
+- `resources/mihomo/mihomo.exe`：Mihomo `v1.19.33`，启动前校验 SHA-256。
+- `resources/geodata/geosite.dat`、`geoip.metadb`：订阅里的 `GEOIP`/`GEOSITE` 规则依赖它们；缺失时 Mihomo 会联网下载并在离线环境超时失败。
+
+构建安装包前先准备资源：
+
+```powershell
+node scripts/prepare-bundle-resources.mjs
+
+$env:CARGO_NET_OFFLINE = 'true'
+pnpm tauri build --bundles nsis
+```
+
+`apps/desktop/src-tauri/resources/` 不入库（约 74 MB 二进制），由上述脚本按固定哈希复制。
+
 
 ## 本地运行
 
@@ -80,18 +111,19 @@ pnpm tauri:dev
 1. 环境变量 `FLOWPROXY_MIHOMO_PATH` 指向的文件。
 2. `flowproxy-desktop.exe` 同目录下的 `mihomo.exe`。
 3. `flowproxy-desktop.exe` 同目录下 `resources\mihomo.exe`。
-4. `flowproxy-desktop.exe` 同目录下 `mihomo\mihomo.exe`。
-5. Tauri 应用配置目录下 `mihomo\mihomo.exe`，Windows 通常为 `%APPDATA%\com.flowproxy.desktop\mihomo\mihomo.exe`。
+4. `flowproxy-desktop.exe` 同目录下 `resources\mihomo\mihomo.exe`（安装包的默认布局）。
+5. `flowproxy-desktop.exe` 同目录下 `mihomo\mihomo.exe`。
+6. Tauri 应用配置目录下 `mihomo\mihomo.exe`，Windows 通常为 `%APPDATA%\com.flowproxy.desktop\mihomo\mihomo.exe`。
 
-本地开发可以直接指定已校验的文件：
+开发时若不想重新打包，可以直接指定已校验的文件：
 
 ```powershell
 $env:FLOWPROXY_MIHOMO_PATH = 'F:\codex-install\mihomo\v1.19.33\mihomo-windows-amd64.exe'
 ```
 
-当前 release 构建不会自动下载或附带 Mihomo。文件缺失、哈希不符或版本不符时，应用仍可启动，但 Runtime 会显示不可用并拒绝启动核心。
+安装包已捆绑 Mihomo 与 geodata，无需手动放置。开发构建（`pnpm tauri:dev`、`pnpm tauri build` 且未跑资源准备脚本）不含核心；文件缺失、哈希不符或版本不符时，应用仍可启动，但 Runtime 会显示不可用并拒绝启动核心。
 
-Mihomo 运行时使用应用配置目录下生成的 `mihomo\config.yaml`。生成配置固定使用本机回环控制端口、随机 API secret、`allow-lan: false`、`bind-address: 127.0.0.1`、空监听器和禁用 TUN，并对候选配置执行 `mihomo -t` 校验。Windows 系统代理只会在 Runtime 已连接、Settings 中显式启用后切换到 Mihomo 的受控回环端口；Stop、Restart、崩溃恢复、受控退出和下次启动的 Journal 恢复会按所有权规则还原或保护用户改动。本阶段不创建或激活 TUN。
+Mihomo 运行时使用应用配置目录下生成的 `mihomo\config.yaml`。导入订阅后，该文件由「订阅原文 + FlowProxy 受控块」生成：订阅里的端口、控制端、secret、`allow-lan`、`bind-address` 和 `authentication` 一律被移除并替换。控制端与 secret 另外通过命令行 `-ext-ctl` / `-secret` 覆盖。候选配置执行 `mihomo -t -d <工作目录> -f <文件>` 校验，`-d` 是必需的——否则带 `GEOIP`/`GEOSITE` 规则的订阅会因为找不到 geodata 而联网超时失败。Windows 系统代理只会在 Runtime 已连接、Settings 中显式启用后切换到 Mihomo 的受控回环端口；Stop、Restart、崩溃恢复、受控退出和下次启动的 Journal 恢复会按所有权规则还原或保护用户改动。本阶段不创建或激活 TUN。
 
 ## 检查与构建
 

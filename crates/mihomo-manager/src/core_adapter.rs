@@ -108,23 +108,22 @@ impl MihomoCoreAdapter {
     fn start_core_with_profile(&mut self) -> Result<(), RuntimeError> {
         let (api_port, proxy_port) = reserve_loopback_ports()?;
         let secret = random_hex(32)?;
-        let profile = crate::render_direct_profile(api_port, proxy_port, &secret)?;
         let binary_path = self.binary.path().to_path_buf();
+        let working_directory = working_directory_of(&self.config_store)?;
+        deploy_bundled_geodata(&working_directory);
+
+        let profile = match self.config_store.read_subscription()? {
+            Some(subscription) => {
+                crate::subscription::prepare_profile(&subscription, proxy_port)?.profile
+            }
+            None => crate::render_direct_profile(api_port, proxy_port, &secret)?,
+        };
+
         self.config_store.activate(&profile, |candidate| {
-            validate_profile(&binary_path, candidate, &secret)
+            validate_profile(&binary_path, &working_directory, candidate, &secret)
         })?;
 
         let config_path = self.config_store.path().to_path_buf();
-        let working_directory = config_path
-            .parent()
-            .ok_or_else(|| {
-                RuntimeError::new(
-                    RuntimeErrorCode::ConfigInvalid,
-                    "The Mihomo configuration path has no parent directory.",
-                    false,
-                )
-            })?
-            .to_path_buf();
 
         let mut command = Command::new(self.binary.path());
         command
@@ -132,6 +131,10 @@ impl MihomoCoreAdapter {
             .arg(&working_directory)
             .arg("-f")
             .arg(&config_path)
+            .arg("-ext-ctl")
+            .arg(format!("127.0.0.1:{api_port}"))
+            .arg("-secret")
+            .arg(&secret)
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
@@ -438,12 +441,58 @@ impl MihomoAdapter for MihomoCoreAdapter {
             .ok()
             .and_then(|metadata| metadata.modified().ok())
             .and_then(system_time_ms);
+
+        let Some(subscription) = self.config_store.read_subscription()? else {
+            return Ok(vec![ProfileInfo {
+                id: "flowproxy-direct".to_owned(),
+                name: "FlowProxy Direct".to_owned(),
+                active: true,
+                updated_at_ms,
+                source: None,
+                proxy_count: Some(0),
+            }]);
+        };
+
+        let proxy_count = crate::subscription::prepare_profile(&subscription, 1)
+            .map(|prepared| prepared.proxy_count as u32)
+            .ok();
+
         Ok(vec![ProfileInfo {
-            id: "flowproxy-direct".to_owned(),
-            name: "FlowProxy Direct".to_owned(),
+            id: "flowproxy-subscription".to_owned(),
+            name: subscription_name(&self.config_store).unwrap_or_else(|| "Imported subscription".to_owned()),
             active: true,
             updated_at_ms,
+            source: Some("subscription".to_owned()),
+            proxy_count,
         }])
+    }
+
+    fn import_subscription(&mut self, name: &str, yaml: &str) -> Result<(), RuntimeError> {
+        let prepared = crate::subscription::prepare_profile(yaml, 1)?;
+        let binary_path = self.binary.path().to_path_buf();
+        let working_directory = working_directory_of(&self.config_store)?;
+        deploy_bundled_geodata(&working_directory);
+
+        // Validate the document exactly as it will be launched, then persist
+        // the operator's original text. Start applies the control block again
+        // for the port it reserves, so storing the prepared copy would nest the
+        // header on every restart.
+        validate_prepared_subscription(&binary_path, &working_directory, &prepared.profile)?;
+        self.config_store.write_subscription(yaml, |_| Ok(()))?;
+
+        let metadata = SubscriptionMetadata {
+            name: sanitize_subscription_name(name),
+            imported_at_ms: now_ms(),
+            proxy_count: prepared.proxy_count,
+        };
+        write_subscription_metadata(&self.config_store, &metadata)?;
+        Ok(())
+    }
+
+    fn clear_subscription(&mut self) -> Result<(), RuntimeError> {
+        self.config_store.remove_subscription()?;
+        let _ = remove_subscription_metadata(&self.config_store);
+        Ok(())
     }
 
     fn take_logs(&mut self) -> Vec<String> {
@@ -533,10 +582,57 @@ fn read_lines(reader: impl Read, sender: SyncSender<String>) {
     }
 }
 
-fn validate_profile(binary: &Path, candidate: &Path, secret: &str) -> Result<(), RuntimeError> {
+/// Validates a prepared document without touching the active configuration.
+fn validate_prepared_subscription(
+    binary: &Path,
+    working_directory: &Path,
+    profile: &str,
+) -> Result<(), RuntimeError> {
+    let candidate = working_directory.join(format!(
+        ".flowproxy-subscription-check.{}.yaml",
+        std::process::id()
+    ));
+    let guard = TempCandidateGuard::new(candidate.clone());
+    std::fs::write(&candidate, profile).map_err(|error| {
+        RuntimeError::new(
+            RuntimeErrorCode::ConfigInvalid,
+            format!("The subscription could not be staged for validation: {error}"),
+            true,
+        )
+    })?;
+
+    let result = validate_profile(binary, working_directory, &candidate, "");
+    drop(guard);
+    result
+}
+
+struct TempCandidateGuard {
+    path: PathBuf,
+}
+
+impl TempCandidateGuard {
+    fn new(path: PathBuf) -> Self {
+        Self { path }
+    }
+}
+
+impl Drop for TempCandidateGuard {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.path);
+    }
+}
+
+fn validate_profile(
+    binary: &Path,
+    working_directory: &Path,
+    candidate: &Path,
+    secret: &str,
+) -> Result<(), RuntimeError> {
     let mut command = Command::new(binary);
     command
         .arg("-t")
+        .arg("-d")
+        .arg(working_directory)
         .arg("-f")
         .arg(candidate)
         .stdin(Stdio::null())
@@ -737,10 +833,68 @@ fn build_binary_candidates(
         if let Some(directory) = executable.parent() {
             candidates.push(directory.join("mihomo.exe"));
             candidates.push(directory.join("resources").join("mihomo.exe"));
+            // Tauri keeps the configured relative path under `resources/`, so
+            // `resources/mihomo/mihomo.exe` arrives as below.
+            candidates.push(
+                directory
+                    .join("resources")
+                    .join("mihomo")
+                    .join("mihomo.exe"),
+            );
+            candidates.push(
+                directory
+                    .join("resources")
+                    .join("resources")
+                    .join("mihomo")
+                    .join("mihomo.exe"),
+            );
             candidates.push(directory.join("mihomo").join("mihomo.exe"));
         }
     }
     candidates.push(config_directory.join("mihomo.exe"));
+    candidates
+}
+
+/// Copies the bundled geodata snapshots into Mihomo's working directory.
+///
+/// `mihomo -t` and the running core both resolve `geosite.dat` and
+/// `geoip.metadb` from `-d`. Without them, any `GEOIP`/`GEOSITE` rule makes the
+/// core try to download the data, which blocks validation for 90 seconds and
+/// then fails on an offline machine.
+///
+/// Failures are ignored on purpose: a subscription that needs no geodata keeps
+/// working, and a subscription that does need it will fail validation with a
+/// clear Mihomo error.
+fn deploy_bundled_geodata(working_directory: &Path) {
+    let executable = std::env::current_exe().ok();
+    for candidate in bundled_geodata_candidates(executable.as_deref()) {
+        if !candidate.is_dir() {
+            continue;
+        }
+        for file in ["geosite.dat", "geoip.metadb"] {
+            let source = candidate.join(file);
+            let target = working_directory.join(file);
+            if !source.is_file() || target.is_file() {
+                continue;
+            }
+            let _ = std::fs::copy(&source, &target);
+        }
+    }
+}
+fn bundled_geodata_candidates(executable: Option<&Path>) -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+    if let Some(executable) = executable {
+        if let Some(directory) = executable.parent() {
+            candidates.push(directory.join("resources").join("geodata"));
+            candidates.push(
+                directory
+                    .join("resources")
+                    .join("resources")
+                    .join("geodata"),
+            );
+            candidates.push(directory.join("geodata"));
+        }
+    }
     candidates
 }
 
@@ -758,6 +912,99 @@ fn system_time_ms(value: SystemTime) -> Option<i64> {
 
 fn now_ms() -> i64 {
     system_time_ms(SystemTime::now()).unwrap_or(0)
+}
+
+fn working_directory_of(config_store: &ConfigStore) -> Result<PathBuf, RuntimeError> {
+    config_store
+        .path()
+        .parent()
+        .map(Path::to_path_buf)
+        .ok_or_else(|| {
+            RuntimeError::new(
+                RuntimeErrorCode::ConfigInvalid,
+                "The Mihomo configuration path has no parent directory.",
+                false,
+            )
+        })
+}
+
+/// Metadata kept beside the imported subscription. Stored as JSON so that a
+/// future schema change can be detected instead of silently mis-parsed.
+#[derive(serde::Serialize, serde::Deserialize)]
+struct SubscriptionMetadata {
+    name: String,
+    imported_at_ms: i64,
+    proxy_count: usize,
+}
+
+const SUBSCRIPTION_METADATA_SUFFIX: &str = ".subscription.json";
+const MAX_SUBSCRIPTION_NAME_CHARS: usize = 120;
+
+fn subscription_metadata_path(config_store: &ConfigStore) -> Option<PathBuf> {
+    let subscription_path = config_store.subscription_path()?;
+    let file_name = subscription_path.file_name()?.to_str()?;
+    let stem = file_name.strip_suffix(".yaml")?;
+    Some(subscription_path.with_file_name(format!(
+        "{stem}{SUBSCRIPTION_METADATA_SUFFIX}"
+    )))
+}
+
+fn write_subscription_metadata(
+    config_store: &ConfigStore,
+    metadata: &SubscriptionMetadata,
+) -> Result<(), RuntimeError> {
+    let Some(path) = subscription_metadata_path(config_store) else {
+        return Ok(());
+    };
+    let encoded = serde_json::to_vec_pretty(metadata).map_err(|error| {
+        RuntimeError::new(
+            RuntimeErrorCode::Internal,
+            format!("The subscription metadata could not be encoded: {error}"),
+            false,
+        )
+    })?;
+    std::fs::write(&path, encoded).map_err(|error| {
+        RuntimeError::new(
+            RuntimeErrorCode::SettingsIo,
+            format!("The subscription metadata could not be written: {error}"),
+            true,
+        )
+    })
+}
+
+fn remove_subscription_metadata(config_store: &ConfigStore) -> std::io::Result<()> {
+    let Some(path) = subscription_metadata_path(config_store) else {
+        return Ok(());
+    };
+    match std::fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error),
+    }
+}
+
+fn subscription_name(config_store: &ConfigStore) -> Option<String> {
+    let path = subscription_metadata_path(config_store)?;
+    let raw = std::fs::read_to_string(path).ok()?;
+    let metadata: SubscriptionMetadata = serde_json::from_str(&raw).ok()?;
+    if metadata.name.trim().is_empty() {
+        return None;
+    }
+    Some(metadata.name)
+}
+
+fn sanitize_subscription_name(name: &str) -> String {
+    let trimmed: String = name
+        .trim()
+        .chars()
+        .filter(|character| !character.is_control())
+        .take(MAX_SUBSCRIPTION_NAME_CHARS)
+        .collect();
+    if trimmed.is_empty() {
+        "Imported subscription".to_owned()
+    } else {
+        trimmed
+    }
 }
 
 fn api_error(message: impl Into<String>) -> RuntimeError {
@@ -1024,8 +1271,27 @@ mod tests {
             vec![
                 PathBuf::from(r"C:\Program Files\FlowProxy\mihomo.exe"),
                 PathBuf::from(r"C:\Program Files\FlowProxy\resources\mihomo.exe"),
+                PathBuf::from(r"C:\Program Files\FlowProxy\resources\mihomo\mihomo.exe"),
+                PathBuf::from(
+                    r"C:\Program Files\FlowProxy\resources\resources\mihomo\mihomo.exe"
+                ),
                 PathBuf::from(r"C:\Program Files\FlowProxy\mihomo\mihomo.exe"),
                 PathBuf::from(r"C:\Users\person\AppData\Roaming\FlowProxy\mihomo.exe"),
+            ]
+        );
+    }
+
+    #[test]
+    fn bundled_geodata_is_looked_up_next_to_the_executable() {
+        let executable = PathBuf::from(r"C:\Program Files\FlowProxy\flowproxy.exe");
+        let candidates = super::bundled_geodata_candidates(Some(&executable));
+
+        assert_eq!(
+            candidates,
+            vec![
+                PathBuf::from(r"C:\Program Files\FlowProxy\resources\geodata"),
+                PathBuf::from(r"C:\Program Files\FlowProxy\resources\resources\geodata"),
+                PathBuf::from(r"C:\Program Files\FlowProxy\geodata"),
             ]
         );
     }
