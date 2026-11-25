@@ -10,6 +10,7 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import {
   useRuntime,
@@ -29,15 +30,6 @@ import { NetworkOrb } from "./NetworkOrb";
 import { NodeMap } from "./NodeMap";
 import { TrafficChart } from "./TrafficChart";
 
-const STATUS_LABELS: Record<RuntimeState, string> = {
-  stopped: "Stopped",
-  starting: "Starting",
-  running_disconnected: "Disconnected",
-  connected: "Connected",
-  stopping: "Stopping",
-  error: "Error",
-  permission_required: "Permission required",
-};
 
 const MEBIBYTE = 1024 * 1024;
 const GIBIBYTE = 1024 * MEBIBYTE;
@@ -65,9 +57,12 @@ function formatSessionTraffic(bytes: number | null): string {
   return `${(bytes / MEBIBYTE).toFixed(1)} MB`;
 }
 
-function formatDuration(startedAtMs: number | null): string {
+function formatDuration(
+  startedAtMs: number | null,
+  emptyLabel: string,
+): string {
   if (startedAtMs === null) {
-    return "No active session";
+    return emptyLabel;
   }
 
   const totalSeconds = Math.max(
@@ -94,6 +89,7 @@ function ConnectionHero({
   onStart: () => void;
   onStop: () => void;
 }) {
+  const { t } = useTranslation();
   const { theme } = useTheme();
   const connected = snapshot?.state === "connected";
   const telemetry = useTelemetry(connected);
@@ -125,10 +121,10 @@ function ConnectionHero({
             data-status={state ?? "stopped"}
           >
             <span className="connection-status-dot" />
-            <span>{state ? STATUS_LABELS[state] : "Loading"}</span>
+            <span>{state ? t(`runtime.state.${state}`) : t("runtime.state.loading")}</span>
           </span>
           <span className="hero-duration">
-            {formatDuration(snapshot?.started_at_ms ?? null)}
+            {formatDuration(snapshot?.started_at_ms ?? null, t("overview.noActiveSession"))}
           </span>
         </div>
 
@@ -140,7 +136,7 @@ function ConnectionHero({
               disabled={pendingAction !== null}
               onClick={onStop}
             >
-              {pendingAction === "stop" ? "Disconnecting..." : "Disconnect"}
+              {pendingAction === "stop" ? t("runtime.disconnecting") : t("runtime.disconnect")}
             </button>
           ) : (
             <button
@@ -149,7 +145,7 @@ function ConnectionHero({
               disabled={pendingAction !== null}
               onClick={onStart}
             >
-              {pendingAction === "start" ? "Connecting..." : "Connect"}
+              {pendingAction === "start" ? t("runtime.connecting") : t("runtime.connect")}
             </button>
           )}
         </div>
@@ -160,7 +156,7 @@ function ConnectionHero({
               <ArrowUp aria-hidden="true" size={17} strokeWidth={2.2} />
             </span>
             <span>
-              <small>Upload</small>
+              <small>{t("overview.upload")}</small>
               <strong>{formatSpeed(latest?.upload_bps ?? null)}</strong>
             </span>
           </div>
@@ -169,7 +165,7 @@ function ConnectionHero({
               <ArrowDown aria-hidden="true" size={17} strokeWidth={2.2} />
             </span>
             <span>
-              <small>Download</small>
+              <small>{t("overview.download")}</small>
               <strong>{formatSpeed(latest?.download_bps ?? null)}</strong>
             </span>
           </div>
@@ -177,35 +173,35 @@ function ConnectionHero({
 
         <div className="hero-traffic">
           <div className="hero-traffic-heading">
-            <span>Live traffic</span>
+            <span>{t("overview.liveTraffic")}</span>
             <span className="traffic-legend">
-              <span data-series="upload">Up</span>
-              <span data-series="download">Down</span>
+              <span data-series="upload">{t("overview.up")}</span>
+              <span data-series="download">{t("overview.down")}</span>
               <span>
                 {telemetry.history.length > 0
-                  ? `${telemetry.history.length} samples`
-                  : "No samples"}
+                  ? t("overview.samples", { count: telemetry.history.length })
+                  : t("overview.noSamples")}
               </span>
             </span>
           </div>
           {connected && !telemetry.latest ? (
             <p className="hero-telemetry-empty">
-              Waiting for live telemetry
+              {t("overview.waitingTelemetry")}
             </p>
           ) : !connected ? (
             <p className="hero-telemetry-empty">
-              Waiting for live telemetry
+              {t("overview.waitingTelemetry")}
             </p>
           ) : null}
           <TrafficChart
             downloadSeries={downloadSeries}
             uploadSeries={uploadSeries}
-            label="Live upload and download traffic"
+            label={t("overview.trafficLabel")}
           />
         </div>
 
         <div className="hero-today">
-          <span>Session Traffic</span>
+          <span>{t("overview.sessionTraffic")}</span>
           <strong>{formatSessionTraffic(sessionTraffic)}</strong>
         </div>
       </div>
@@ -228,18 +224,20 @@ function ProxySelectionCard({
   onGroupChange: (group: string) => void;
   onNodeChange: (node: string) => void;
 }) {
+  const { t } = useTranslation();
+
   return (
     <section className="overview-card proxy-card" aria-labelledby="proxy-title">
       <div className="overview-card-heading">
         <div>
-          <span className="overview-card-kicker">Routing</span>
-          <h2 id="proxy-title">Proxy Group</h2>
+          <span className="overview-card-kicker">{t("overview.routing")}</span>
+          <h2 id="proxy-title">{t("overview.proxyGroup")}</h2>
         </div>
         <Network aria-hidden="true" size={17} />
       </div>
 
       <div className="proxy-select-row">
-        <label htmlFor="proxy-group-select">Group</label>
+        <label htmlFor="proxy-group-select">{t("overview.group")}</label>
         <div className="select-wrap">
           <select
             id="proxy-group-select"
@@ -248,7 +246,7 @@ function ProxySelectionCard({
             onChange={(event) => onGroupChange(event.target.value)}
           >
             {groups.length === 0 ? (
-              <option value="">No proxy groups available</option>
+              <option value="">{t("overview.noProxyGroups")}</option>
             ) : (
               groups.map((option) => (
                 <option key={option.name} value={option.name}>
@@ -263,17 +261,17 @@ function ProxySelectionCard({
 
       <div className="proxy-node-row">
         <div className="proxy-node-copy">
-          <span className="overview-card-kicker">Current node</span>
+          <span className="overview-card-kicker">{t("overview.currentNode")}</span>
           <div className="proxy-node-name">
             <Globe2 aria-hidden="true" size={15} />
             <strong aria-live="polite">
-              {selectedNodeName || "No node selected"}
+              {selectedNodeName || t("overview.noNodeSelected")}
             </strong>
           </div>
         </div>
         <div className="select-wrap node-select-wrap">
           <label className="sr-only" htmlFor="proxy-node-select">
-            Current node
+            {t("overview.currentNode")}
           </label>
           <select
             id="proxy-node-select"
@@ -286,7 +284,7 @@ function ProxySelectionCard({
             }}
           >
             {nodes.length === 0 ? (
-              <option value="">No nodes available</option>
+              <option value="">{t("overview.noNodes")}</option>
             ) : (
               nodes.map((option) => (
                 <option key={option.name} value={option.name}>
@@ -315,14 +313,15 @@ function LatencyCard({
   isMeasuring: boolean;
   onMeasure: () => void;
 }) {
+  const { t } = useTranslation();
   const quality =
     latencyMs === null
-      ? { label: "Latency not measured", level: "unavailable" }
+      ? { label: t("overview.latencyUnmeasured"), level: "unavailable" }
       : latencyMs < 80
-        ? { label: "Excellent route", level: "success" }
+        ? { label: t("overview.latencyExcellent"), level: "success" }
         : latencyMs < 150
-          ? { label: "Good route", level: "notice" }
-          : { label: "High latency", level: "danger" };
+          ? { label: t("overview.latencyGood"), level: "notice" }
+          : { label: t("overview.latencyHigh"), level: "danger" };
 
   return (
     <section
@@ -332,9 +331,9 @@ function LatencyCard({
       <div className="overview-card-heading">
         <div>
           <span className="overview-card-kicker">
-            {node?.name ?? "No active node"}
+            {node?.name ?? t("overview.noActiveNode")}
           </span>
-          <h2 id="latency-title">Latency</h2>
+          <h2 id="latency-title">{t("overview.latency")}</h2>
         </div>
         <CircleGauge aria-hidden="true" size={17} />
       </div>
@@ -345,7 +344,7 @@ function LatencyCard({
       <button
         className="latency-measure-button"
         type="button"
-        aria-label="Measure current node delay"
+        aria-label={t("overview.measureAria")}
         disabled={!canMeasure || isMeasuring}
         onClick={onMeasure}
       >
@@ -354,7 +353,7 @@ function LatencyCard({
         ) : (
           <CircleGauge aria-hidden="true" size={12} />
         )}
-        {isMeasuring ? "Measuring" : "Measure delay"}
+        {isMeasuring ? t("overview.measuring") : t("overview.measureDelay")}
       </button>
     </section>
   );
@@ -378,6 +377,7 @@ function buildSparklinePath(values: readonly number[]): string {
 }
 
 function ActiveConnectionsCard({ connected }: { connected: boolean }) {
+  const { t } = useTranslation();
   const telemetry = useTelemetry(connected);
   const latest = connected ? telemetry.latest : null;
   const history = connected
@@ -390,8 +390,8 @@ function ActiveConnectionsCard({ connected }: { connected: boolean }) {
     <Link className="overview-card active-connections-card" to="/connections">
       <div className="overview-card-heading">
         <div>
-          <span className="overview-card-kicker">Live sessions</span>
-          <h2>Active Connections</h2>
+          <span className="overview-card-kicker">{t("overview.liveSessions")}</span>
+          <h2>{t("overview.activeConnections")}</h2>
         </div>
         <ArrowUpRight aria-hidden="true" size={17} />
       </div>
@@ -402,7 +402,7 @@ function ActiveConnectionsCard({ connected }: { connected: boolean }) {
           className="connections-sparkline"
           viewBox="0 0 130 62"
           role="img"
-          aria-label="Active connection history"
+          aria-label={t("overview.connectionHistory")}
         >
           <defs>
             <linearGradient id="connections-fill" x1="0" y1="0" x2="0" y2="1">
@@ -429,8 +429,8 @@ function ActiveConnectionsCard({ connected }: { connected: boolean }) {
         <span className="connections-active-dot" />
         <span>
           {history.length > 0
-            ? `${history.length} live samples`
-            : "Waiting for live telemetry"}
+            ? t("overview.samples", { count: history.length })
+            : t("overview.waitingTelemetry")}
         </span>
       </div>
     </Link>
@@ -438,6 +438,7 @@ function ActiveConnectionsCard({ connected }: { connected: boolean }) {
 }
 
 export function OverviewPage() {
+  const { t } = useTranslation();
   const runtime = useRuntime();
   const [selectedGroupName, setSelectedGroupName] = useState("");
   const [selectedNodeName, setSelectedNodeName] = useState("");
@@ -520,7 +521,7 @@ export function OverviewPage() {
   return (
     <section className="overview-page" aria-labelledby="overview-title">
       <h1 id="overview-title" className="sr-only">
-        Overview
+        {t("nav.overview")}
       </h1>
 
       {runtime.lastError ? (

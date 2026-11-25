@@ -62,17 +62,19 @@ pub fn fetch(url: &str) -> Result<String, RuntimeError> {
         }))
         .user_agent(USER_AGENT)
         .build()
-        .map_err(|error| invalid(format!("The download client could not start: {}", redact(&error.to_string()))))?;
-
-    let mut response = client
-        .get(url)
-        .send()
         .map_err(|error| {
             invalid(format!(
-                "The subscription could not be downloaded: {}",
-                describe_request_error(&error)
+                "The download client could not start: {}",
+                redact(&error.to_string())
             ))
         })?;
+
+    let mut response = client.get(url).send().map_err(|error| {
+        invalid(format!(
+            "The subscription could not be downloaded: {}",
+            describe_request_error(&error)
+        ))
+    })?;
 
     if !response.status().is_success() {
         return Err(invalid(format!(

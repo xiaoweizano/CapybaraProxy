@@ -19,9 +19,10 @@ import {
   SystemIntegrationContext,
   type SystemIntegrationAction,
 } from "./systemIntegrationContext";
+import { i18n } from "../../i18n";
 
-const unavailableNotice =
-  "Desktop system integration is unavailable in this preview.";
+const unavailableNotice = (): string =>
+  i18n.t("errors.integrationUnavailable");
 
 type IntegrationState = {
   status: SystemIntegrationStatus | null;
@@ -124,7 +125,7 @@ export function SystemIntegrationProvider({
           updateState({ isLoading: false });
         }
       } else if (result.status === "unavailable") {
-        updateState({ isLoading: false, notice: unavailableNotice });
+        updateState({ isLoading: false, notice: unavailableNotice() });
       } else {
         updateState({ isLoading: false, error: result.error });
       }
@@ -133,7 +134,7 @@ export function SystemIntegrationProvider({
         updateState({
           isLoading: false,
           error: unexpectedError(
-            "FlowProxy could not read desktop integration state.",
+            i18n.t("errors.integrationState"),
           ),
         });
       }
@@ -156,7 +157,7 @@ export function SystemIntegrationProvider({
       .catch(() => {
         if (!disposed) {
           updateState({
-            notice: "Desktop integration events are unavailable.",
+            notice: i18n.t("errors.integrationEvents"),
           });
         }
       });
@@ -200,7 +201,7 @@ export function SystemIntegrationProvider({
             updateState({ pendingAction: null });
           }
         } else if (result.status === "unavailable") {
-          updateState({ pendingAction: null, notice: unavailableNotice });
+          updateState({ pendingAction: null, notice: unavailableNotice() });
         } else {
           updateState({ pendingAction: null, error: result.error });
         }
@@ -209,7 +210,7 @@ export function SystemIntegrationProvider({
           updateState({
             pendingAction: null,
             error: unexpectedError(
-              "FlowProxy could not update desktop integration state.",
+              i18n.t("errors.integrationUpdate"),
             ),
           });
         }

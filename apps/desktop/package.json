@@ -14,13 +14,15 @@
     "tauri": "tauri"
   },
   "dependencies": {
+    "@flowproxy/design-tokens": "workspace:*",
     "@fontsource-variable/manrope": "^5.3.0",
     "@fontsource-variable/sora": "^5.3.0",
-    "@flowproxy/design-tokens": "workspace:*",
     "@tauri-apps/api": "^2.12.4",
+    "i18next": "^27.2.7",
     "lucide-react": "^1.68.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
+    "react-i18next": "^18.0.3",
     "react-router-dom": "^7.18.5"
   },
   "devDependencies": {

@@ -37,6 +37,8 @@ import com.flowproxy.core.model.ProxyStatus
 import com.flowproxy.core.model.ThemeId
 import com.flowproxy.core.model.VpnServiceState
 import com.flowproxy.core.theme.LocalFlowPalette
+import com.flowproxy.android.i18n.AppLanguage
+import com.flowproxy.android.i18n.LocalAppStrings
 
 @Composable
 fun SettingsPage(
@@ -51,7 +53,10 @@ fun SettingsPage(
     onRequestNotifications: () -> Unit,
     onOpenBatterySettings: () -> Unit,
     onStartStopVpn: () -> Unit,
+    language: AppLanguage,
+    onLanguageChange: (AppLanguage) -> Unit,
 ) {
+    val strings = LocalAppStrings.current
     val palette = LocalFlowPalette.current
     val appVersion = rememberAppVersion()
     val vpnSessionActive = status.vpnService == VpnServiceState.RUNNING ||
@@ -69,21 +74,21 @@ fun SettingsPage(
     ) {
         item {
             PageIntro(
-                eyebrow = "Preferences",
-                title = "Settings",
-                description = "Theme and lifecycle settings are persisted on device. Runtime controls remain capability-gated.",
+                eyebrow = strings.settingsEyebrow,
+                title = strings.settingsTitle,
+                description = strings.settingsDescription,
             )
         }
         item {
             FlowCard {
                 Text(
-                    text = "Appearance",
+                    text = strings.appearance,
                     color = palette.textPrimary,
                     style = MaterialTheme.typography.titleMedium,
                 )
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    text = "A is the default dark theme. C switches to the warm blue-white theme.",
+                    text = strings.appearanceDescription,
                     color = palette.textSecondary,
                     style = MaterialTheme.typography.bodyMedium,
                 )
@@ -96,13 +101,13 @@ fun SettingsPage(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     ThemeChoice(
-                        themeLabel = "A · Cyber Flow",
+                        themeLabel = strings.themeACyberFlow,
                         selected = themeId == ThemeId.CYBER_FLOW,
                         onClick = { onThemeChange(ThemeId.CYBER_FLOW) },
                         modifier = Modifier.weight(1f),
                     )
                     ThemeChoice(
-                        themeLabel = "C · Warm Flow",
+                        themeLabel = strings.themeCWarmFlow,
                         selected = themeId == ThemeId.WARM_FLOW,
                         onClick = { onThemeChange(ThemeId.WARM_FLOW) },
                         modifier = Modifier.weight(1f),
@@ -110,11 +115,47 @@ fun SettingsPage(
                 }
                 Spacer(Modifier.height(8.dp))
                 SettingToggle(
-                    title = "Reduce motion",
-                    description = "Pauses Orb and companion idle animation when enabled.",
+                    title = strings.reduceMotion,
+                    description = strings.reduceMotionDescription,
                     checked = reducedMotion,
                     onCheckedChange = onReducedMotionChange,
                 )
+            }
+        }
+        item {
+            FlowCard {
+                Text(
+                    text = strings.languageTitle,
+                    color = palette.textPrimary,
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = strings.languageDescription,
+                    color = palette.textSecondary,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Spacer(Modifier.height(14.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(palette.surfaceSoft, RoundedCornerShape(12.dp))
+                        .padding(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    ThemeChoice(
+                        themeLabel = strings.languageEnglish,
+                        selected = language == AppLanguage.ENGLISH,
+                        onClick = { onLanguageChange(AppLanguage.ENGLISH) },
+                        modifier = Modifier.weight(1f),
+                    )
+                    ThemeChoice(
+                        themeLabel = strings.languageChinese,
+                        selected = language == AppLanguage.SIMPLIFIED_CHINESE,
+                        onClick = { onLanguageChange(AppLanguage.SIMPLIFIED_CHINESE) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
         }
         item {
@@ -125,7 +166,7 @@ fun SettingsPage(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = "Android VPN",
+                        text = strings.androidVpn,
                         color = palette.textPrimary,
                         style = MaterialTheme.typography.titleMedium,
                     )
@@ -144,19 +185,19 @@ fun SettingsPage(
                 }
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    text = "The service uses an Android foreground notification. No routes are installed until a verified Mihomo bridge can consume the TUN descriptor.",
+                    text = strings.androidVpnDescription,
                     color = palette.textSecondary,
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Spacer(Modifier.height(14.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     Metric(
-                        label = "PERMISSION",
+                        label = strings.permissionLabel,
                         value = status.permission.name,
                         modifier = Modifier.weight(1f),
                     )
                     Metric(
-                        label = "SERVICE",
+                        label = strings.serviceLabel,
                         value = status.vpnService.name,
                         modifier = Modifier.weight(1f),
                     )
@@ -164,9 +205,9 @@ fun SettingsPage(
                 Spacer(Modifier.height(16.dp))
                 FlowButton(
                     text = if (vpnSessionActive) {
-                        "Stop VPN session"
+                        strings.actionStopVpn
                     } else {
-                        "Start VPN session"
+                        strings.actionStartVpn
                     },
                     onClick = onStartStopVpn,
                     secondary = vpnSessionActive,
@@ -176,28 +217,28 @@ fun SettingsPage(
         item {
             FlowCard {
                 Text(
-                    text = "Notifications & battery",
+                    text = strings.notificationsBattery,
                     color = palette.textPrimary,
                     style = MaterialTheme.typography.titleMedium,
                 )
                 Spacer(Modifier.height(8.dp))
                 SettingActionRow(
-                    title = "Foreground notification",
+                    title = strings.foregroundNotification,
                     description = if (notificationsEnabled) {
-                        "Allowed. VPN lifecycle status is visible in the notification shade."
+                        strings.notificationAllowed
                     } else {
-                        "Not allowed. Android can hide notification content, but the foreground-service requirement still applies."
+                        strings.notificationBlocked
                     },
-                    action = if (notificationsEnabled) null else "Allow",
+                    action = if (notificationsEnabled) null else strings.allow,
                     onAction = onRequestNotifications,
                 )
                 Spacer(Modifier.height(12.dp))
                 DividerLine()
                 Spacer(Modifier.height(12.dp))
                 SettingActionRow(
-                    title = "Battery optimization",
-                    description = "Keep the VPN session active while the screen is off. Exact behavior depends on the device vendor.",
-                    action = "Open",
+                    title = strings.batteryOptimization,
+                    description = strings.batteryDescription,
+                    action = strings.open,
                     onAction = onOpenBatterySettings,
                 )
             }
@@ -210,27 +251,27 @@ fun SettingsPage(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = "Mihomo native bridge",
+                        text = strings.mihomoBridge,
                         color = palette.textPrimary,
                         style = MaterialTheme.typography.titleMedium,
                     )
                     DemoBadge(
                         text = when (capability.state) {
-                            MihomoBridgeState.AVAILABLE -> "VERIFIED"
-                            MihomoBridgeState.PROBE_ONLY -> "PROBE ONLY"
-                            MihomoBridgeState.UNAVAILABLE -> "UNAVAILABLE"
+                            MihomoBridgeState.AVAILABLE -> strings.verifiedBadge
+                            MihomoBridgeState.PROBE_ONLY -> strings.probeOnlyBadge
+                            MihomoBridgeState.UNAVAILABLE -> strings.unavailableBadge
                         },
                     )
                 }
                 Spacer(Modifier.height(12.dp))
-                CapabilityRow("ABI", capability.abi)
+                CapabilityRow(strings.abiLabel, capability.abi)
                 CapabilityRow(
-                    "Library",
-                    if (capability.nativeLibraryPresent) "Present" else "Not bundled",
+                    strings.libraryLabel,
+                    if (capability.nativeLibraryPresent) strings.present else strings.notBundled,
                 )
                 CapabilityRow(
-                    "TUN FD handoff",
-                    if (capability.tunFileDescriptorSupported) "Verified" else "Unverified",
+                    strings.tunHandoffLabel,
+                    if (capability.tunFileDescriptorSupported) strings.verifiedValue else strings.unverifiedValue,
                 )
                 Spacer(Modifier.height(10.dp))
                 Text(
@@ -243,13 +284,13 @@ fun SettingsPage(
         item {
             FlowCard {
                 Text(
-                    text = "Stage boundary",
+                    text = strings.stageBoundary,
                     color = palette.textPrimary,
                     style = MaterialTheme.typography.titleMedium,
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    text = "Proxy groups, nodes, rules, connections, profiles and logs are isolated demo catalogs. They never report as live Mihomo data.",
+                    text = strings.stageBoundaryDescription,
                     color = palette.textSecondary,
                     style = MaterialTheme.typography.bodyMedium,
                 )

@@ -7,6 +7,7 @@ import {
   CircleX,
 } from "lucide-react";
 import { useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useRuntime } from "../../app/runtime/runtimeContext";
 import { useBridgeResource } from "../../app/runtime/useBridgeResource";
 import {
@@ -37,6 +38,7 @@ function formatBytes(bytes: number): string {
 }
 
 export function ConnectionsPage() {
+  const { t } = useTranslation();
   const { snapshot } = useRuntime();
   const isConnected = snapshot?.state === "connected";
   const connections = useBridgeResource(getConnections, isConnected);
@@ -126,9 +128,9 @@ export function ConnectionsPage() {
 
   return (
     <WorkspacePage
-      eyebrow="Live traffic"
-      title="Connections"
-      badge={isConnected ? "Live Mihomo" : "Offline"}
+      eyebrow={t("connections.eyebrow")}
+      title={t("connections.title")}
+      badge={isConnected ? t("common.liveMihomo") : t("common.offline")}
     >
       <ResourceFeedback
         error={connections.error ?? actionError}
@@ -141,17 +143,17 @@ export function ConnectionsPage() {
         <section className="workspace-panel">
           <div className="workspace-panel-heading">
             <div>
-              <span className="workspace-kicker">Mihomo API</span>
-              <h2>Active Connections</h2>
+              <span className="workspace-kicker">{t("connections.kicker")}</span>
+              <h2>{t("connections.heading")}</h2>
             </div>
             <div className="workspace-panel-actions">
               <span className="workspace-count">
-                {visibleConnections.length} sessions
+                {t("connections.count", { count: visibleConnections.length })}
               </span>
               <RefreshButton
                 isLoading={connections.isLoading}
                 onClick={() => void connections.reload()}
-                label="Refresh connections"
+                label={t("connections.refresh")}
               />
             </div>
           </div>
@@ -160,24 +162,24 @@ export function ConnectionsPage() {
             <div className="connections-summary">
               <span>
                 <ArrowUp aria-hidden="true" size={13} />
-                {formatBytes(connections.data.upload_total_bytes)} uploaded
+                {t("connections.uploaded", { value: formatBytes(connections.data.upload_total_bytes) })}
               </span>
               <span>
                 <ArrowDown aria-hidden="true" size={13} />
-                {formatBytes(connections.data.download_total_bytes)} downloaded
+                {t("connections.downloaded", { value: formatBytes(connections.data.download_total_bytes) })}
               </span>
-              <span>{formatBytes(connections.data.memory_bytes)} memory</span>
+              <span>{t("connections.memory", { value: formatBytes(connections.data.memory_bytes) })}</span>
             </div>
           ) : null}
 
           {connections.isLoading && connections.data === null ? (
-            <LoadingState label="Loading active connections..." />
+            <LoadingState label={t("connections.loading")} />
           ) : visibleConnections.length === 0 ? (
             <div className="workspace-empty">
               <Cable aria-hidden="true" size={22} />
               <div>
-                <h2>No active connections</h2>
-                <p>Mihomo is running, but no proxy sessions are open.</p>
+                <h2>{t("connections.emptyTitle")}</h2>
+                <p>{t("connections.emptyBody")}</p>
               </div>
             </div>
           ) : (
@@ -207,8 +209,8 @@ export function ConnectionsPage() {
                     <button
                       className="workspace-icon-button workspace-danger-button"
                       type="button"
-                      aria-label={`Close connection ${connection.host || connection.destination_ip}`}
-                      title="Close connection"
+                      aria-label={t("connections.close", { name: connection.host || connection.destination_ip })}
+                      title={t("connections.close", { name: connection.host || connection.destination_ip })}
                       disabled={pendingConnection !== null}
                       onClick={() => void close(connection.id)}
                     >
@@ -218,15 +220,15 @@ export function ConnectionsPage() {
                 ))}
               </div>
               {pageCount > 1 ? (
-                <nav className="connection-pagination" aria-label="Connections pages">
+                <nav className="connection-pagination" aria-label={t("connections.pagination")}>
                   <span>
-                    Page {currentPage} of {pageCount}
+                    {t("connections.page", { current: currentPage, total: pageCount })}
                   </span>
                   <div>
                     <button
                       className="workspace-icon-button"
                       type="button"
-                      aria-label="Previous connections page"
+                      aria-label={t("connections.previousPage")}
                       disabled={currentPage === 1}
                       onClick={() => setPage((current) => Math.max(1, current - 1))}
                     >
@@ -235,7 +237,7 @@ export function ConnectionsPage() {
                     <button
                       className="workspace-icon-button"
                       type="button"
-                      aria-label="Next connections page"
+                      aria-label={t("connections.nextPage")}
                       disabled={currentPage === pageCount}
                       onClick={() =>
                         setPage((current) => Math.min(pageCount, current + 1))

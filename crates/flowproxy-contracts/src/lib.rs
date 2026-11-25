@@ -497,7 +497,10 @@ mod tests {
             (RuntimeErrorCode::ApiUnavailable, "api_unavailable"),
             (RuntimeErrorCode::SelectionFailed, "selection_failed"),
             (RuntimeErrorCode::ConnectionNotFound, "connection_not_found"),
-            (RuntimeErrorCode::SubscriptionInvalid, "subscription_invalid"),
+            (
+                RuntimeErrorCode::SubscriptionInvalid,
+                "subscription_invalid",
+            ),
         ] {
             assert_eq!(
                 serde_json::to_value(code).expect("serialize error code"),

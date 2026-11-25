@@ -23,6 +23,15 @@ import {
   type ThemeId,
 } from "../theme/theme";
 import {
+  DEFAULT_LANGUAGE,
+  detectSystemLanguage,
+  isLanguage,
+  readStoredLanguage,
+  writeStoredLanguage,
+  type LanguageId,
+} from "../../i18n/language";
+import { applyLanguage } from "../../i18n";
+import {
   AppSettingsContext,
   SETTINGS_MIGRATION_KEY,
   type AppPreferences,
@@ -32,21 +41,19 @@ import {
 
 type PreferencePatch = Partial<AppPreferences>;
 
-function defaultPreferences(): AppPreferences {
-  return {
-    theme: "cyber_flow",
-    closeBehavior: "hide_to_tray",
-  };
-}
-
 function readPreviewPreferences(): AppPreferences {
   try {
     return {
       theme: readStoredTheme(window.localStorage),
       closeBehavior: readStoredCloseBehavior(window.localStorage),
+      language: readStoredLanguage(window.localStorage),
     };
   } catch {
-    return defaultPreferences();
+    return {
+      theme: "cyber_flow",
+      closeBehavior: "hide_to_tray",
+      language: DEFAULT_LANGUAGE,
+    };
   }
 }
 
@@ -54,6 +61,9 @@ function fromNativeSettings(settings: DesktopSettings): AppPreferences {
   return {
     theme: settings.theme,
     closeBehavior: settings.close_behavior,
+    // A `settings.json` written before the field existed has no language;
+    // follow the system locale instead of forcing English on a fresh upgrade.
+    language: settings.language ?? detectSystemLanguage(),
   };
 }
 
@@ -62,6 +72,7 @@ function toNativeSettings(settings: AppPreferences): DesktopSettings {
     version: 1,
     theme: settings.theme,
     close_behavior: settings.closeBehavior,
+    language: settings.language,
   };
 }
 
@@ -72,6 +83,7 @@ function writePreferenceCache(settings: AppPreferences): void {
       window.localStorage,
       settings.closeBehavior,
     );
+    writeStoredLanguage(window.localStorage, settings.language);
   } catch {
     // The native settings store remains authoritative when cache writes fail.
   }
@@ -126,6 +138,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     settingsRef.current = nextSettings;
     setSettings(nextSettings);
     writePreferenceCache(nextSettings);
+    applyLanguage(nextSettings.language);
   }, []);
 
   useEffect(() => {
@@ -275,6 +288,19 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     [enqueueUpdate],
   );
 
+  const updateLanguage = useCallback(
+    (language: LanguageId): Promise<SettingsUpdateResult> => {
+      if (!isLanguage(language)) {
+        const message = "Unknown FlowProxy language.";
+        setError(message);
+        return Promise.resolve({ ok: false, message });
+      }
+
+      return enqueueUpdate({ language });
+    },
+    [enqueueUpdate],
+  );
+
   const clearError = useCallback(() => setError(null), []);
 
   const value = useMemo(
@@ -285,6 +311,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       error,
       updateTheme,
       updateCloseBehavior,
+      updateLanguage,
       clearError,
     }),
     [
@@ -294,6 +321,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       error,
       updateTheme,
       updateCloseBehavior,
+      updateLanguage,
       clearError,
     ],
   );

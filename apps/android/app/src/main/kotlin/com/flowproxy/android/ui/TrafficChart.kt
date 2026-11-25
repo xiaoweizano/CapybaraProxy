@@ -32,6 +32,7 @@ import com.flowproxy.android.data.DemoCatalog
 import com.flowproxy.core.model.TrafficHistory
 import com.flowproxy.core.model.TrafficSample
 import com.flowproxy.core.theme.LocalFlowPalette
+import com.flowproxy.android.i18n.LocalAppStrings
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -92,12 +93,12 @@ fun DemoTrafficChart(
         ) {
             Column {
                 Text(
-                    text = "Traffic",
+                    text = LocalAppStrings.current.traffic,
                     color = palette.textPrimary,
                     style = MaterialTheme.typography.titleMedium,
                 )
                 Text(
-                    text = "Synthetic preview · no proxy telemetry",
+                    text = LocalAppStrings.current.trafficSyntheticNote,
                     color = palette.textMuted,
                     style = MaterialTheme.typography.labelMedium,
                 )
@@ -107,12 +108,12 @@ fun DemoTrafficChart(
         Spacer(Modifier.height(16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
             TrafficValue(
-                label = "Upload",
+                label = LocalAppStrings.current.upload,
                 value = formatRate(upload),
                 color = palette.accentCyan,
             )
             TrafficValue(
-                label = "Download",
+                label = LocalAppStrings.current.download,
                 value = formatRate(download),
                 color = palette.accent,
             )

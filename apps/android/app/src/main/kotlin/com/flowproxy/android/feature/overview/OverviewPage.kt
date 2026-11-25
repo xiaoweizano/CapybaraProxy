@@ -43,6 +43,10 @@ import com.flowproxy.core.model.VpnPermissionState
 import com.flowproxy.core.model.VpnServiceState
 import com.flowproxy.core.model.deriveConnectionStatus
 import com.flowproxy.core.theme.LocalFlowPalette
+import com.flowproxy.android.i18n.LocalAppStrings
+import com.flowproxy.android.i18n.AppStrings
+import com.flowproxy.android.i18n.coreStateLabel
+import com.flowproxy.android.i18n.vpnStateLabel
 
 @Composable
 fun OverviewPage(
@@ -53,6 +57,7 @@ fun OverviewPage(
     reducedMotion: Boolean,
     onStartStop: () -> Unit,
 ) {
+    val strings = LocalAppStrings.current
     val connectionStatus = deriveConnectionStatus(status)
     val lifecycleActive = rememberLifecycleActive()
 
@@ -93,23 +98,23 @@ fun OverviewPage(
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Text(
-                        text = "Route",
+                        text = strings.route,
                         color = LocalFlowPalette.current.textPrimary,
                         style = MaterialTheme.typography.titleMedium,
                     )
                     DemoBadge()
                 }
                 Spacer(Modifier.height(14.dp))
-                Metric(label = "PROXY GROUP", value = DemoCatalog.groups.first().name)
+                Metric(label = strings.proxyGroupLabel, value = DemoCatalog.groups.first().name)
                 Spacer(Modifier.height(14.dp))
                 Metric(
-                    label = "CURRENT NODE",
+                    label = strings.currentNodeLabel,
                     value = DemoCatalog.groups.first().selectedNode,
                     valueColor = LocalFlowPalette.current.accentCyan,
                 )
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    text = "Catalog preview only. No node switch is sent to a proxy core.",
+                    text = strings.catalogPreviewNote,
                     color = LocalFlowPalette.current.textMuted,
                     style = MaterialTheme.typography.labelMedium,
                 )
@@ -122,7 +127,7 @@ fun OverviewPage(
             ) {
                 FlowCard(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Latency",
+                        text = strings.latency,
                         color = LocalFlowPalette.current.textPrimary,
                         style = MaterialTheme.typography.titleMedium,
                     )
@@ -139,7 +144,7 @@ fun OverviewPage(
                         )
                     }
                     Text(
-                        text = "Runtime not connected",
+                        text = strings.runtimeNotConnected,
                         modifier = Modifier.align(Alignment.CenterHorizontally),
                         color = LocalFlowPalette.current.textMuted,
                         style = MaterialTheme.typography.labelMedium,
@@ -147,7 +152,7 @@ fun OverviewPage(
                 }
                 FlowCard(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Connections",
+                        text = strings.connections,
                         color = LocalFlowPalette.current.textPrimary,
                         style = MaterialTheme.typography.titleMedium,
                     )
@@ -158,13 +163,13 @@ fun OverviewPage(
                         style = MaterialTheme.typography.displaySmall,
                     )
                     Text(
-                        text = "active",
+                        text = strings.active,
                         color = LocalFlowPalette.current.textMuted,
                         style = MaterialTheme.typography.labelMedium,
                     )
                     Spacer(Modifier.height(24.dp))
                     Text(
-                        text = "No core telemetry",
+                        text = strings.noCoreTelemetry,
                         color = LocalFlowPalette.current.warning,
                         style = MaterialTheme.typography.labelMedium,
                     )
@@ -179,12 +184,12 @@ fun OverviewPage(
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Text(
-                        text = "Node map",
+                        text = strings.nodeMap,
                         color = LocalFlowPalette.current.textPrimary,
                         style = MaterialTheme.typography.titleMedium,
                     )
                     Text(
-                        text = "UNAVAILABLE",
+                        text = strings.unavailableLabel,
                         color = LocalFlowPalette.current.warning,
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
@@ -195,7 +200,7 @@ fun OverviewPage(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(148.dp),
-                    label = "No trusted node coordinates",
+                    label = strings.noTrustedCoordinates,
                 )
             }
         }
@@ -213,13 +218,14 @@ private fun ConnectionHero(
     visualActive: Boolean,
     onStartStop: () -> Unit,
 ) {
+    val strings = LocalAppStrings.current
     val palette = LocalFlowPalette.current
     val running = status.vpnService == VpnServiceState.RUNNING ||
         status.vpnService == VpnServiceState.STARTING
     val actionLabel = when {
-        running -> "Stop VPN session"
-        status.permission == VpnPermissionState.DENIED -> "Review VPN permission"
-        else -> "Start VPN session"
+        running -> strings.actionStopVpn
+        status.permission == VpnPermissionState.DENIED -> strings.actionReviewPermission
+        else -> strings.actionStartVpn
     }
 
     GradientPanel(
@@ -233,9 +239,9 @@ private fun ConnectionHero(
             ) {
                 Text(
                     text = if (themeId == ThemeId.CYBER_FLOW) {
-                        "A · CYBER FLOW"
+                        strings.themeA
                     } else {
-                        "C · WARM FLOW"
+                        strings.themeC
                     },
                     color = palette.textSecondary,
                     style = MaterialTheme.typography.labelMedium,
@@ -265,7 +271,7 @@ private fun ConnectionHero(
                 }
             }
             Text(
-                text = connectionHeadline(connectionStatus),
+                text = connectionHeadline(connectionStatus, strings),
                 modifier = Modifier.fillMaxWidth(),
                 color = palette.textPrimary,
                 style = MaterialTheme.typography.titleLarge,
@@ -273,7 +279,7 @@ private fun ConnectionHero(
             )
             Spacer(Modifier.height(5.dp))
             Text(
-                text = connectionDetail(status, capability, networkAvailable),
+                text = connectionDetail(status, capability, networkAvailable, strings),
                 color = palette.textSecondary,
                 style = MaterialTheme.typography.bodyMedium,
             )
@@ -291,7 +297,7 @@ private fun ConnectionHero(
                         tint = palette.warning,
                     )
                     Text(
-                        text = "Mihomo native bridge: ${capability.state.name.lowercase()}",
+                        text = strings.bridgePrefix + capability.state.name.lowercase(),
                         color = palette.warning,
                         style = MaterialTheme.typography.labelMedium,
                     )
@@ -303,18 +309,18 @@ private fun ConnectionHero(
                 horizontalArrangement = Arrangement.spacedBy(18.dp),
             ) {
                 Metric(
-                    label = "NETWORK",
-                    value = if (networkAvailable) "Online" else "Offline",
+                    label = strings.networkLabel,
+                    value = if (networkAvailable) strings.online else strings.offline,
                     modifier = Modifier.weight(1f),
                 )
                 Metric(
-                    label = "VPN",
-                    value = status.vpnService.shortLabel(),
+                    label = strings.vpnLabel,
+                    value = strings.vpnStateLabel(status.vpnService),
                     modifier = Modifier.weight(1f),
                 )
                 Metric(
-                    label = "CORE",
-                    value = status.core.shortLabel(),
+                    label = strings.coreLabel,
+                    value = strings.coreStateLabel(status.core),
                     modifier = Modifier.weight(1f),
                     valueColor = if (status.core == CoreState.UNAVAILABLE) {
                         palette.warning
@@ -333,51 +339,34 @@ private fun ConnectionHero(
     }
 }
 
-private fun connectionHeadline(status: ConnectionStatus): String =
+private fun connectionHeadline(status: ConnectionStatus, strings: AppStrings): String =
     when (status) {
-        ConnectionStatus.CONNECTED -> "Network flow is protected"
-        ConnectionStatus.STARTING -> "Bringing the session online"
-        ConnectionStatus.RUNNING_DISCONNECTED -> "VPN shell is ready"
-        ConnectionStatus.STOPPING -> "Stopping the VPN session"
-        ConnectionStatus.ERROR -> "VPN session needs attention"
-        ConnectionStatus.PERMISSION_REQUIRED -> "VPN permission is required"
-        ConnectionStatus.STOPPED -> "Your network flow is paused"
+        ConnectionStatus.CONNECTED -> strings.headlineConnected
+        ConnectionStatus.STARTING -> strings.headlineStarting
+        ConnectionStatus.RUNNING_DISCONNECTED -> strings.headlineRunningDisconnected
+        ConnectionStatus.STOPPING -> strings.headlineStopping
+        ConnectionStatus.ERROR -> strings.headlineError
+        ConnectionStatus.PERMISSION_REQUIRED -> strings.headlinePermission
+        ConnectionStatus.STOPPED -> strings.headlineStopped
     }
 
 private fun connectionDetail(
     status: ProxyStatus,
     capability: MihomoCapabilityReport,
     networkAvailable: Boolean,
+    strings: AppStrings,
 ): String {
     if (!networkAvailable) {
-        return "No active Android network. The app remains responsive and will update after connectivity returns."
+        return strings.detailNoNetwork
     }
     if (status.permission == VpnPermissionState.DENIED) {
-        return "Android did not grant VPN consent. Tap the action to request it again."
+        return strings.detailPermissionDenied
     }
     if (status.vpnService == VpnServiceState.RUNNING && capability.state !=
         com.flowproxy.core.model.MihomoBridgeState.AVAILABLE
     ) {
-        return "Android accepted a no-route VPN shell. No traffic is proxied because the core is unavailable."
+        return strings.detailShellWithoutCore
     }
-    return "Connect starts only the Android VPN lifecycle. A verified Mihomo native bridge is still required for proxying."
+    return strings.detailDefault
 }
 
-private fun VpnServiceState.shortLabel(): String =
-    when (this) {
-        VpnServiceState.STOPPED -> "Stopped"
-        VpnServiceState.STARTING -> "Starting"
-        VpnServiceState.RUNNING -> "Ready"
-        VpnServiceState.STOPPING -> "Stopping"
-        VpnServiceState.ERROR -> "Error"
-    }
-
-private fun CoreState.shortLabel(): String =
-    when (this) {
-        CoreState.UNAVAILABLE -> "Missing"
-        CoreState.PROBING -> "Probing"
-        CoreState.READY -> "Ready"
-        CoreState.STARTING -> "Starting"
-        CoreState.RUNNING -> "Running"
-        CoreState.ERROR -> "Error"
-    }

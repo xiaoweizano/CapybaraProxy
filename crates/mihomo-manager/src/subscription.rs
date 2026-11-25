@@ -209,7 +209,7 @@ fn split_top_level_key(line: &str) -> Option<(&str, &str)> {
 
 #[cfg(test)]
 mod tests {
-    use super::{prepare_profile, preflight, MAX_SUBSCRIPTION_BYTES};
+    use super::{preflight, prepare_profile, MAX_SUBSCRIPTION_BYTES};
 
     const SAMPLE: &str = "\
 # operator notes

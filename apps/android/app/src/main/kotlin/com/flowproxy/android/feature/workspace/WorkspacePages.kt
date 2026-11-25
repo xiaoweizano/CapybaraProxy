@@ -44,6 +44,7 @@ import com.flowproxy.android.ui.Metric
 import com.flowproxy.android.ui.PageIntro
 import com.flowproxy.core.model.ConnectionStatus
 import com.flowproxy.core.theme.LocalFlowPalette
+import com.flowproxy.android.i18n.LocalAppStrings
 
 private val PagePadding = androidx.compose.foundation.layout.PaddingValues(
     start = 16.dp,
@@ -54,6 +55,7 @@ private val PagePadding = androidx.compose.foundation.layout.PaddingValues(
 
 @Composable
 fun ProxiesPage() {
+    val strings = LocalAppStrings.current
     var selectedGroup by remember { mutableIntStateOf(0) }
     var selectedNode by remember { mutableStateOf(DemoCatalog.nodes.first().name) }
     val palette = LocalFlowPalette.current
@@ -64,9 +66,9 @@ fun ProxiesPage() {
     ) {
         item {
             PageIntro(
-                eyebrow = "Routing",
-                title = "Proxies",
-                description = "Group and node catalog preview. Runtime switching remains disabled until the core is verified.",
+                eyebrow = strings.proxiesEyebrow,
+                title = strings.proxiesTitle,
+                description = strings.proxiesDescription,
             )
         }
         item {
@@ -117,7 +119,7 @@ fun ProxiesPage() {
                             style = MaterialTheme.typography.titleMedium,
                         )
                         Text(
-                            text = "Selected node: $selectedNode",
+                            text = strings.selectedNodePrefix + selectedNode,
                             color = palette.textSecondary,
                             style = MaterialTheme.typography.bodyMedium,
                         )
@@ -128,7 +130,7 @@ fun ProxiesPage() {
                 DividerLine()
                 Spacer(Modifier.height(14.dp))
                 Text(
-                    text = "Node selection updates only this preview screen.",
+                    text = strings.nodeSelectionPreviewNote,
                     color = palette.textMuted,
                     style = MaterialTheme.typography.labelMedium,
                 )
@@ -150,6 +152,7 @@ private fun NodePreview(
     selected: Boolean,
     onSelect: () -> Unit,
 ) {
+    val strings = LocalAppStrings.current
     val palette = LocalFlowPalette.current
     FlowCard {
         Row(
@@ -188,12 +191,12 @@ private fun NodePreview(
             if (selected) {
                 Icon(
                     Icons.Filled.Check,
-                    contentDescription = "Selected demo node",
+                    contentDescription = strings.selectedDemoNodeDescription,
                     tint = palette.success,
                 )
             } else {
                 Text(
-                    text = "Select",
+                    text = strings.select,
                     modifier = Modifier
                         .clickable(onClick = onSelect)
                         .padding(8.dp),
@@ -207,6 +210,7 @@ private fun NodePreview(
 
 @Composable
 fun RulesPage() {
+    val strings = LocalAppStrings.current
     val palette = LocalFlowPalette.current
     LazyColumn(
         contentPadding = PagePadding,
@@ -214,9 +218,9 @@ fun RulesPage() {
     ) {
         item {
             PageIntro(
-                eyebrow = "Policy",
-                title = "Rules",
-                description = "Sample routing rules, isolated from Runtime. Live rules require a connected Mihomo API.",
+                eyebrow = strings.rulesEyebrow,
+                title = strings.rulesTitle,
+                description = strings.rulesDescription,
             )
         }
         items(DemoCatalog.rules) { rule ->
@@ -244,7 +248,7 @@ fun RulesPage() {
                             style = MaterialTheme.typography.bodyLarge,
                         )
                         Text(
-                            text = "Policy · ${rule.policy}",
+                            text = strings.policyPrefix + rule.policy,
                             color = palette.textMuted,
                             style = MaterialTheme.typography.labelMedium,
                         )
@@ -260,6 +264,7 @@ fun RulesPage() {
 fun ConnectionsPage(
     connectionStatus: ConnectionStatus,
 ) {
+    val strings = LocalAppStrings.current
     val palette = LocalFlowPalette.current
     LazyColumn(
         contentPadding = PagePadding,
@@ -267,9 +272,9 @@ fun ConnectionsPage(
     ) {
         item {
             PageIntro(
-                eyebrow = "Network activity",
-                title = "Connections",
-                description = "The live list is empty until VPN and a verified proxy core are both running.",
+                eyebrow = strings.connectionsEyebrow,
+                title = strings.connectionsTitle,
+                description = strings.connectionsDescription,
             )
         }
         item {
@@ -282,22 +287,22 @@ fun ConnectionsPage(
                     Column {
                         Text(
                             text = when (connectionStatus) {
-                                ConnectionStatus.CONNECTED -> "Live monitoring available"
-                                ConnectionStatus.RUNNING_DISCONNECTED -> "VPN ready · core unavailable"
-                                ConnectionStatus.PERMISSION_REQUIRED -> "VPN permission required"
-                                ConnectionStatus.ERROR -> "Connection monitor paused"
-                                else -> "No active proxy session"
+                                ConnectionStatus.CONNECTED -> strings.liveMonitoringAvailable
+                                ConnectionStatus.RUNNING_DISCONNECTED -> strings.vpnReadyCoreUnavailable
+                                ConnectionStatus.PERMISSION_REQUIRED -> strings.vpnPermissionRequired
+                                ConnectionStatus.ERROR -> strings.connectionMonitorPaused
+                                else -> strings.noActiveProxySession
                             },
                             color = palette.textPrimary,
                             style = MaterialTheme.typography.titleMedium,
                         )
                         Text(
-                            text = "Live active connections: 0",
+                            text = strings.liveActiveConnectionsZero,
                             color = palette.textMuted,
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     }
-                    DemoBadge("SAMPLE LIST")
+                    DemoBadge(strings.sampleList)
                 }
             }
         }
@@ -339,6 +344,7 @@ fun ConnectionsPage(
 
 @Composable
 fun ProfilesPage() {
+    val strings = LocalAppStrings.current
     var selected by remember { mutableStateOf("Daily Flow") }
     val palette = LocalFlowPalette.current
     LazyColumn(
@@ -347,9 +353,9 @@ fun ProfilesPage() {
     ) {
         item {
             PageIntro(
-                eyebrow = "Configuration",
-                title = "Profiles",
-                description = "Preview profiles are local demo records. Subscription download and core reload are not enabled.",
+                eyebrow = strings.profilesEyebrow,
+                title = strings.profilesTitle,
+                description = strings.profilesDescription,
             )
         }
         items(DemoCatalog.profiles) { profile ->
@@ -378,13 +384,13 @@ fun ProfilesPage() {
                 Column {
                     if (isSelected) {
                         Text(
-                            text = "Demo profile selected",
+                            text = strings.demoProfileSelected,
                             color = palette.success,
                             style = MaterialTheme.typography.labelMedium,
                         )
                     } else {
                         FlowButton(
-                            text = "Select demo profile",
+                            text = strings.selectDemoProfile,
                             onClick = { selected = profile.name },
                             secondary = true,
                         )
@@ -417,6 +423,7 @@ fun ProfilesPage() {
 
 @Composable
 fun LogsPage() {
+    val strings = LocalAppStrings.current
     val palette = LocalFlowPalette.current
     LazyColumn(
         contentPadding = PagePadding,
@@ -424,9 +431,9 @@ fun LogsPage() {
     ) {
         item {
             PageIntro(
-                eyebrow = "Diagnostics",
-                title = "Logs",
-                description = "Synthetic entries demonstrate layout and severity treatment. They are not Runtime logs.",
+                eyebrow = strings.logsEyebrow,
+                title = strings.logsTitle,
+                description = strings.logsDescription,
             )
         }
         items(DemoCatalog.logs) { log ->
@@ -458,7 +465,7 @@ fun LogsPage() {
         }
         item {
             Text(
-                text = "SECRET REDACTION AND LIVE STREAMING NOT CONNECTED",
+                text = strings.secretRedactionNote,
                 modifier = Modifier.padding(horizontal = 4.dp),
                 color = palette.warning,
                 style = MaterialTheme.typography.labelMedium,

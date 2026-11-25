@@ -459,7 +459,8 @@ impl MihomoAdapter for MihomoCoreAdapter {
 
         Ok(vec![ProfileInfo {
             id: "flowproxy-subscription".to_owned(),
-            name: subscription_name(&self.config_store).unwrap_or_else(|| "Imported subscription".to_owned()),
+            name: subscription_name(&self.config_store)
+                .unwrap_or_else(|| "Imported subscription".to_owned()),
             active: true,
             updated_at_ms,
             source: Some("subscription".to_owned()),
@@ -944,9 +945,7 @@ fn subscription_metadata_path(config_store: &ConfigStore) -> Option<PathBuf> {
     let subscription_path = config_store.subscription_path()?;
     let file_name = subscription_path.file_name()?.to_str()?;
     let stem = file_name.strip_suffix(".yaml")?;
-    Some(subscription_path.with_file_name(format!(
-        "{stem}{SUBSCRIPTION_METADATA_SUFFIX}"
-    )))
+    Some(subscription_path.with_file_name(format!("{stem}{SUBSCRIPTION_METADATA_SUFFIX}")))
 }
 
 fn write_subscription_metadata(
@@ -1272,9 +1271,7 @@ mod tests {
                 PathBuf::from(r"C:\Program Files\FlowProxy\mihomo.exe"),
                 PathBuf::from(r"C:\Program Files\FlowProxy\resources\mihomo.exe"),
                 PathBuf::from(r"C:\Program Files\FlowProxy\resources\mihomo\mihomo.exe"),
-                PathBuf::from(
-                    r"C:\Program Files\FlowProxy\resources\resources\mihomo\mihomo.exe"
-                ),
+                PathBuf::from(r"C:\Program Files\FlowProxy\resources\resources\mihomo\mihomo.exe"),
                 PathBuf::from(r"C:\Program Files\FlowProxy\mihomo\mihomo.exe"),
                 PathBuf::from(r"C:\Users\person\AppData\Roaming\FlowProxy\mihomo.exe"),
             ]

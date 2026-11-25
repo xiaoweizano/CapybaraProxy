@@ -24,6 +24,9 @@ import com.flowproxy.android.platform.VpnAction
 import com.flowproxy.android.platform.VpnPermissionProbe
 import com.flowproxy.android.platform.decideVpnAction
 import com.flowproxy.android.platform.permissionAfterConsent
+import com.flowproxy.android.i18n.AppLanguage
+import com.flowproxy.android.i18n.AppStrings
+import com.flowproxy.android.i18n.stringsFor
 import com.flowproxy.android.ui.FlowProxyApp
 import com.flowproxy.core.model.ProxyStatus
 import com.flowproxy.core.model.VpnPermissionState
@@ -53,6 +56,12 @@ class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModels()
     private var notificationsEnabled by mutableStateOf(false)
 
+    /** Current interface strings, resolved from the persisted preference. */
+    private val strings: AppStrings
+        get() = stringsFor(
+            AppLanguage.parse(viewModel.preferences.value.languageId),
+        )
+
     private val vpnConsentLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
     ) { result ->
@@ -68,7 +77,7 @@ class MainActivity : ComponentActivity() {
     ) { granted ->
         notificationsEnabled = granted
         if (!granted) {
-            showMessage("Notifications remain disabled in Android settings.")
+            showMessage(strings.notificationsDisabledNotice)
         }
     }
 
@@ -96,6 +105,8 @@ class MainActivity : ComponentActivity() {
                     onRequestNotifications = ::requestNotificationPermission,
                     onOpenBatterySettings = ::openBatteryOptimizationSettings,
                     onVpnAction = { handleVpnAction(status) },
+                    language = AppLanguage.parse(preferences.languageId),
+                    onLanguageChange = viewModel::setLanguage,
                 )
             }
         }
@@ -137,7 +148,7 @@ class MainActivity : ComponentActivity() {
                     }
 
                     else -> {
-                        showMessage("Android VPN consent is unavailable.")
+                        showMessage(strings.vpnConsentUnavailable)
                     }
                 }
             }
@@ -153,10 +164,10 @@ class MainActivity : ComponentActivity() {
                 VpnConsentProbe.ConsentRequired(intent)
             }
         } catch (error: SecurityException) {
-            showMessage(error.message ?: "Unable to check Android VPN permission.")
+            showMessage(error.message ?: strings.vpnPermissionCheckFailed)
             VpnConsentProbe.CheckFailed
         } catch (error: IllegalStateException) {
-            showMessage(error.message ?: "Unable to prepare Android VPN permission.")
+            showMessage(error.message ?: strings.vpnPermissionPrepareFailed)
             VpnConsentProbe.CheckFailed
         }
 
@@ -165,10 +176,10 @@ class MainActivity : ComponentActivity() {
             FlowProxyVpnService.start(this)
         } catch (error: SecurityException) {
             ProxyRuntimeState.reportServiceStartFailure()
-            showMessage(error.message ?: "Android denied the VPN service start.")
+            showMessage(error.message ?: strings.vpnStartDenied)
         } catch (error: IllegalStateException) {
             ProxyRuntimeState.reportServiceStartFailure()
-            showMessage(error.message ?: "The VPN service cannot start right now.")
+            showMessage(error.message ?: strings.vpnCannotStart)
         }
     }
 
@@ -176,9 +187,9 @@ class MainActivity : ComponentActivity() {
         try {
             FlowProxyVpnService.stop(this)
         } catch (error: SecurityException) {
-            showMessage(error.message ?: "Android denied the VPN service stop.")
+            showMessage(error.message ?: strings.vpnStopDenied)
         } catch (error: IllegalStateException) {
-            showMessage(error.message ?: "The VPN service is not running.")
+            showMessage(error.message ?: strings.vpnNotRunning)
         }
     }
 
@@ -215,9 +226,9 @@ class MainActivity : ComponentActivity() {
         try {
             startActivity(intent)
         } catch (error: ActivityNotFoundException) {
-            showMessage("This Android device does not expose that settings screen.")
+            showMessage(strings.settingsScreenUnavailable)
         } catch (error: SecurityException) {
-            showMessage(error.message ?: "Android denied access to that settings screen.")
+            showMessage(error.message ?: strings.settingsAccessDenied)
         }
     }
 

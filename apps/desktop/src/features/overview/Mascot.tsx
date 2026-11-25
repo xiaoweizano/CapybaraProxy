@@ -1,10 +1,14 @@
+import { useTranslation } from "react-i18next";
+
 export function Mascot() {
+  const { t } = useTranslation();
+
   return (
     <svg
       className="warm-mascot"
       viewBox="0 0 520 330"
       role="img"
-      aria-label="FlowProxy mascot"
+      aria-label={t("diagram.mascot")}
     >
       <defs>
         <linearGradient id="mascot-body" x1="158" y1="98" x2="355" y2="280">

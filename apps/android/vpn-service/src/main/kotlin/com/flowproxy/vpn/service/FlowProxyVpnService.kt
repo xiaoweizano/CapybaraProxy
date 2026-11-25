@@ -52,15 +52,15 @@ class FlowProxyVpnService : VpnService() {
     private fun startTunnel() {
         if (tunnel != null) {
             ProxyRuntimeState.setVpnService(VpnServiceState.RUNNING)
-            updateNotification("VPN interface ready")
+            updateNotification(getString(com.flowproxy.vpn.service.R.string.notification_ready))
             return
         }
 
         ProxyRuntimeState.setVpnService(VpnServiceState.STARTING)
         try {
-            startForeground(NOTIFICATION_ID, buildNotification("Preparing VPN session"))
+            startForeground(NOTIFICATION_ID, buildNotification(getString(com.flowproxy.vpn.service.R.string.notification_preparing)))
             val descriptor = Builder()
-                .setSession("FlowProxy - proxy core unavailable")
+                .setSession(getString(com.flowproxy.vpn.service.R.string.vpn_session_name))
                 .setMtu(MTU)
                 .addAddress(TUN_ADDRESS, TUN_PREFIX)
                 .setBlocking(false)
@@ -70,12 +70,14 @@ class FlowProxyVpnService : VpnService() {
                     }
                 }
                 .establish()
-                ?: error("Android rejected the VPN interface")
+                ?: error(getString(com.flowproxy.vpn.service.R.string.vpn_interface_rejected))
 
             tunnel = descriptor
             lastFailure = null
             ProxyRuntimeState.setVpnService(VpnServiceState.RUNNING)
-            updateNotification("VPN interface ready · proxy core unavailable")
+            updateNotification(
+                getString(com.flowproxy.vpn.service.R.string.notification_ready_no_core),
+            )
         } catch (error: SecurityException) {
             failStart(error)
         } catch (error: IllegalArgumentException) {
@@ -160,14 +162,14 @@ class FlowProxyVpnService : VpnService() {
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(com.flowproxy.vpn.service.R.drawable.ic_flowproxy_notification)
-            .setContentTitle("FlowProxy")
+            .setContentTitle(getString(com.flowproxy.vpn.service.R.string.notification_title))
             .setContentText(text)
             .setContentIntent(contentIntent)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setPriority(NotificationCompat.PRIORITY_LOW)
-            .addAction(0, "Stop", stopIntent)
+            .addAction(0, getString(com.flowproxy.vpn.service.R.string.notification_stop), stopIntent)
             .build()
     }
 

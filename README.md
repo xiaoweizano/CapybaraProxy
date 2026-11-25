@@ -62,6 +62,7 @@
 3. 回到 **Overview**，点击 hero 区域下方的 **Connect**。
 4. 状态变为 `Connected` 后，Proxies 页面会列出订阅里的真实节点。
 5. 需要走系统代理时，在 **Settings → Integration** 打开 **System proxy**。
+6. 界面语言在 **Settings → Appearance → Language** 切换（中文 / English），选择会持久化；旧版 `settings.json` 没有该字段时按系统语言初始化。
 
 订阅能力的完整边界见 `docs/development/subscription-scope.md`。
 

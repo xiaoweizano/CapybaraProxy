@@ -1,11 +1,13 @@
+import { useTranslation } from "react-i18next";
 import { useLocation } from "react-router-dom";
-import { getPageTitle } from "../navigation";
+import { getPageTitleKey } from "../navigation";
 import { ThemeToggle } from "./ThemeToggle";
 import { WindowControls } from "./WindowControls";
 
 export function TitleBar() {
   const { pathname } = useLocation();
-  const pageTitle = getPageTitle(pathname);
+  const { t } = useTranslation();
+  const pageTitle = t(`nav.${getPageTitleKey(pathname)}`);
 
   return (
     <header className="titlebar">

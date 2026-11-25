@@ -29,11 +29,11 @@ import {
   type RuntimeContextValue,
   type RuntimeViewState,
 } from "./runtimeContext";
+import { i18n } from "../../i18n";
 
 const MAX_VISIBLE_LOGS = 100;
 const DEFAULT_DELAY_TIMEOUT_MS = 5_000;
-const unavailableNotice =
-  "Desktop Runtime is unavailable. No native state is simulated.";
+const unavailableNotice = (): string => i18n.t("errors.runtimeUnavailable");
 
 const initialState: RuntimeViewState = {
   snapshot: null,
@@ -94,11 +94,11 @@ export function RuntimeProvider({ children }: { children: ReactNode }) {
     const [coreResult, groupsResult] = await Promise.all([
       getCoreInfo().catch(() => ({
         status: "error" as const,
-        error: unexpectedError("FlowProxy could not read Mihomo Core details."),
+        error: unexpectedError(i18n.t("errors.coreDetails")),
       })),
       getProxyGroups().catch(() => ({
         status: "error" as const,
-        error: unexpectedError("FlowProxy could not read proxy groups."),
+        error: unexpectedError(i18n.t("errors.proxyGroups")),
       })),
     ]);
 
@@ -109,7 +109,7 @@ export function RuntimeProvider({ children }: { children: ReactNode }) {
     if (coreResult.status === "ok") {
       updateState({ coreInfo: coreResult.data });
     } else if (coreResult.status === "unavailable") {
-      updateState({ notice: unavailableNotice });
+      updateState({ notice: unavailableNotice() });
     } else {
       updateState({ lastError: coreResult.error });
     }
@@ -117,7 +117,7 @@ export function RuntimeProvider({ children }: { children: ReactNode }) {
     if (groupsResult.status === "ok") {
       updateState({ proxyGroups: groupsResult.data });
     } else if (groupsResult.status === "unavailable") {
-      updateState({ notice: unavailableNotice });
+      updateState({ notice: unavailableNotice() });
     } else {
       updateState({ lastError: groupsResult.error });
     }
@@ -162,7 +162,7 @@ export function RuntimeProvider({ children }: { children: ReactNode }) {
       if (result.status === "ok") {
         apply(result.data);
       } else if (result.status === "unavailable") {
-        updateState({ notice: unavailableNotice });
+        updateState({ notice: unavailableNotice() });
       } else {
         updateState({ lastError: result.error });
       }
@@ -177,12 +177,12 @@ export function RuntimeProvider({ children }: { children: ReactNode }) {
       getRuntimeSnapshot().catch(() => ({
         status: "error" as const,
         error: unexpectedError(
-          "FlowProxy could not read the Desktop Runtime.",
+          i18n.t("errors.desktopRuntime"),
         ),
       })),
       getRuntimeLogs().catch(() => ({
         status: "error" as const,
-        error: unexpectedError("FlowProxy could not read Runtime logs."),
+        error: unexpectedError(i18n.t("errors.runtimeLogs")),
       })),
     ]);
 
@@ -218,7 +218,7 @@ export function RuntimeProvider({ children }: { children: ReactNode }) {
       .catch(() => {
         if (mountedRef.current) {
           updateState({
-            notice: "Runtime state events are unavailable.",
+            notice: i18n.t("errors.stateEvents"),
           });
         }
       });
@@ -226,7 +226,7 @@ export function RuntimeProvider({ children }: { children: ReactNode }) {
       .then(retainCleanup)
       .catch(() => {
         if (mountedRef.current) {
-          updateState({ notice: "Runtime log events are unavailable." });
+          updateState({ notice: i18n.t("errors.logEvents") });
         }
       });
     void refresh();
@@ -263,7 +263,7 @@ export function RuntimeProvider({ children }: { children: ReactNode }) {
         if (result.status === "ok") {
           applySnapshot(result.data);
         } else if (result.status === "unavailable") {
-          updateState({ pendingAction: null, notice: unavailableNotice });
+          updateState({ pendingAction: null, notice: unavailableNotice() });
         } else {
           updateState({ pendingAction: null, lastError: result.error });
         }
@@ -272,7 +272,7 @@ export function RuntimeProvider({ children }: { children: ReactNode }) {
           updateState({
             pendingAction: null,
             lastError: unexpectedError(
-              "The Desktop Runtime command failed unexpectedly.",
+              i18n.t("errors.commandFailed"),
             ),
           });
         }
@@ -306,7 +306,7 @@ export function RuntimeProvider({ children }: { children: ReactNode }) {
         }
 
         if (result.status === "unavailable") {
-          updateState({ notice: unavailableNotice });
+          updateState({ notice: unavailableNotice() });
         } else if (result.status === "error") {
           updateState({ lastError: result.error });
         } else {
@@ -326,7 +326,7 @@ export function RuntimeProvider({ children }: { children: ReactNode }) {
         if (mountedRef.current) {
           updateState({
             lastError: unexpectedError(
-              "FlowProxy could not change the selected proxy.",
+              i18n.t("errors.selectProxy"),
             ),
           });
         }
@@ -354,7 +354,7 @@ export function RuntimeProvider({ children }: { children: ReactNode }) {
         }
 
         if (result.status === "unavailable") {
-          updateState({ notice: unavailableNotice });
+          updateState({ notice: unavailableNotice() });
         } else {
           updateState({ lastError: result.error });
         }
@@ -362,7 +362,7 @@ export function RuntimeProvider({ children }: { children: ReactNode }) {
         if (mountedRef.current) {
           updateState({
             lastError: unexpectedError(
-              "FlowProxy could not measure the proxy delay.",
+              i18n.t("errors.measureDelay"),
             ),
           });
         }

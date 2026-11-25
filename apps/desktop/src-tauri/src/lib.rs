@@ -598,7 +598,11 @@ fn import_subscription(
         ));
     }
 
-    if let Err(error) = validate_identifier("subscription name", &name, RuntimeErrorCode::SubscriptionInvalid) {
+    if let Err(error) = validate_identifier(
+        "subscription name",
+        &name,
+        RuntimeErrorCode::SubscriptionInvalid,
+    ) {
         return CommandResult::failure(error);
     }
 
@@ -607,12 +611,7 @@ fn import_subscription(
         return CommandResult::failure(failure.error);
     }
 
-    CommandResult::success(
-        state
-            .runtime
-            .profiles()
-            .unwrap_or_default(),
-    )
+    CommandResult::success(state.runtime.profiles().unwrap_or_default())
 }
 
 #[tauri::command]
@@ -625,12 +624,7 @@ fn clear_subscription(
         return CommandResult::failure(failure.error);
     }
 
-    CommandResult::success(
-        state
-            .runtime
-            .profiles()
-            .unwrap_or_default(),
-    )
+    CommandResult::success(state.runtime.profiles().unwrap_or_default())
 }
 
 #[tauri::command]
@@ -897,6 +891,7 @@ mod tests {
             version: SETTINGS_VERSION,
             theme: Theme::CyberFlow,
             close_behavior: CloseBehavior::ExitApplication,
+            ..DesktopSettings::default()
         };
         let state = test_app_state(directory.path(), store, settings);
 
@@ -912,6 +907,7 @@ mod tests {
             version: SETTINGS_VERSION,
             theme: Theme::WarmFlow,
             close_behavior: CloseBehavior::ExitApplication,
+            ..DesktopSettings::default()
         };
 
         state
@@ -932,6 +928,7 @@ mod tests {
             version: SETTINGS_VERSION + 1,
             theme: Theme::WarmFlow,
             close_behavior: CloseBehavior::ExitApplication,
+            ..DesktopSettings::default()
         };
 
         state
@@ -1034,13 +1031,7 @@ mod tests {
 
     #[test]
     fn hidden_window_uses_a_slower_runtime_health_poll() {
-        assert_eq!(
-            runtime_health_interval(true),
-            Duration::from_millis(1_500)
-        );
-        assert_eq!(
-            runtime_health_interval(false),
-            Duration::from_millis(5_000)
-        );
+        assert_eq!(runtime_health_interval(true), Duration::from_millis(1_500));
+        assert_eq!(runtime_health_interval(false), Duration::from_millis(5_000));
     }
 }

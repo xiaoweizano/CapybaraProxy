@@ -1,10 +1,14 @@
+import { useTranslation } from "react-i18next";
+
 export function NetworkOrb() {
+  const { t } = useTranslation();
+
   return (
     <svg
       className="network-orb"
       viewBox="0 0 430 340"
       role="img"
-      aria-label="Network Orb"
+      aria-label={t("diagram.networkOrb")}
     >
       <defs>
         <radialGradient id="orb-sphere" cx=".42" cy=".34" r=".68">

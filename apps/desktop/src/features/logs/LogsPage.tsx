@@ -1,18 +1,14 @@
 import { ScrollText } from "lucide-react";
 import { useDeferredValue, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useRuntime } from "../../app/runtime/runtimeContext";
 import type { RuntimeLogLevel } from "../../platform/runtime";
 import { WorkspacePage } from "../workspace/WorkspaceUi";
 
 type LogFilter = "all" | RuntimeLogLevel;
 
-const timeFormatter = new Intl.DateTimeFormat(undefined, {
-  hour: "2-digit",
-  minute: "2-digit",
-  second: "2-digit",
-});
-
 export function LogsPage() {
+  const { t, i18n } = useTranslation();
   const { logs } = useRuntime();
   const [filter, setFilter] = useState<LogFilter>("all");
   const deferredFilter = useDeferredValue(filter);
@@ -20,20 +16,25 @@ export function LogsPage() {
     deferredFilter === "all"
       ? logs
       : logs.filter((entry) => entry.level === deferredFilter);
+  const timeFormatter = new Intl.DateTimeFormat(i18n.language, {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
 
   return (
     <WorkspacePage
-      eyebrow="Runtime events"
-      title="Logs"
-      badge={`${logs.length} retained`}
+      eyebrow={t("logs.eyebrow")}
+      title={t("logs.title")}
+      badge={t("logs.badge", { count: logs.length })}
     >
       <section className="workspace-panel logs-panel">
         <div className="workspace-panel-heading">
           <div>
-            <span className="workspace-kicker">Bounded event buffer</span>
-            <h2>Runtime logs</h2>
+            <span className="workspace-kicker">{t("logs.kicker")}</span>
+            <h2>{t("logs.heading")}</h2>
           </div>
-          <div className="workspace-segmented" aria-label="Log level filter">
+          <div className="workspace-segmented" aria-label={t("logs.filter")}>
             {(["all", "info", "warn", "error"] as const).map((level) => (
               <button
                 key={level}
@@ -51,14 +52,14 @@ export function LogsPage() {
           <div className="workspace-empty">
             <ScrollText aria-hidden="true" size={22} />
             <div>
-              <h2>No Runtime events</h2>
-              <p>Runtime activity will appear here as it is reported.</p>
+              <h2>{t("logs.emptyTitle")}</h2>
+              <p>{t("logs.emptyBody")}</p>
             </div>
           </div>
         ) : (
           <>
             <p className="workspace-result-count">
-              {visibleLogs.length} {visibleLogs.length === 1 ? "event" : "events"}
+              {t("logs.count", { count: visibleLogs.length })}
             </p>
             <ol className="log-list">
               {visibleLogs.map((entry) => (

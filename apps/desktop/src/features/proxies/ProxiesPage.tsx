@@ -6,6 +6,7 @@ import {
   Server,
 } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useRuntime } from "../../app/runtime/runtimeContext";
 import type { ProxyNode } from "../../platform/runtime";
 import {
@@ -15,6 +16,7 @@ import {
 } from "../workspace/WorkspaceUi";
 
 export function ProxiesPage() {
+  const { t } = useTranslation();
   const {
     snapshot,
     proxyGroups,
@@ -59,9 +61,9 @@ export function ProxiesPage() {
 
   return (
     <WorkspacePage
-      eyebrow="Proxy control"
-      title="Proxies"
-      badge={isConnected ? "Live Mihomo" : "Offline"}
+      eyebrow={t("proxies.eyebrow")}
+      title={t("proxies.title")}
+      badge={isConnected ? t("common.liveMihomo") : t("common.offline")}
     >
       <ResourceFeedback error={lastError} unavailable={false} />
 
@@ -70,14 +72,14 @@ export function ProxiesPage() {
       ) : isLoading && proxyGroups.length === 0 ? (
         <div className="workspace-loading" role="status">
           <CircleDashed aria-hidden="true" size={17} />
-          <span>Loading proxy groups...</span>
+          <span>{t("proxies.loading")}</span>
         </div>
       ) : proxyGroups.length === 0 ? (
         <div className="workspace-empty">
           <Server aria-hidden="true" size={22} />
           <div>
-            <h2>No proxy groups</h2>
-            <p>The active Mihomo profile did not expose any groups.</p>
+            <h2>{t("proxies.emptyTitle")}</h2>
+            <p>{t("proxies.emptyBody")}</p>
           </div>
         </div>
       ) : (
@@ -94,7 +96,7 @@ export function ProxiesPage() {
                   <h2 id={`group-${group.name}`}>{group.name}</h2>
                 </div>
                 <span className="workspace-count">
-                  {group.nodes.length} nodes
+                  {t("proxies.nodes", { count: group.nodes.length })}
                 </span>
               </div>
 
@@ -133,13 +135,13 @@ export function ProxiesPage() {
                                 : "poor"
                         }
                       >
-                        {delay === null ? "Not tested" : `${delay} ms`}
+                        {delay === null ? t("proxies.notTested") : `${delay} ms`}
                       </span>
                       <button
                         className="workspace-icon-button"
                         type="button"
-                        aria-label={`Test delay for ${node.name}`}
-                        title={`Test delay for ${node.name}`}
+                        aria-label={t("proxies.testDelay", { name: node.name })}
+                        title={t("proxies.testDelay", { name: node.name })}
                         disabled={pendingDelay !== null}
                         onClick={() => void testDelay(node)}
                       >
@@ -148,15 +150,15 @@ export function ProxiesPage() {
                       <button
                         className="workspace-action-button"
                         type="button"
-                        aria-label={`Select ${node.name}`}
+                        aria-label={t("proxies.selectNode", { name: node.name })}
                         disabled={pendingSelection !== null || selected}
                         onClick={() => void chooseProxy(group.name, node)}
                       >
                         {selected
-                          ? "Selected"
+                          ? t("proxies.selected")
                           : pendingSelection === node.name
-                            ? "Selecting..."
-                            : "Select"}
+                            ? t("proxies.selecting")
+                            : t("proxies.select")}
                       </button>
                     </div>
                   );

@@ -1,12 +1,16 @@
+import { useTranslation } from "react-i18next";
+
 export function NodeMap() {
+  const { t } = useTranslation();
+
   return (
     <section className="overview-card node-map-card" aria-labelledby="map-title">
       <div className="overview-card-heading">
         <div>
-          <span className="overview-card-kicker">Global routes</span>
-          <h2 id="map-title">Node Map</h2>
+          <span className="overview-card-kicker">{t("overview.globalRoutes")}</span>
+          <h2 id="map-title">{t("overview.nodeMap")}</h2>
         </div>
-        <span className="overview-card-note">Location data unavailable</span>
+        <span className="overview-card-note">{t("overview.locationUnavailable")}</span>
       </div>
 
       <div className="node-map-canvas">
@@ -14,7 +18,7 @@ export function NodeMap() {
           className="world-map"
           viewBox="0 0 760 300"
           role="img"
-          aria-label="Node location data unavailable"
+          aria-label={t("overview.locationUnavailable")}
           preserveAspectRatio="xMidYMid meet"
         >
           <g className="map-latitude-lines" aria-hidden="true">
@@ -30,9 +34,9 @@ export function NodeMap() {
             <path d="M602 215c24-14 57-7 70 13 13 22-2 45-24 50-29 7-63-13-62-35 0-11 5-21 16-28Z" />
           </g>
         </svg>
-        <span className="node-map-region node-map-region-americas">Americas</span>
-        <span className="node-map-region node-map-region-europe">Europe</span>
-        <span className="node-map-region node-map-region-asia">Asia Pacific</span>
+        <span className="node-map-region node-map-region-americas">{t("overview.americas")}</span>
+        <span className="node-map-region node-map-region-europe">{t("overview.europe")}</span>
+        <span className="node-map-region node-map-region-asia">{t("overview.asiaPacific")}</span>
       </div>
     </section>
   );

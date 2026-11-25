@@ -144,6 +144,7 @@ describe("SettingsProvider", () => {
       version: 1,
       theme: "warm_flow",
       close_behavior: "exit_application",
+      language: "english",
     });
     expect(localStorage.getItem(SETTINGS_MIGRATION_KEY)).toBe("1");
   });

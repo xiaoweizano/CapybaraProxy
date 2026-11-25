@@ -40,6 +40,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.flowproxy.core.model.ConnectionStatus
 import com.flowproxy.core.theme.LocalFlowPalette
+import com.flowproxy.android.i18n.LocalAppStrings
+import com.flowproxy.android.i18n.statusLabel
 
 @Composable
 fun FlowCard(
@@ -98,7 +100,7 @@ fun PageIntro(
 }
 
 @Composable
-fun DemoBadge(text: String = "DEMO") {
+fun DemoBadge(text: String = LocalAppStrings.current.demoBadge) {
     val palette = LocalFlowPalette.current
     Surface(
         color = palette.accentOrange.copy(alpha = if (palette.isDark) 0.18f else 0.14f),
@@ -131,15 +133,7 @@ fun StatusPill(
         -> palette.danger
         ConnectionStatus.STOPPED -> palette.textSecondary
     }
-    val label = when (status) {
-        ConnectionStatus.CONNECTED -> "Connected"
-        ConnectionStatus.STARTING -> "Starting"
-        ConnectionStatus.STOPPING -> "Stopping"
-        ConnectionStatus.RUNNING_DISCONNECTED -> "VPN ready"
-        ConnectionStatus.ERROR -> "Error"
-        ConnectionStatus.PERMISSION_REQUIRED -> "Permission needed"
-        ConnectionStatus.STOPPED -> "Stopped"
-    }
+    val label = LocalAppStrings.current.statusLabel(status)
 
     Row(
         modifier = modifier

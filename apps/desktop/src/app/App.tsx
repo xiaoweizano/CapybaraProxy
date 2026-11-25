@@ -1,4 +1,5 @@
 import { lazy, Suspense } from "react";
+import { useTranslation } from "react-i18next";
 import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 import { RuntimeProvider } from "./runtime/RuntimeProvider";
 import { SettingsProvider } from "./settings/SettingsProvider";
@@ -50,6 +51,8 @@ function AppRuntime() {
 }
 
 export function App() {
+  const { t } = useTranslation();
+
   return (
     <SettingsProvider>
       <ThemeProvider>
@@ -59,7 +62,7 @@ export function App() {
             <Suspense
               fallback={
                 <div className="workspace-loading" role="status">
-                  Loading page...
+                  {t("workspace.loadingPage")}
                 </div>
               }
             >

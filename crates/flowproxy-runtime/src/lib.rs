@@ -417,11 +417,7 @@ where
     /// stopped: an operator has to import a subscription *before* the core can
     /// start with it. It is still serialised against start/stop through the
     /// operation lock.
-    pub fn import_subscription(
-        &self,
-        name: &str,
-        yaml: &str,
-    ) -> Result<(), RuntimeFailure> {
+    pub fn import_subscription(&self, name: &str, yaml: &str) -> Result<(), RuntimeFailure> {
         self.adapter_mutation("subscription import", |adapter| {
             adapter.import_subscription(name, yaml)
         })

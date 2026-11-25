@@ -1,5 +1,6 @@
 import { CircleAlert, LoaderCircle, RefreshCw, WifiOff } from "lucide-react";
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import type { RuntimeError } from "../../platform/runtime";
 
 export function WorkspacePage({
@@ -34,6 +35,8 @@ export function ResourceFeedback({
   error: RuntimeError | null;
   unavailable: boolean;
 }) {
+  const { t } = useTranslation();
+
   if (error) {
     return (
       <div className="workspace-feedback workspace-feedback-error" role="alert">
@@ -47,7 +50,7 @@ export function ResourceFeedback({
     return (
       <div className="workspace-feedback" role="status">
         <WifiOff aria-hidden="true" size={16} />
-        <span>Desktop data is unavailable. No values are simulated.</span>
+        <span>{t("workspace.unavailable")}</span>
       </div>
     );
   }
@@ -56,14 +59,16 @@ export function ResourceFeedback({
 }
 
 export function RuntimeDisconnected() {
+  const { t } = useTranslation();
+
   return (
     <div className="workspace-empty workspace-empty-large">
       <span className="workspace-empty-icon">
         <WifiOff aria-hidden="true" size={25} strokeWidth={1.5} />
       </span>
       <div>
-        <h2>Mihomo is not connected</h2>
-        <p>Start the Mihomo Core in Settings to load live data.</p>
+        <h2>{t("workspace.disconnectedTitle")}</h2>
+        <p>{t("workspace.disconnectedBody")}</p>
       </div>
     </div>
   );

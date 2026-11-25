@@ -25,11 +25,25 @@ pub(crate) enum CloseBehavior {
     ExitApplication,
 }
 
+/// Interface language. `English` is the default so existing installations keep
+/// their current appearance after the upgrade.
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum Language {
+    #[default]
+    English,
+    SimplifiedChinese,
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub(crate) struct DesktopSettings {
     pub version: u32,
     pub theme: Theme,
     pub close_behavior: CloseBehavior,
+    /// Added after the first release. `#[serde(default)]` keeps older
+    /// `settings.json` files loadable without a version bump.
+    #[serde(default)]
+    pub language: Language,
 }
 
 impl Default for DesktopSettings {
@@ -38,6 +52,7 @@ impl Default for DesktopSettings {
             version: SETTINGS_VERSION,
             theme: Theme::CyberFlow,
             close_behavior: CloseBehavior::HideToTray,
+            language: Language::English,
         }
     }
 }
@@ -217,7 +232,8 @@ impl Drop for TemporaryFileGuard {
 #[cfg(test)]
 mod tests {
     use super::{
-        CloseBehavior, DesktopSettings, SettingsStore, Theme, SETTINGS_FILE_NAME, SETTINGS_VERSION,
+        CloseBehavior, DesktopSettings, Language, SettingsStore, Theme, SETTINGS_FILE_NAME,
+        SETTINGS_VERSION,
     };
     use std::fs;
     use tempfile::TempDir;
@@ -238,6 +254,44 @@ mod tests {
         assert_eq!(loaded.settings.version, SETTINGS_VERSION);
         assert_eq!(loaded.settings.theme, Theme::CyberFlow);
         assert_eq!(loaded.settings.close_behavior, CloseBehavior::HideToTray);
+        assert_eq!(loaded.settings.language, Language::English);
+        assert_eq!(loaded.warning, None);
+    }
+
+    #[test]
+    fn settings_written_before_language_existed_still_load() {
+        let (directory, store) = temporary_store();
+        fs::write(
+            directory.path().join(SETTINGS_FILE_NAME),
+            r#"{"version":1,"theme":"warm_flow","close_behavior":"exit_application"}"#,
+        )
+        .expect("write legacy settings");
+
+        let loaded = store.load();
+
+        assert_eq!(loaded.warning, None);
+        assert_eq!(loaded.settings.theme, Theme::WarmFlow);
+        assert_eq!(
+            loaded.settings.close_behavior,
+            CloseBehavior::ExitApplication
+        );
+        assert_eq!(loaded.settings.language, Language::English);
+    }
+
+    #[test]
+    fn language_round_trips_through_json() {
+        let (_directory, store) = temporary_store();
+        let expected = DesktopSettings {
+            version: SETTINGS_VERSION,
+            theme: Theme::CyberFlow,
+            close_behavior: CloseBehavior::HideToTray,
+            language: Language::SimplifiedChinese,
+        };
+
+        store.save(&expected).expect("save settings");
+        let loaded = store.load();
+
+        assert_eq!(loaded.settings, expected);
         assert_eq!(loaded.warning, None);
     }
 
@@ -248,6 +302,7 @@ mod tests {
             version: SETTINGS_VERSION,
             theme: Theme::WarmFlow,
             close_behavior: CloseBehavior::ExitApplication,
+            ..DesktopSettings::default()
         };
 
         store.save(&expected).expect("save settings");
@@ -301,6 +356,7 @@ mod tests {
                 version: SETTINGS_VERSION,
                 theme: Theme::WarmFlow,
                 close_behavior: CloseBehavior::HideToTray,
+                ..DesktopSettings::default()
             })
             .expect("replace settings");
 

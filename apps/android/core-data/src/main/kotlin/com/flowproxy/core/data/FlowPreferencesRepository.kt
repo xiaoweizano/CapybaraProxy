@@ -22,6 +22,8 @@ private val Context.flowPreferencesDataStore: DataStore<Preferences> by preferen
 data class AppPreferences(
     val themeId: ThemeId = ThemeId.CYBER_FLOW,
     val reducedMotion: Boolean = false,
+    /** Raw language id; parsed by the app layer, which owns the enum. */
+    val languageId: String = "english",
 )
 
 class FlowPreferencesRepository(
@@ -41,6 +43,7 @@ class FlowPreferencesRepository(
             AppPreferences(
                 themeId = parseThemeId(preferences[THEME_ID]),
                 reducedMotion = preferences[REDUCED_MOTION] ?: false,
+                languageId = preferences[LANGUAGE_ID] ?: "english",
             )
         }
 
@@ -59,8 +62,15 @@ class FlowPreferencesRepository(
         }
     }
 
+    suspend fun setLanguage(languageId: String) {
+        dataStore.edit { preferences ->
+            preferences[LANGUAGE_ID] = languageId
+        }
+    }
+
     private companion object {
         val THEME_ID = stringPreferencesKey("theme_id")
         val REDUCED_MOTION = booleanPreferencesKey("reduced_motion")
+        val LANGUAGE_ID = stringPreferencesKey("language_id")
     }
 }

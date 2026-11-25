@@ -12,6 +12,7 @@ import com.flowproxy.core.model.VpnPermissionState
 import com.flowproxy.mihomo.bridge.AndroidMihomoBridge
 import com.flowproxy.android.platform.VpnPermissionProbe
 import com.flowproxy.android.platform.permissionAfterProbe
+import com.flowproxy.android.i18n.AppLanguage
 import com.flowproxy.vpn.service.ProxyRuntimeState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -58,6 +59,12 @@ class MainViewModel(
     fun setReducedMotion(enabled: Boolean) {
         viewModelScope.launch {
             preferencesRepository.setReducedMotion(enabled)
+        }
+    }
+
+    fun setLanguage(language: AppLanguage) {
+        viewModelScope.launch {
+            preferencesRepository.setLanguage(language.id)
         }
     }
 

@@ -1,12 +1,14 @@
 import { createContext, useContext } from "react";
 import type { ThemeId } from "../theme/theme";
 import type { CloseBehavior } from "../../shared/closeBehavior";
+import type { LanguageId } from "../../i18n/language";
 
 export const SETTINGS_MIGRATION_KEY = "flowproxy.settings.migrated.v1";
 
 export type AppPreferences = {
   theme: ThemeId;
   closeBehavior: CloseBehavior;
+  language: LanguageId;
 };
 
 export type SettingsStorageMode = "loading" | "native" | "preview";
@@ -24,6 +26,7 @@ export type AppSettingsContextValue = {
   updateCloseBehavior: (
     behavior: CloseBehavior,
   ) => Promise<SettingsUpdateResult>;
+  updateLanguage: (language: LanguageId) => Promise<SettingsUpdateResult>;
   clearError: () => void;
 };
 

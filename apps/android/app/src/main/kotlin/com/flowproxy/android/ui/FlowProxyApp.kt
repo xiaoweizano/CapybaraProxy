@@ -29,6 +29,7 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -52,6 +53,9 @@ import com.flowproxy.core.model.ProxyStatus
 import com.flowproxy.core.model.ThemeId
 import com.flowproxy.core.model.deriveConnectionStatus
 import com.flowproxy.core.theme.LocalFlowPalette
+import com.flowproxy.android.i18n.AppLanguage
+import com.flowproxy.android.i18n.LocalAppStrings
+import com.flowproxy.android.i18n.stringsFor
 
 @Composable
 fun FlowProxyApp(
@@ -66,7 +70,10 @@ fun FlowProxyApp(
     onRequestNotifications: () -> Unit,
     onOpenBatterySettings: () -> Unit,
     onVpnAction: () -> Unit,
+    language: AppLanguage,
+    onLanguageChange: (AppLanguage) -> Unit,
 ) {
+    val strings = stringsFor(language)
     var selectedPage by rememberSaveable { mutableStateOf(AppPage.OVERVIEW) }
     var showMore by rememberSaveable { mutableStateOf(false) }
     val palette = LocalFlowPalette.current
@@ -92,14 +99,15 @@ fun FlowProxyApp(
         }
     }
 
+    CompositionLocalProvider(LocalAppStrings provides strings) {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = palette.canvas,
         topBar = {
             FlowTopBar(
                 title = when {
-                    showMore -> "More"
-                    else -> selectedPage.label
+                    showMore -> strings.more
+                    else -> selectedPage.label(strings)
                 },
                 themeId = themeId,
                 showBack = selectedPage in MobileNavigation.morePages && !showMore,
@@ -149,9 +157,12 @@ fun FlowProxyApp(
                     onRequestNotifications = onRequestNotifications,
                     onOpenBatterySettings = onOpenBatterySettings,
                     onStartStopVpn = onVpnAction,
+                    language = language,
+                    onLanguageChange = onLanguageChange,
                 )
             }
         }
+    }
     }
 }
 
@@ -178,7 +189,7 @@ private fun FlowTopBar(
             IconButton(onClick = onBack) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back to More",
+                    contentDescription = LocalAppStrings.current.backToMore,
                     tint = palette.textPrimary,
                 )
             }
@@ -194,7 +205,7 @@ private fun FlowTopBar(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = "LOCAL CONTROL",
+                text = LocalAppStrings.current.localControl,
                 color = palette.textMuted,
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Bold,
@@ -272,10 +283,10 @@ private fun FlowBottomNavigation(
                 icon = {
                     Icon(
                         imageVector = page.icon,
-                        contentDescription = page.label,
+                        contentDescription = page.label(LocalAppStrings.current),
                     )
                 },
-                label = { Text(page.label) },
+                label = { Text(page.label(LocalAppStrings.current)) },
                 colors = itemColors,
             )
         }
@@ -285,10 +296,10 @@ private fun FlowBottomNavigation(
             icon = {
                 Icon(
                     imageVector = Icons.Filled.MoreVert,
-                    contentDescription = "More",
+                    contentDescription = LocalAppStrings.current.more,
                 )
             },
-            label = { Text("More") },
+            label = { Text(LocalAppStrings.current.more) },
             colors = itemColors,
         )
     }
@@ -298,6 +309,7 @@ private fun FlowBottomNavigation(
 private fun MorePage(
     onOpen: (AppPage) -> Unit,
 ) {
+    val strings = LocalAppStrings.current
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(
@@ -310,9 +322,9 @@ private fun MorePage(
     ) {
         item {
             PageIntro(
-                eyebrow = "Workspace",
-                title = "More",
-                description = "Configuration, diagnostics and preferences live here on compact screens.",
+                eyebrow = strings.workspaceEyebrow,
+                title = strings.more,
+                description = strings.moreDescription,
             )
         }
         MobileNavigation.morePages.forEach { page ->
@@ -359,13 +371,13 @@ private fun MoreDestination(
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = page.label,
+                    text = page.label(LocalAppStrings.current),
                     color = palette.textPrimary,
                     style = MaterialTheme.typography.titleMedium,
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
-                    text = pageDescription(page),
+                    text = pageDescription(page, LocalAppStrings.current),
                     color = palette.textMuted,
                     style = MaterialTheme.typography.labelMedium,
                 )
@@ -379,10 +391,10 @@ private fun MoreDestination(
     }
 }
 
-private fun pageDescription(page: AppPage): String =
+private fun pageDescription(page: AppPage, strings: com.flowproxy.android.i18n.AppStrings): String =
     when (page) {
-        AppPage.PROFILES -> "Isolated profile catalog"
-        AppPage.LOGS -> "Synthetic diagnostic entries"
-        AppPage.SETTINGS -> "Theme, motion and device permissions"
+        AppPage.PROFILES -> strings.describeProfiles
+        AppPage.LOGS -> strings.describeLogs
+        AppPage.SETTINGS -> strings.describeSettings
         else -> ""
     }

@@ -7,6 +7,7 @@ import {
   Upload,
 } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useRuntime } from "../../app/runtime/runtimeContext";
 import { useBridgeResource } from "../../app/runtime/useBridgeResource";
 import {
@@ -23,14 +24,10 @@ import {
   WorkspacePage,
 } from "../workspace/WorkspaceUi";
 
-const dateFormatter = new Intl.DateTimeFormat(undefined, {
-  dateStyle: "medium",
-  timeStyle: "short",
-});
-
 type ImportMode = "url" | "yaml";
 
 export function ProfilesPage() {
+  const { t } = useTranslation();
   const { snapshot } = useRuntime();
   const profiles = useBridgeResource(getProfiles, true);
   const [mode, setMode] = useState<ImportMode>("url");
@@ -55,7 +52,7 @@ export function ProfilesPage() {
     if (trimmedName.length === 0) {
       setActionError({
         code: "subscription_invalid",
-        message: "Give the subscription a name first.",
+        message: t("profiles.errorName"),
         retryable: false,
       });
       return;
@@ -63,7 +60,7 @@ export function ProfilesPage() {
     if (mode === "url" && trimmedUrl.length === 0) {
       setActionError({
         code: "subscription_invalid",
-        message: "Paste a subscription URL first.",
+        message: t("profiles.errorUrl"),
         retryable: false,
       });
       return;
@@ -71,7 +68,7 @@ export function ProfilesPage() {
     if (mode === "yaml" && yaml.trim().length === 0) {
       setActionError({
         code: "subscription_invalid",
-        message: "Paste the subscription YAML first.",
+        message: t("profiles.errorYaml"),
         retryable: false,
       });
       return;
@@ -87,7 +84,7 @@ export function ProfilesPage() {
       if (result.status === "unavailable") {
         setActionError({
           code: "internal",
-          message: "The native bridge is unavailable in this build.",
+          message: t("profiles.errorBridge"),
           retryable: true,
         });
         return;
@@ -100,8 +97,8 @@ export function ProfilesPage() {
       await profiles.reload();
       setNotice(
         coreRunning
-          ? "Subscription imported. Restart the Runtime to load its nodes."
-          : "Subscription imported. Start the Runtime to load its nodes.",
+          ? t("profiles.noticeRunning")
+          : t("profiles.noticeStopped"),
       );
       setUrl("");
       setYaml("");
@@ -123,13 +120,13 @@ export function ProfilesPage() {
       if (result.status === "unavailable") {
         setActionError({
           code: "internal",
-          message: "The native bridge is unavailable in this build.",
+          message: t("profiles.errorBridge"),
           retryable: true,
         });
         return;
       }
       await profiles.reload();
-      setNotice("Subscription removed. The direct profile is active again.");
+      setNotice(t("profiles.noticeRemoved"));
     } finally {
       setPending(false);
     }
@@ -138,7 +135,11 @@ export function ProfilesPage() {
   const showImportForm = !hasSubscription;
 
   return (
-    <WorkspacePage eyebrow="Configuration" title="Profiles" badge="Local">
+    <WorkspacePage
+      eyebrow={t("profiles.eyebrow")}
+      title={t("profiles.title")}
+      badge={t("common.local")}
+    >
       <ResourceFeedback
         error={profiles.error ?? actionError}
         unavailable={profiles.unavailable}
@@ -152,14 +153,14 @@ export function ProfilesPage() {
       <section className="workspace-panel">
         <div className="workspace-panel-heading">
           <div>
-            <span className="workspace-kicker">Mihomo profiles</span>
-            <h2>Available configurations</h2>
+            <span className="workspace-kicker">{t("profiles.kicker")}</span>
+            <h2>{t("profiles.heading")}</h2>
           </div>
           <button
             className="workspace-icon-button"
             type="button"
-            aria-label="Refresh profiles"
-            title="Refresh profiles"
+            aria-label={t("profiles.refresh")}
+            title={t("profiles.refresh")}
             disabled={profiles.isLoading}
             onClick={() => void profiles.reload()}
           >
@@ -168,13 +169,13 @@ export function ProfilesPage() {
         </div>
 
         {profiles.isLoading && profiles.data === null ? (
-          <LoadingState label="Loading profiles..." />
+          <LoadingState label={t("profiles.loading")} />
         ) : !profiles.data?.length ? (
           <div className="workspace-empty">
             <FileStack aria-hidden="true" size={22} />
             <div>
-              <h2>No profiles reported</h2>
-              <p>Mihomo did not expose any profile metadata.</p>
+              <h2>{t("profiles.emptyTitle")}</h2>
+              <p>{t("profiles.emptyBody")}</p>
             </div>
           </div>
         ) : (
@@ -196,15 +197,13 @@ export function ProfilesPage() {
         <section className="workspace-panel">
           <div className="workspace-panel-heading">
             <div>
-              <span className="workspace-kicker">Subscription</span>
-              <h2>Import a subscription</h2>
+              <span className="workspace-kicker">
+                {t("profiles.subscriptionKicker")}
+              </span>
+              <h2>{t("profiles.subscriptionHeading")}</h2>
             </div>
           </div>
-          <p className="workspace-hint">
-            FlowProxy keeps the control endpoint, API secret and proxy port
-            under its own policy. Everything else in the subscription is used
-            unchanged.
-          </p>
+          <p className="workspace-hint">{t("profiles.subscriptionHint")}</p>
 
           <div className="subscription-tabs" role="tablist">
             <button
@@ -214,7 +213,7 @@ export function ProfilesPage() {
               className={mode === "url" ? "is-active" : undefined}
               onClick={() => setMode("url")}
             >
-              <Link2 aria-hidden="true" size={14} /> From a URL
+              <Link2 aria-hidden="true" size={14} /> {t("profiles.tabUrl")}
             </button>
             <button
               type="button"
@@ -223,17 +222,17 @@ export function ProfilesPage() {
               className={mode === "yaml" ? "is-active" : undefined}
               onClick={() => setMode("yaml")}
             >
-              <Upload aria-hidden="true" size={14} /> Paste YAML
+              <Upload aria-hidden="true" size={14} /> {t("profiles.tabYaml")}
             </button>
           </div>
 
           <label className="subscription-field">
-            <span>Name</span>
+            <span>{t("profiles.name")}</span>
             <input
               type="text"
               value={name}
               maxLength={120}
-              placeholder="My provider"
+              placeholder={t("profiles.namePlaceholder")}
               disabled={pending}
               onChange={(event) => setName(event.target.value)}
             />
@@ -241,11 +240,11 @@ export function ProfilesPage() {
 
           {mode === "url" ? (
             <label className="subscription-field">
-              <span>Subscription URL</span>
+              <span>{t("profiles.url")}</span>
               <input
                 type="url"
                 value={url}
-                placeholder="https://provider.example.com/subscribe?token=..."
+                placeholder={t("profiles.urlPlaceholder")}
                 spellCheck={false}
                 autoComplete="off"
                 disabled={pending}
@@ -254,11 +253,11 @@ export function ProfilesPage() {
             </label>
           ) : (
             <label className="subscription-field">
-              <span>Subscription YAML</span>
+              <span>{t("profiles.yaml")}</span>
               <textarea
                 rows={10}
                 value={yaml}
-                placeholder={"proxies:\n  - name: Tokyo 01\n    type: ss\n    ..."}
+                placeholder={t("profiles.yamlPlaceholder")}
                 spellCheck={false}
                 disabled={pending}
                 onChange={(event) => setYaml(event.target.value)}
@@ -273,7 +272,7 @@ export function ProfilesPage() {
               disabled={pending}
               onClick={() => void submitImport()}
             >
-              {pending ? "Importing..." : "Import subscription"}
+              {pending ? t("profiles.importing") : t("profiles.import")}
             </button>
           </div>
         </section>
@@ -293,6 +292,12 @@ function ProfileCard({
   disabled: boolean;
   onRemove: () => void;
 }) {
+  const { t, i18n } = useTranslation();
+  const dateFormatter = new Intl.DateTimeFormat(i18n.language, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+
   return (
     <article className="profile-card">
       <span className="profile-icon" aria-hidden="true">
@@ -302,25 +307,27 @@ function ProfileCard({
         <strong>{profile.name}</strong>
         <small>
           {profile.updated_at_ms === null
-            ? "Update time unavailable"
-            : `Updated ${dateFormatter.format(profile.updated_at_ms)}`}
+            ? t("profiles.updateUnavailable")
+            : t("profiles.updated", {
+                time: dateFormatter.format(profile.updated_at_ms),
+              })}
           {typeof profile.proxy_count === "number"
-            ? ` · ${profile.proxy_count} proxies`
+            ? ` · ${t("profiles.proxyCount", { count: profile.proxy_count })}`
             : ""}
         </small>
       </span>
       {profile.active ? (
         <span className="profile-active">
           <CircleCheck aria-hidden="true" size={13} />
-          Active
+          {t("profiles.active")}
         </span>
       ) : null}
       {removable ? (
         <button
           type="button"
           className="workspace-icon-button"
-          aria-label="Remove subscription"
-          title="Remove subscription"
+          aria-label={t("profiles.remove")}
+          title={t("profiles.remove")}
           disabled={disabled}
           onClick={onRemove}
         >

@@ -7,6 +7,7 @@ import {
   ShieldCheck,
   TriangleAlert,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useRuntime } from "../../app/runtime/runtimeContext";
 import { useSystemIntegration } from "../../app/systemIntegration/systemIntegrationContext";
 import type {
@@ -15,34 +16,14 @@ import type {
 } from "../../platform/runtime";
 
 const MAX_VISIBLE_LOGS = 100;
-const timeFormatter = new Intl.DateTimeFormat(undefined, {
-  hour: "2-digit",
-  minute: "2-digit",
-  second: "2-digit",
-});
 
-const stateLabels: Record<RuntimeState, string> = {
-  stopped: "Stopped",
-  starting: "Starting",
-  running_disconnected: "Running (not connected)",
-  connected: "Connected",
-  stopping: "Stopping",
-  error: "Error",
-  permission_required: "Permission required",
-};
-
-const capabilityLabels = {
-  available: "Enabled",
-  blocked: "Blocked",
-  unsupported: "Unsupported",
-  unverified: "Unverified",
-} as const;
-
-const systemProxyLabels = {
-  disabled: "Disabled",
-  enabled: "Enabled",
-  managed_inactive: "Inactive",
-} as const;
+function useTimeFormatter() {
+  return new Intl.DateTimeFormat(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
 
 function canStart(state: RuntimeState | undefined): boolean {
   return state === "stopped" || state === "error";
@@ -57,6 +38,8 @@ function canStopOrRestart(state: RuntimeState | undefined): boolean {
 }
 
 function RuntimeLogRow({ entry }: { entry: RuntimeLogEntry }) {
+  const timeFormatter = useTimeFormatter();
+
   return (
     <li data-level={entry.level}>
       <time dateTime={new Date(entry.timestamp_ms).toISOString()}>
@@ -68,6 +51,7 @@ function RuntimeLogRow({ entry }: { entry: RuntimeLogEntry }) {
 }
 
 export function MihomoCorePanel() {
+  const { t } = useTranslation();
   const integration = useSystemIntegration();
   const {
     snapshot,
@@ -85,20 +69,26 @@ export function MihomoCorePanel() {
   const isPending = pendingAction !== null;
   const visibleLogs = logs.slice(-MAX_VISIBLE_LOGS);
   const stateLabel = state
-    ? stateLabels[state]
+    ? t(`runtime.state.${state}`)
     : isLoading
-      ? "Loading"
-      : "Unavailable";
+      ? t("runtime.state.loading")
+      : t("runtime.state.unavailable");
   const systemProxyLabel = integration.status
-    ? systemProxyLabels[integration.status.system_proxy.state]
+    ? t(
+        `common.${
+          integration.status.system_proxy.state === "managed_inactive"
+            ? "inactive"
+            : integration.status.system_proxy.state
+        }`,
+      )
     : integration.isLoading
-      ? "Checking"
-      : "Unavailable";
+      ? t("common.checking")
+      : t("common.unavailable");
   const tunLabel = integration.status
-    ? capabilityLabels[integration.status.capabilities.tun.state]
+    ? t(`common.${integration.status.capabilities.tun.state}`)
     : integration.isLoading
-      ? "Checking"
-      : "Unavailable";
+      ? t("common.checking")
+      : t("common.unavailable");
 
   return (
     <section
@@ -107,8 +97,8 @@ export function MihomoCorePanel() {
     >
       <div className="settings-panel-heading mihomo-core-heading">
         <div>
-          <span className="settings-label">Proxy engine</span>
-          <h2 id="mihomo-core-title">Mihomo Core</h2>
+          <span className="settings-label">{t("core.kicker")}</span>
+          <h2 id="mihomo-core-title">{t("core.title")}</h2>
         </div>
         <span
           className="mihomo-core-badge"
@@ -128,23 +118,23 @@ export function MihomoCorePanel() {
             />
             <span className="runtime-state-copy">
               <strong>{stateLabel}</strong>
-              <small>Locally managed process</small>
+              <small>{t("core.localProcess")}</small>
             </span>
-            <span className="runtime-demo-tag">Loopback API</span>
+            <span className="runtime-demo-tag">{t("core.loopbackApi")}</span>
           </div>
 
           <dl className="mihomo-core-facts">
             <div>
-              <dt>Backend</dt>
-              <dd>{coreInfo?.backend ?? snapshot?.backend ?? "N/A"}</dd>
+              <dt>{t("core.backend")}</dt>
+              <dd>{coreInfo?.backend ?? snapshot?.backend ?? t("common.notAvailable")}</dd>
             </div>
             <div>
-              <dt>Version</dt>
-              <dd>{coreInfo?.version ?? "N/A"}</dd>
+              <dt>{t("core.version")}</dt>
+              <dd>{coreInfo?.version ?? t("common.notAvailable")}</dd>
             </div>
             <div>
-              <dt>PID</dt>
-              <dd>{coreInfo?.pid ?? "N/A"}</dd>
+              <dt>{t("core.pid")}</dt>
+              <dd>{coreInfo?.pid ?? t("common.notAvailable")}</dd>
             </div>
           </dl>
 
@@ -156,7 +146,7 @@ export function MihomoCorePanel() {
               onClick={() => void start()}
             >
               <Play aria-hidden="true" size={13} />
-              {pendingAction === "start" ? "Starting core" : "Start core"}
+              {pendingAction === "start" ? t("core.starting") : t("core.start")}
             </button>
             <button
               className="runtime-action"
@@ -165,7 +155,7 @@ export function MihomoCorePanel() {
               onClick={() => void stop()}
             >
               <CircleStop aria-hidden="true" size={13} />
-              {pendingAction === "stop" ? "Stopping core" : "Stop core"}
+              {pendingAction === "stop" ? t("core.stopping") : t("core.stop")}
             </button>
             <button
               className="runtime-action"
@@ -175,8 +165,8 @@ export function MihomoCorePanel() {
             >
               <RotateCw aria-hidden="true" size={13} />
               {pendingAction === "restart"
-                ? "Restarting core"
-                : "Restart core"}
+                ? t("core.restarting")
+                : t("core.restart")}
             </button>
           </div>
 
@@ -187,7 +177,7 @@ export function MihomoCorePanel() {
                 <strong>{lastError.message}</strong>
                 <small>
                   {lastError.code}
-                  {lastError.retryable ? " / retryable" : ""}
+                  {lastError.retryable ? ` / ${t("core.retryable")}` : ""}
                 </small>
               </span>
             </div>
@@ -201,7 +191,7 @@ export function MihomoCorePanel() {
                 <RadioTower aria-hidden="true" size={16} />
               </span>
               <span>
-                <strong>System proxy</strong>
+                <strong>{t("core.systemProxy")}</strong>
                 <small data-state={integration.status?.system_proxy.state}>
                   {systemProxyLabel}
                 </small>
@@ -212,7 +202,7 @@ export function MihomoCorePanel() {
                 <ShieldCheck aria-hidden="true" size={16} />
               </span>
               <span>
-                <strong>TUN interface</strong>
+                <strong>{t("core.tun")}</strong>
                 <small data-state={integration.status?.capabilities.tun.state}>
                   {tunLabel}
                 </small>
@@ -225,7 +215,7 @@ export function MihomoCorePanel() {
           <div className="runtime-log-heading">
             <span>
               <ScrollText aria-hidden="true" size={13} />
-              Runtime logs
+              {t("core.logs")}
             </span>
             <small>{visibleLogs.length} / 100</small>
           </div>
@@ -236,7 +226,7 @@ export function MihomoCorePanel() {
               ))}
             </ol>
           ) : (
-            <div className="runtime-log-empty">No Runtime logs yet.</div>
+            <div className="runtime-log-empty">{t("core.noLogs")}</div>
           )}
         </div>
       </div>

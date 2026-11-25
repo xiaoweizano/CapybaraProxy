@@ -1,4 +1,5 @@
 import { Route } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useRuntime } from "../../app/runtime/runtimeContext";
 import { useBridgeResource } from "../../app/runtime/useBridgeResource";
 import { getRules } from "../../platform/runtime";
@@ -13,6 +14,7 @@ import {
 const MAX_VISIBLE_RULES = 500;
 
 export function RulesPage() {
+  const { t } = useTranslation();
   const { snapshot } = useRuntime();
   const isConnected = snapshot?.state === "connected";
   const rules = useBridgeResource(getRules, isConnected);
@@ -20,9 +22,9 @@ export function RulesPage() {
 
   return (
     <WorkspacePage
-      eyebrow="Routing"
-      title="Rules"
-      badge={isConnected ? "Live Mihomo" : "Offline"}
+      eyebrow={t("rules.eyebrow")}
+      title={t("rules.title")}
+      badge={isConnected ? t("common.liveMihomo") : t("common.offline")}
     >
       <ResourceFeedback
         error={rules.error}
@@ -35,29 +37,29 @@ export function RulesPage() {
         <section className="workspace-panel">
           <div className="workspace-panel-heading">
             <div>
-              <span className="workspace-kicker">Rule provider</span>
-              <h2>Active routing rules</h2>
+              <span className="workspace-kicker">{t("rules.kicker")}</span>
+              <h2>{t("rules.heading")}</h2>
             </div>
             <div className="workspace-panel-actions">
               <span className="workspace-count">
-                {rules.data?.length ?? 0} rules
+                {t("rules.count", { count: rules.data?.length ?? 0 })}
               </span>
               <RefreshButton
                 isLoading={rules.isLoading}
                 onClick={() => void rules.reload()}
-                label="Refresh rules"
+                label={t("rules.refresh")}
               />
             </div>
           </div>
 
           {rules.isLoading && rules.data === null ? (
-            <LoadingState label="Loading routing rules..." />
+            <LoadingState label={t("rules.loading")} />
           ) : visibleRules.length === 0 ? (
             <div className="workspace-empty">
               <Route aria-hidden="true" size={22} />
               <div>
-                <h2>No rules reported</h2>
-                <p>Mihomo returned an empty active rule table.</p>
+                <h2>{t("rules.emptyTitle")}</h2>
+                <p>{t("rules.emptyBody")}</p>
               </div>
             </div>
           ) : (
@@ -66,9 +68,9 @@ export function RulesPage() {
                 <thead>
                   <tr>
                     <th scope="col">#</th>
-                    <th scope="col">Type</th>
-                    <th scope="col">Payload</th>
-                    <th scope="col">Target</th>
+                    <th scope="col">{t("rules.type")}</th>
+                    <th scope="col">{t("rules.payload")}</th>
+                    <th scope="col">{t("rules.target")}</th>
                   </tr>
                 </thead>
                 <tbody>

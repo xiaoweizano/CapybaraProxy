@@ -1,11 +1,14 @@
 import type { ThemeId } from "../app/theme/theme";
 import type { CloseBehavior } from "../shared/closeBehavior";
+import type { LanguageId } from "../i18n/language";
 import { invokeNativeCommand, type NativeBridgeError } from "./tauri";
 
 export type DesktopSettings = {
   version: 1;
   theme: ThemeId;
   close_behavior: CloseBehavior;
+  /** Optional because builds before the field existed do not send it. */
+  language?: LanguageId;
 };
 
 export type SettingsBridgeResult<T> =
@@ -23,7 +26,10 @@ function isDesktopSettings(value: unknown): value is DesktopSettings {
     value.version === 1 &&
     (value.theme === "cyber_flow" || value.theme === "warm_flow") &&
     (value.close_behavior === "hide_to_tray" ||
-      value.close_behavior === "exit_application")
+      value.close_behavior === "exit_application") &&
+    (value.language === undefined ||
+      value.language === "english" ||
+      value.language === "simplified_chinese")
   );
 }
 
