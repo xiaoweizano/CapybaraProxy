@@ -111,6 +111,9 @@ export const en = {
     selectNode: "Select {{name}}",
     testDelay: "Test delay for {{name}}",
     notTested: "Not tested",
+    offlineNotice:
+      "Mihomo is not running. These entries come from the imported subscription and cannot be used until the core starts.",
+    offlineTag: "Offline",
   },
   rules: {
     eyebrow: "Routing",
@@ -125,6 +128,8 @@ export const en = {
     type: "Type",
     payload: "Payload",
     target: "Target",
+    offlineNotice:
+      "Mihomo is not running. This rule table comes from the imported subscription.",
   },
   connections: {
     eyebrow: "Live traffic",

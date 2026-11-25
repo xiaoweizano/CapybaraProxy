@@ -126,6 +126,16 @@ export type ProfileInfo = {
   proxy_count: number | null;
 };
 
+/**
+ * Groups and rules read from the stored subscription while the Runtime is
+ * stopped. Read-only: it never reflects a running core.
+ */
+export type SubscriptionSnapshot = {
+  groups: ProxyGroup[];
+  rules: RuleItem[];
+  has_subscription: boolean;
+};
+
 const runtimeStates = new Set<RuntimeState>([
   "stopped",
   "starting",
@@ -359,6 +369,7 @@ async function executeRuntimeCommand<T>(
     | "close_connection"
     | "get_rules"
     | "get_profiles"
+    | "get_subscription_snapshot"
     | "import_subscription"
     | "clear_subscription",
   isValidData: (value: unknown) => value is T,
@@ -462,6 +473,27 @@ export function getProfiles(): Promise<RuntimeBridgeResult<ProfileInfo[]>> {
 
 const isProfileList = (value: unknown): value is ProfileInfo[] =>
   Array.isArray(value) && value.every(isProfileInfo);
+
+function isSubscriptionSnapshot(value: unknown): value is SubscriptionSnapshot {
+  return (
+    isRecord(value) &&
+    typeof value.has_subscription === "boolean" &&
+    Array.isArray(value.groups) &&
+    value.groups.every(isProxyGroup) &&
+    Array.isArray(value.rules) &&
+    value.rules.every(isRuleItem)
+  );
+}
+
+/** Reads the offline summary of the stored subscription. */
+export function getSubscriptionSnapshot(): Promise<
+  RuntimeBridgeResult<SubscriptionSnapshot>
+> {
+  return executeRuntimeCommand(
+    "get_subscription_snapshot",
+    isSubscriptionSnapshot,
+  );
+}
 
 export function importSubscription(
   name: string,

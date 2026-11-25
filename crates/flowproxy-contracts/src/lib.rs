@@ -143,6 +143,16 @@ pub struct ConnectionSummary {
     pub started_at_ms: i64,
 }
 
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+pub struct SubscriptionSnapshot {
+    /// Groups and nodes read from the imported document. Does not reflect a
+    /// running core; it exists so the UI has something to show while stopped.
+    pub groups: Vec<ProxyGroup>,
+    pub rules: Vec<RuleItem>,
+    /// True when a subscription is stored on disk.
+    pub has_subscription: bool,
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ConnectionPage {
     pub upload_total_bytes: u64,

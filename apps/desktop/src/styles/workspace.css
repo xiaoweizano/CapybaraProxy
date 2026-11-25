@@ -2,7 +2,9 @@
   display: flex;
   min-height: 100%;
   flex-direction: column;
-  gap: 18px;
+  /* Must exceed the panel padding (18px), otherwise adjacent cards read as one
+     block. */
+  gap: 22px;
 }
 
 .workspace-live-badge,
@@ -527,6 +529,184 @@
   }
 }
 
+/* ---------------------------------------------------------------------------
+   Subscription import
+   --------------------------------------------------------------------------- */
+
+.workspace-notice {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(var(--success-rgb), 0.34);
+  border-radius: var(--radius-sm);
+  background: rgba(var(--success-rgb), 0.08);
+  color: var(--success);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.workspace-hint {
+  max-width: 72ch;
+  margin: 0 0 16px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.subscription-tabs {
+  display: inline-flex;
+  gap: 3px;
+  margin-bottom: 16px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--input-bg);
+}
+
+.subscription-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 12px;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-faint);
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background-color 150ms ease,
+    color 150ms ease;
+}
+
+.subscription-tabs button:hover:not(.is-active) {
+  color: var(--text-secondary);
+}
+
+.subscription-tabs button.is-active {
+  background: rgba(var(--accent-rgb), 0.16);
+  color: var(--accent-cyan);
+}
+
+:root[data-theme="warm_flow"] .subscription-tabs button.is-active {
+  background: rgba(43, 150, 243, 0.12);
+  color: #267dc4;
+}
+
+.subscription-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
+  gap: 14px 16px;
+  align-items: start;
+}
+
+/* The YAML editor is a single column because the text is multi-line. */
+.subscription-field-wide {
+  grid-column: 1 / -1;
+}
+
+.subscription-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.subscription-field > span {
+  color: var(--text-faint);
+  font-size: 8px;
+  font-weight: 750;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.subscription-field input,
+.subscription-field textarea {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--input-bg);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 11px;
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease;
+}
+
+.subscription-field textarea {
+  resize: vertical;
+  min-height: 132px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  line-height: 1.6;
+}
+
+.subscription-field input::placeholder,
+.subscription-field textarea::placeholder {
+  color: var(--text-faint);
+  opacity: 0.72;
+}
+
+.subscription-field input:focus,
+.subscription-field textarea:focus {
+  outline: none;
+  border-color: var(--border-strong);
+  background: rgba(var(--accent-rgb), 0.06);
+}
+
+.subscription-field input:disabled,
+.subscription-field textarea:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.subscription-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.workspace-primary-button {
+  min-height: 33px;
+  padding: 0 18px;
+  border: 1px solid rgba(var(--accent-rgb), 0.32);
+  border-radius: var(--radius-sm);
+  background: rgba(var(--accent-rgb), 0.12);
+  color: var(--accent-cyan);
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease;
+}
+
+.workspace-primary-button:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: rgba(var(--accent-rgb), 0.2);
+}
+
+.workspace-primary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* Warm Flow's --accent-cyan (#62d6fa) has too little contrast on the light
+   panel, so the accent switches to the deeper blue used by the core panel. */
+:root[data-theme="warm_flow"] .workspace-primary-button {
+  border-color: rgba(43, 150, 243, 0.22);
+  background: rgba(43, 150, 243, 0.1);
+  color: #267dc4;
+}
+
 @media (max-width: 900px) {
   .connection-row {
     grid-template-columns: 34px minmax(140px, 1fr) minmax(120px, 0.8fr) 31px;
@@ -540,6 +720,20 @@
 @media (max-width: 680px) {
   .workspace-panel {
     padding: 14px;
+  }
+
+  .subscription-tabs {
+    display: flex;
+    width: 100%;
+  }
+
+  .subscription-tabs button {
+    flex: 1 1 0;
+    justify-content: center;
+  }
+
+  .subscription-form {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .proxy-node {

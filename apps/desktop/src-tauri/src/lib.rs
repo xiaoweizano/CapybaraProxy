@@ -1,9 +1,11 @@
 mod settings;
+mod tray_strings;
 mod system_integration;
 
 use flowproxy_contracts::{
     CommandResult, ConnectionPage, CoreInfo, ProfileInfo, ProxyGroup, RuleItem, RuntimeBackend,
-    RuntimeError, RuntimeErrorCode, RuntimeLogEntry, RuntimeSnapshot, TelemetrySnapshot,
+    RuntimeError, RuntimeErrorCode, RuntimeLogEntry, RuntimeSnapshot, SubscriptionSnapshot,
+    TelemetrySnapshot,
 };
 use flowproxy_mihomo_manager::{MihomoAdapter, MihomoCoreAdapter, UnavailableMihomoAdapter};
 use flowproxy_runtime::{RuntimeChange, RuntimeFailure, RuntimeManager};
@@ -266,23 +268,13 @@ fn show_main_window(app: &tauri::AppHandle) {
     }
 }
 
-fn tray_connection_label(runtime: &RuntimeSnapshot) -> (&'static str, bool) {
-    match runtime.state {
-        flowproxy_contracts::RuntimeState::Stopped | flowproxy_contracts::RuntimeState::Error => {
-            ("Connect", true)
-        }
-        flowproxy_contracts::RuntimeState::RunningDisconnected
-        | flowproxy_contracts::RuntimeState::Connected => ("Disconnect", true),
-        flowproxy_contracts::RuntimeState::Starting => ("Connecting...", false),
-        flowproxy_contracts::RuntimeState::Stopping => ("Disconnecting...", false),
-        flowproxy_contracts::RuntimeState::PermissionRequired => ("Connect unavailable", false),
-    }
-}
-
 fn build_tray_menu(app: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     let state = app.state::<AppState>();
     let runtime = state.runtime.snapshot();
-    let (connection_label, connection_enabled) = tray_connection_label(&runtime);
+    let language = state.settings().language;
+    let strings = tray_strings::tray_strings(language);
+    let (connection_label, connection_enabled) =
+        tray_strings::connection_label(language, runtime.state);
     let connection = MenuItem::with_id(
         app,
         TRAY_TOGGLE_CONNECTION_ID,
@@ -290,8 +282,8 @@ fn build_tray_menu(app: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         connection_enabled,
         None::<&str>,
     )?;
-    let show = MenuItem::with_id(app, "show", "Show FlowProxy", true, None::<&str>)?;
-    let exit = MenuItem::with_id(app, "exit", "Exit", true, None::<&str>)?;
+    let show = MenuItem::with_id(app, "show", strings.show, true, None::<&str>)?;
+    let exit = MenuItem::with_id(app, "exit", strings.exit, true, None::<&str>)?;
     Menu::with_items(app, &[&connection, &show, &exit])
 }
 
@@ -331,11 +323,12 @@ fn run_tray_connection_action(app: &tauri::AppHandle, state: &AppState) {
 
 fn install_tray(app: &tauri::App) -> tauri::Result<()> {
     let menu = build_tray_menu(app.handle())?;
+    let language = app.state::<AppState>().settings().language;
 
     let mut builder = TrayIconBuilder::with_id(TRAY_ID)
         .menu(&menu)
         .show_menu_on_left_click(false)
-        .tooltip("FlowProxy")
+        .tooltip(tray_strings::tray_strings(language).tooltip)
         .on_menu_event(|app, event| match event.id().as_ref() {
             TRAY_TOGGLE_CONNECTION_ID => {
                 let state = app.state::<AppState>();
@@ -561,6 +554,16 @@ fn get_profiles(
     run_data_command(&app, state.runtime.profiles())
 }
 
+/// Returns the stored subscription's groups and rules so the pages have
+/// something to show while the Runtime is stopped.
+#[tauri::command]
+fn get_subscription_snapshot(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> CommandResult<SubscriptionSnapshot> {
+    run_data_command(&app, state.runtime.subscription_snapshot())
+}
+
 /// Imports a subscription from pasted YAML or, when `url` is given, downloads
 /// it first. The download happens before the Runtime lock is taken so a slow
 /// upstream cannot block start/stop.
@@ -660,11 +663,17 @@ fn get_settings(state: State<'_, AppState>) -> CommandResult<DesktopSettings> {
 
 #[tauri::command]
 fn save_settings(
+    app: tauri::AppHandle,
     state: State<'_, AppState>,
     settings: DesktopSettings,
 ) -> CommandResult<DesktopSettings> {
     match state.update_settings(settings) {
-        Ok(settings) => CommandResult::success(settings),
+        Ok(settings) => {
+            // The tray menu is built in Rust, so it has to be rebuilt when the
+            // interface language changes.
+            refresh_tray_menu(&app);
+            CommandResult::success(settings)
+        }
         Err(error) => CommandResult::failure(map_settings_error(error)),
     }
 }
@@ -752,6 +761,7 @@ pub fn run() {
             close_connection,
             get_rules,
             get_profiles,
+            get_subscription_snapshot,
             import_subscription,
             clear_subscription,
             get_runtime_logs,

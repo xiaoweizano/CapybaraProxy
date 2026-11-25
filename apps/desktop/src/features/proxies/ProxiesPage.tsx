@@ -8,7 +8,11 @@ import {
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useRuntime } from "../../app/runtime/runtimeContext";
-import type { ProxyNode } from "../../platform/runtime";
+import { useBridgeResource } from "../../app/runtime/useBridgeResource";
+import {
+  getSubscriptionSnapshot,
+  type ProxyNode,
+} from "../../platform/runtime";
 import {
   ResourceFeedback,
   RuntimeDisconnected,
@@ -25,12 +29,19 @@ export function ProxiesPage() {
     lastError,
     isLoading,
   } = useRuntime();
+
   const [pendingSelection, setPendingSelection] = useState<string | null>(null);
   const [pendingDelay, setPendingDelay] = useState<string | null>(null);
   const [testedDelays, setTestedDelays] = useState<Record<string, number | null>>(
     {},
   );
   const isConnected = snapshot?.state === "connected";
+  // When the core is stopped the control API is unreachable, so fall back to
+  // the stored subscription. This list is read-only and clearly labelled.
+  const offline = useBridgeResource(getSubscriptionSnapshot, !isConnected);
+  const offlineGroups = offline.data?.has_subscription
+    ? offline.data.groups
+    : [];
 
   const chooseProxy = async (group: string, node: ProxyNode) => {
     if (pendingSelection || node.name === proxyGroups.find((item) => item.name === group)?.selected) {
@@ -68,7 +79,55 @@ export function ProxiesPage() {
       <ResourceFeedback error={lastError} unavailable={false} />
 
       {!isConnected ? (
-        <RuntimeDisconnected />
+        offlineGroups.length > 0 ? (
+          <div className="proxy-groups">
+            <div className="workspace-feedback" role="status">
+              <Radio aria-hidden="true" size={16} />
+              <span>{t("proxies.offlineNotice")}</span>
+            </div>
+            {offlineGroups.map((group) => (
+              <section
+                className="workspace-panel proxy-group-panel"
+                key={group.name}
+                aria-labelledby={`offline-group-${group.name}`}
+              >
+                <div className="workspace-panel-heading">
+                  <div>
+                    <span className="workspace-kicker">
+                      {group.group_type}
+                    </span>
+                    <h2 id={`offline-group-${group.name}`}>{group.name}</h2>
+                  </div>
+                  <span className="workspace-count">
+                    {t("proxies.nodes", { count: group.nodes.length })}
+                  </span>
+                </div>
+
+                <div className="proxy-node-list">
+                  {group.nodes.map((node) => (
+                    <div
+                      className="proxy-node"
+                      key={`${group.name}-${node.name}`}
+                    >
+                      <span className="proxy-node-state" aria-hidden="true">
+                        <CircleDashed size={15} />
+                      </span>
+                      <span className="proxy-node-details">
+                        <strong>{node.name}</strong>
+                        <small>{node.proxy_type || "—"}</small>
+                      </span>
+                      <span className="proxy-delay" data-quality="unknown">
+                        {t("proxies.offlineTag")}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
+        ) : (
+          <RuntimeDisconnected />
+        )
       ) : isLoading && proxyGroups.length === 0 ? (
         <div className="workspace-loading" role="status">
           <CircleDashed aria-hidden="true" size={17} />

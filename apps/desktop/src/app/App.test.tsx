@@ -8,6 +8,7 @@ import {
   getRules,
   getRuntimeLogs,
   getRuntimeSnapshot,
+  getSubscriptionSnapshot,
   getTelemetry,
   subscribeRuntimeLog,
   subscribeRuntimeState,
@@ -21,6 +22,7 @@ vi.mock("../platform/runtime", () => ({
   getConnections: vi.fn(),
   getCoreInfo: vi.fn(),
   getProfiles: vi.fn(),
+  getSubscriptionSnapshot: vi.fn(),
   getProxyGroups: vi.fn(),
   getRules: vi.fn(),
   getRuntimeLogs: vi.fn(),
@@ -48,6 +50,7 @@ const getProxyGroupsMock = vi.mocked(getProxyGroups);
 const getRulesMock = vi.mocked(getRules);
 const getRuntimeLogsMock = vi.mocked(getRuntimeLogs);
 const getRuntimeSnapshotMock = vi.mocked(getRuntimeSnapshot);
+const getSubscriptionSnapshotMock = vi.mocked(getSubscriptionSnapshot);
 const getTelemetryMock = vi.mocked(getTelemetry);
 const subscribeRuntimeLogMock = vi.mocked(subscribeRuntimeLog);
 const subscribeRuntimeStateMock = vi.mocked(subscribeRuntimeState);
@@ -129,6 +132,10 @@ describe("App shell", () => {
     getRuntimeSnapshotMock.mockReset().mockResolvedValue({
       status: "ok",
       data: connectedSnapshot,
+    });
+    getSubscriptionSnapshotMock.mockReset().mockResolvedValue({
+      status: "ok",
+      data: { groups: [], rules: [], has_subscription: false },
     });
     getTelemetryMock.mockReset().mockResolvedValue({
       status: "ok",

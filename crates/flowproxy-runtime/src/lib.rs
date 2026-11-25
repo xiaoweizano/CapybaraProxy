@@ -4,7 +4,7 @@ mod redaction;
 use flowproxy_contracts::{
     ConnectionPage, CoreInfo, ProfileInfo, ProxyGroup, RuleItem, RuntimeBackend, RuntimeError,
     RuntimeErrorCode, RuntimeLogEntry, RuntimeLogLevel, RuntimeSnapshot, RuntimeState,
-    TelemetrySnapshot,
+    SubscriptionSnapshot, TelemetrySnapshot,
 };
 use flowproxy_mihomo_manager::MihomoAdapter;
 use log_buffer::LogBuffer;
@@ -387,6 +387,34 @@ where
     /// Unlike the other adapter data calls this does not require a connected
     /// Runtime: it reflects the configuration on disk, which is exactly what an
     /// operator needs to see before starting the core.
+    /// Read-only summary of the stored subscription for the offline UI.
+    ///
+    /// Like [`Self::profiles`] this works while the Runtime is stopped, because
+    /// it reads the document from disk instead of the control API.
+    pub fn subscription_snapshot(&self) -> Result<SubscriptionSnapshot, RuntimeFailure> {
+        let _operation = self.lock_operation();
+        let result = {
+            let mut adapter = self.lock_adapter();
+            adapter.subscription_snapshot()
+        };
+        match result {
+            Ok(snapshot) => Ok(snapshot),
+            Err(error) => {
+                let mut inner = self.lock_inner();
+                let mut logs = Vec::new();
+                inner.last_error = Some(error.clone());
+                push_log_locked(
+                    &mut inner,
+                    &mut logs,
+                    RuntimeLogLevel::Warn,
+                    error.message.clone(),
+                    Some(error.code),
+                );
+                Err(failure_locked(&inner, error, logs))
+            }
+        }
+    }
+
     pub fn profiles(&self) -> Result<Vec<ProfileInfo>, RuntimeFailure> {
         let _operation = self.lock_operation();
         let result = {

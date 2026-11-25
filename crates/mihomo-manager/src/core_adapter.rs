@@ -7,7 +7,7 @@ use crate::control_api::{
 use crate::MihomoAdapter;
 use flowproxy_contracts::{
     ConnectionPage, CoreInfo, ProfileInfo, ProxyGroup, RuleItem, RuntimeBackend, RuntimeError,
-    RuntimeErrorCode, RuntimeState, TelemetrySnapshot,
+    RuntimeErrorCode, RuntimeState, SubscriptionSnapshot, TelemetrySnapshot,
 };
 use std::collections::VecDeque;
 use std::io::{BufRead, BufReader, Read};
@@ -494,6 +494,19 @@ impl MihomoAdapter for MihomoCoreAdapter {
         self.config_store.remove_subscription()?;
         let _ = remove_subscription_metadata(&self.config_store);
         Ok(())
+    }
+
+    fn subscription_snapshot(&mut self) -> Result<SubscriptionSnapshot, RuntimeError> {
+        let Some(subscription) = self.config_store.read_subscription()? else {
+            return Ok(SubscriptionSnapshot::default());
+        };
+
+        let parsed = crate::subscription_preview::preview(&subscription);
+        Ok(SubscriptionSnapshot {
+            groups: parsed.groups,
+            rules: parsed.rules,
+            has_subscription: true,
+        })
     }
 
     fn take_logs(&mut self) -> Vec<String> {
@@ -1039,6 +1052,45 @@ mod tests {
     use std::thread;
     use std::time::{Duration, Instant};
 
+    /// Spawns a child and returns it *after it has already exited*.
+    ///
+    /// `cmd.exe /C exit 0` proved unreliable: depending on the shell it stays
+    /// resident, and these tests then burned their deadline waiting for an exit
+    /// that never came. Spawning a long-running process and terminating it here
+    /// gives the same precondition — a `Child` in the exited state — without
+    /// depending on how a helper binary handles `/C`.
+    /// Spawns a child and returns it *after it has already exited*.
+    ///
+    /// `cmd.exe /C exit 0` proved unreliable here: depending on the shell it
+    /// stays resident, and the tests then burned their deadline waiting for an
+    /// exit that never came. `cmd /C rem` exits promptly, and the state is
+    /// observed below so the returned `Child` is guaranteed to be reaped.
+    fn spawn_exited_child() -> std::process::Child {
+        let mut child = Command::new("cmd.exe")
+            .args(["/C", "rem"])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("spawn short-lived child");
+
+        let deadline = Instant::now() + Duration::from_secs(10);
+        loop {
+            match child.try_wait() {
+                Ok(Some(_)) => return child,
+                Ok(None) if Instant::now() < deadline => {
+                    thread::sleep(Duration::from_millis(10));
+                }
+                Ok(None) => {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    panic!("short-lived child did not exit");
+                }
+                Err(error) => panic!("could not read child state: {error}"),
+            }
+        }
+    }
+
     #[test]
     fn telemetry_rates_use_elapsed_time_and_ignore_counter_resets() {
         assert_eq!(rate_per_second(1_500, 500, 2.0), 500);
@@ -1084,22 +1136,7 @@ mod tests {
     #[test]
     fn controlled_proxy_endpoint_is_cleared_after_the_core_exits() {
         let directory = tempfile::tempdir().expect("temporary config directory");
-        let mut child = Command::new("cmd.exe")
-            .args(["/C", "exit", "0"])
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .expect("spawn short-lived child");
-        let deadline = Instant::now() + Duration::from_secs(2);
-        while child
-            .try_wait()
-            .expect("read short-lived child state")
-            .is_none()
-        {
-            assert!(Instant::now() < deadline, "short-lived child did not exit");
-            thread::sleep(Duration::from_millis(10));
-        }
+        let child = spawn_exited_child();
         let mut adapter = MihomoCoreAdapter::new(
             VerifiedMihomoBinary::test_fixture(),
             ConfigStore::new(directory.path().join("config.yaml")),
@@ -1115,22 +1152,7 @@ mod tests {
     #[test]
     fn exited_core_session_joins_log_workers_and_clears_connection_state() {
         let directory = tempfile::tempdir().expect("temporary config directory");
-        let mut child = Command::new("cmd.exe")
-            .args(["/C", "exit", "0"])
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .expect("spawn short-lived child");
-        let deadline = Instant::now() + Duration::from_secs(2);
-        while child
-            .try_wait()
-            .expect("read short-lived child state")
-            .is_none()
-        {
-            assert!(Instant::now() < deadline, "short-lived child did not exit");
-            thread::sleep(Duration::from_millis(10));
-        }
+        let child = spawn_exited_child();
 
         let first_finished = Arc::new(AtomicBool::new(false));
         let second_finished = Arc::new(AtomicBool::new(false));

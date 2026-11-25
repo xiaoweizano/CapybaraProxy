@@ -4,10 +4,11 @@ mod control_api;
 mod core_adapter;
 pub mod subscription;
 pub mod subscription_fetch;
+pub mod subscription_preview;
 
 use flowproxy_contracts::{
     ConnectionPage, CoreInfo, ProfileInfo, ProxyGroup, RuleItem, RuntimeError, RuntimeErrorCode,
-    TelemetrySnapshot,
+    SubscriptionSnapshot, TelemetrySnapshot,
 };
 
 pub use binary::{
@@ -119,6 +120,14 @@ pub trait MihomoAdapter: Send {
         Err(unsupported_adapter_data("subscription removal"))
     }
 
+    /// Read-only summary of the stored subscription for the offline UI.
+    ///
+    /// Unlike the other data methods this must work while the core is stopped:
+    /// it reads the document from disk and never touches the control API.
+    fn subscription_snapshot(&mut self) -> Result<SubscriptionSnapshot, RuntimeError> {
+        Err(unsupported_adapter_data("subscription summary"))
+    }
+
     fn take_logs(&mut self) -> Vec<String> {
         Vec::new()
     }
@@ -194,6 +203,10 @@ where
 
     fn clear_subscription(&mut self) -> Result<(), RuntimeError> {
         self.as_mut().clear_subscription()
+    }
+
+    fn subscription_snapshot(&mut self) -> Result<SubscriptionSnapshot, RuntimeError> {
+        self.as_mut().subscription_snapshot()
     }
 
     fn take_logs(&mut self) -> Vec<String> {

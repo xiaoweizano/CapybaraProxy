@@ -366,7 +366,10 @@
   font-size: 28px;
   font-variation-settings: "wght" 580;
   letter-spacing: 0;
-  line-height: 1.05;
+  /* 1.05 was tight enough to clip CJK glyphs, whose ink box is taller than a
+     Latin line box at the same font size. */
+  line-height: 1.32;
+  padding-block: 1px;
 }
 
 .module-page,

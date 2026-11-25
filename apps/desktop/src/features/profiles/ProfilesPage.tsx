@@ -226,46 +226,48 @@ export function ProfilesPage() {
             </button>
           </div>
 
-          <label className="subscription-field">
-            <span>{t("profiles.name")}</span>
-            <input
-              type="text"
-              value={name}
-              maxLength={120}
-              placeholder={t("profiles.namePlaceholder")}
-              disabled={pending}
-              onChange={(event) => setName(event.target.value)}
-            />
-          </label>
-
-          {mode === "url" ? (
+          <div className="subscription-form">
             <label className="subscription-field">
-              <span>{t("profiles.url")}</span>
+              <span>{t("profiles.name")}</span>
               <input
-                type="url"
-                value={url}
-                placeholder={t("profiles.urlPlaceholder")}
-                spellCheck={false}
-                autoComplete="off"
+                type="text"
+                value={name}
+                maxLength={120}
+                placeholder={t("profiles.namePlaceholder")}
                 disabled={pending}
-                onChange={(event) => setUrl(event.target.value)}
+                onChange={(event) => setName(event.target.value)}
               />
             </label>
-          ) : (
-            <label className="subscription-field">
-              <span>{t("profiles.yaml")}</span>
-              <textarea
-                rows={10}
-                value={yaml}
-                placeholder={t("profiles.yamlPlaceholder")}
-                spellCheck={false}
-                disabled={pending}
-                onChange={(event) => setYaml(event.target.value)}
-              />
-            </label>
-          )}
 
-          <div className="workspace-panel-actions">
+            {mode === "url" ? (
+              <label className="subscription-field">
+                <span>{t("profiles.url")}</span>
+                <input
+                  type="url"
+                  value={url}
+                  placeholder={t("profiles.urlPlaceholder")}
+                  spellCheck={false}
+                  autoComplete="off"
+                  disabled={pending}
+                  onChange={(event) => setUrl(event.target.value)}
+                />
+              </label>
+            ) : (
+              <label className="subscription-field subscription-field-wide">
+                <span>{t("profiles.yaml")}</span>
+                <textarea
+                  rows={8}
+                  value={yaml}
+                  placeholder={t("profiles.yamlPlaceholder")}
+                  spellCheck={false}
+                  disabled={pending}
+                  onChange={(event) => setYaml(event.target.value)}
+                />
+              </label>
+            )}
+          </div>
+
+          <div className="subscription-actions">
             <button
               type="button"
               className="workspace-primary-button"

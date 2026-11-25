@@ -114,6 +114,8 @@ export const zhCN: ResourceShape = {
     selectNode: "选择 {{name}}",
     testDelay: "测试 {{name}} 的延迟",
     notTested: "未测试",
+    offlineNotice: "Mihomo 未运行。以下条目来自已导入的订阅，启动核心前无法使用。",
+    offlineTag: "离线",
   },
   rules: {
     eyebrow: "路由",
@@ -128,6 +130,7 @@ export const zhCN: ResourceShape = {
     type: "类型",
     payload: "匹配内容",
     target: "目标",
+    offlineNotice: "Mihomo 未运行。以下规则表来自已导入的订阅。",
   },
   connections: {
     eyebrow: "实时流量",

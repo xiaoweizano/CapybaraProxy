@@ -19,6 +19,7 @@ export type NativeCommandName =
   | "close_connection"
   | "get_rules"
   | "get_profiles"
+  | "get_subscription_snapshot"
   | "import_subscription"
   | "clear_subscription"
   | "get_runtime_logs"
