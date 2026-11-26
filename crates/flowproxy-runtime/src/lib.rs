@@ -2,8 +2,9 @@ mod log_buffer;
 mod redaction;
 
 use flowproxy_contracts::{
-    ConnectionPage, CoreInfo, ProfileInfo, ProxyGroup, RuleItem, RuntimeBackend, RuntimeError,
-    RuntimeErrorCode, RuntimeLogEntry, RuntimeLogLevel, RuntimeSnapshot, RuntimeState,
+    ConnectionPage, CoreInfo, CorePreferences, DelayProbeSettings, GroupDelayResult, LogLevel,
+    ProfileInfo, ProxyGroup, RoutingMode, RuleItem, RuntimeBackend, RuntimeError, RuntimeErrorCode,
+    RuntimeLogEntry, RuntimeLogLevel, RuntimeSnapshot, RuntimeState, StartupPreferences,
     SubscriptionSnapshot, TelemetrySnapshot,
 };
 use flowproxy_mihomo_manager::MihomoAdapter;
@@ -368,6 +369,30 @@ where
         })
     }
 
+    pub fn test_group_delay(
+        &self,
+        group: &str,
+        timeout_ms: u32,
+    ) -> Result<GroupDelayResult, RuntimeFailure> {
+        self.adapter_data("group delay", |adapter| {
+            adapter.test_group_delay(group, timeout_ms)
+        })
+    }
+
+    pub fn core_preferences(&self) -> Result<CorePreferences, RuntimeFailure> {
+        self.adapter_data("core preferences", A::core_preferences)
+    }
+
+    pub fn update_core_preferences(
+        &self,
+        mode: Option<RoutingMode>,
+        log_level: Option<LogLevel>,
+    ) -> Result<CorePreferences, RuntimeFailure> {
+        self.adapter_data("core preference updates", |adapter| {
+            adapter.update_core_preferences(mode, log_level)
+        })
+    }
+
     pub fn connections(&self) -> Result<ConnectionPage, RuntimeFailure> {
         self.adapter_data("active connections", A::connections)
     }
@@ -455,6 +480,35 @@ where
     /// built-in direct profile.
     pub fn clear_subscription(&self) -> Result<(), RuntimeFailure> {
         self.adapter_mutation("subscription removal", A::clear_subscription)
+    }
+
+    /// Sets the values the adapter writes into the next generated profile.
+    ///
+    /// This does not touch the running core: the preferences take effect the
+    /// next time the Runtime starts or restarts.
+    pub fn apply_startup_preferences(&self, preferences: StartupPreferences) {
+        let _operation = self.lock_operation();
+        self.lock_adapter().set_startup_preferences(preferences);
+    }
+
+    /// Sets the target used by latency probes.
+    pub fn apply_delay_probe(&self, probe: DelayProbeSettings) {
+        let _operation = self.lock_operation();
+        self.lock_adapter().set_delay_probe(probe);
+    }
+
+    /// Records the source URL for the next subscription import.
+    pub fn set_pending_subscription_url(&self, url: Option<String>) {
+        let _operation = self.lock_operation();
+        self.lock_adapter().set_pending_subscription_url(url);
+    }
+
+    /// Returns the URL the stored subscription was imported from.
+    ///
+    /// Reads the metadata file, so it works while the Runtime is stopped.
+    pub fn subscription_source_url(&self) -> Option<String> {
+        let _operation = self.lock_operation();
+        self.lock_adapter().subscription_source_url()
     }
 
     fn adapter_mutation(
@@ -724,8 +778,9 @@ fn now_ms() -> i64 {
 mod tests {
     use super::{apply_health_poll_locked, RuntimeChange, RuntimeFailure, RuntimeManager};
     use flowproxy_contracts::{
-        ConnectionPage, CoreInfo, ProfileInfo, ProxyGroup, ProxyNode, RuleItem, RuntimeBackend,
-        RuntimeError, RuntimeErrorCode, RuntimeState, TelemetrySnapshot,
+        ConnectionPage, CoreInfo, CorePreferences, GroupDelayResult, LogLevel, ProfileInfo,
+        ProxyGroup, ProxyNode, RoutingMode, RuleItem, RuntimeBackend, RuntimeError,
+        RuntimeErrorCode, RuntimeState, TelemetrySnapshot,
     };
     use flowproxy_mihomo_manager::{FakeMihomoAdapter, MihomoAdapter};
     use std::sync::{Arc, Mutex};
@@ -1184,6 +1239,48 @@ mod tests {
                     true,
                 ))
             }
+        }
+
+        fn test_group_delay(
+            &mut self,
+            group: &str,
+            _timeout_ms: u32,
+        ) -> Result<GroupDelayResult, RuntimeError> {
+            if group == "FlowProxy Direct" {
+                Ok(GroupDelayResult {
+                    group: group.to_owned(),
+                    delays: vec![flowproxy_contracts::DelaySample {
+                        proxy: "DIRECT".to_owned(),
+                        delay_ms: 12,
+                    }],
+                })
+            } else {
+                Err(RuntimeError::new(
+                    RuntimeErrorCode::AdapterFailure,
+                    "test group delay check failed",
+                    true,
+                ))
+            }
+        }
+
+        fn core_preferences(&mut self) -> Result<CorePreferences, RuntimeError> {
+            Ok(CorePreferences {
+                mode: Some(RoutingMode::Rule),
+                log_level: Some(LogLevel::Warning),
+                ipv6: Some(false),
+            })
+        }
+
+        fn update_core_preferences(
+            &mut self,
+            mode: Option<RoutingMode>,
+            log_level: Option<LogLevel>,
+        ) -> Result<CorePreferences, RuntimeError> {
+            Ok(CorePreferences {
+                mode,
+                log_level,
+                ipv6: Some(false),
+            })
         }
 
         fn close_connection(&mut self, connection_id: &str) -> Result<(), RuntimeError> {

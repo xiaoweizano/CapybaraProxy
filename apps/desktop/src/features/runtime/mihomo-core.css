@@ -16,7 +16,7 @@
   border-radius: 999px;
   background: rgba(var(--accent-rgb), 0.08);
   color: var(--text-secondary);
-  font-size: 9px;
+  font-size: 0.8125rem;
   font-weight: 750;
   letter-spacing: 0.055em;
   text-transform: uppercase;
@@ -101,7 +101,7 @@
 .runtime-state-copy strong {
   overflow: hidden;
   color: var(--text-primary);
-  font-size: 11px;
+  font-size: 0.9375rem;
   font-variation-settings: "wght" 680;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -110,13 +110,13 @@
 .runtime-state-copy small {
   margin-top: 2px;
   color: var(--text-faint);
-  font-size: 8px;
+  font-size: 0.75rem;
 }
 
 .runtime-demo-tag {
   margin-left: auto;
   color: var(--text-faint);
-  font-size: 8px;
+  font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -140,7 +140,7 @@
 .mihomo-core-facts dt {
   margin-bottom: 4px;
   color: var(--text-faint);
-  font-size: 8px;
+  font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.07em;
   text-transform: uppercase;
@@ -151,7 +151,7 @@
   margin: 0;
   color: var(--text-primary);
   font-family: var(--font-display);
-  font-size: 10px;
+  font-size: 0.875rem;
   font-variant-numeric: tabular-nums;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -175,7 +175,7 @@
   border-radius: 9px;
   background: transparent;
   color: var(--text-secondary);
-  font-size: 9px;
+  font-size: 0.8125rem;
   font-weight: 700;
   cursor: pointer;
 }
@@ -221,7 +221,7 @@
 }
 
 .runtime-error strong {
-  font-size: 9px;
+  font-size: 0.8125rem;
   font-weight: 680;
   line-height: 1.5;
 }
@@ -229,13 +229,13 @@
 .runtime-error small {
   margin-top: 2px;
   color: var(--text-secondary);
-  font-size: 8px;
+  font-size: 0.75rem;
 }
 
 .runtime-bridge-notice {
   margin: 11px 1px 0;
   color: var(--text-faint);
-  font-size: 9px;
+  font-size: 0.8125rem;
   line-height: 1.55;
 }
 
@@ -264,12 +264,12 @@
 .mihomo-platform-boundary strong {
   margin-bottom: 2px;
   color: var(--text-primary);
-  font-size: 9px;
+  font-size: 0.8125rem;
 }
 
 .mihomo-platform-boundary small {
   color: var(--text-faint);
-  font-size: 8px;
+  font-size: 0.75rem;
 }
 
 .mihomo-platform-boundary small[data-state="enabled"] {
@@ -308,7 +308,7 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  font-size: 9px;
+  font-size: 0.8125rem;
   font-weight: 700;
   letter-spacing: 0.035em;
   text-transform: uppercase;
@@ -316,7 +316,7 @@
 
 .runtime-log-heading small {
   color: var(--text-faint);
-  font-size: 8px;
+  font-size: 0.75rem;
 }
 
 .runtime-log-list {
@@ -339,7 +339,7 @@
   padding: 5px 6px;
   border-radius: 6px;
   color: var(--text-secondary);
-  font-size: 8px;
+  font-size: 0.75rem;
   line-height: 1.45;
 }
 
@@ -355,7 +355,7 @@
 .runtime-log-list time {
   color: var(--text-faint);
   font-family: var(--font-display);
-  font-size: 7px;
+  font-size: 0.6875rem;
   font-variant-numeric: tabular-nums;
 }
 
@@ -365,7 +365,7 @@
   min-height: 150px;
   place-items: center;
   color: var(--text-faint);
-  font-size: 9px;
+  font-size: 0.8125rem;
 }
 
 :root[data-theme="warm_flow"] .runtime-action-primary {

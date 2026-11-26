@@ -5,12 +5,16 @@ import {
   ShieldCheck,
   SunMedium,
   Waves,
+  ZoomIn,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAppSettings } from "../../app/settings/settingsContext";
+import { useRuntime } from "../../app/runtime/runtimeContext";
 import { useSystemIntegration } from "../../app/systemIntegration/systemIntegrationContext";
 import type { CloseBehavior } from "../../shared/closeBehavior";
+import { UI_SCALE_STEPS } from "../../shared/uiScale";
 import type { LanguageId } from "../../i18n/language";
+import type { CoreLogLevel } from "../../platform/runtime";
 import { MihomoCorePanel } from "../runtime/MihomoCorePanel";
 
 const themeOptions = [
@@ -62,6 +66,13 @@ const closeOptions: Array<{
   },
 ];
 
+const logLevelOptions: Array<{ id: CoreLogLevel; labelKey: string }> = [
+  { id: "error", labelKey: "settings.logError" },
+  { id: "warning", labelKey: "settings.logWarning" },
+  { id: "info", labelKey: "settings.logInfo" },
+  { id: "debug", labelKey: "settings.logDebug" },
+];
+
 export function SettingsPage() {
   const { t } = useTranslation();
   const {
@@ -72,9 +83,14 @@ export function SettingsPage() {
     updateTheme,
     updateCloseBehavior,
     updateLanguage,
+    updateUiScale,
+    updateCoreLogLevel,
+    updateIpv6,
   } = useAppSettings();
+  const runtime = useRuntime();
   const integration = useSystemIntegration();
-  const { theme, closeBehavior, language } = settings;
+  const { theme, closeBehavior, language, uiScale, coreLogLevel, ipv6 } =
+    settings;
   const controlsDisabled = mode === "loading" || isSaving;
   const systemProxyCapability =
     integration.status?.capabilities.system_proxy;
@@ -201,6 +217,88 @@ export function SettingsPage() {
                 </span>
               </button>
             ))}
+          </div>
+
+          <div className="settings-panel-heading settings-panel-heading-inset">
+            <div>
+              <span className="settings-label">{t("settings.uiScaleLabel")}</span>
+              <h2>{t("settings.uiScale")}</h2>
+            </div>
+            <ZoomIn aria-hidden="true" size={16} />
+          </div>
+
+          <div className="ui-scale-options" role="group" aria-label={t("settings.uiScale")}>
+            {UI_SCALE_STEPS.map((step) => (
+              <button
+                key={step}
+                className="ui-scale-option"
+                type="button"
+                aria-pressed={uiScale === step}
+                disabled={controlsDisabled}
+                onClick={() => void updateUiScale(step)}
+              >
+                {step}%
+              </button>
+            ))}
+          </div>
+          <p className="settings-inline-hint">{t("settings.uiScaleHint")}</p>
+        </section>
+
+        <section className="settings-panel">
+          <div className="settings-panel-heading">
+            <div>
+              <span className="settings-label">{t("settings.core")}</span>
+              <h2>{t("settings.coreLogLevel")}</h2>
+            </div>
+            <span className="settings-index">02</span>
+          </div>
+
+          <div className="behavior-options">
+            {logLevelOptions.map(({ id, labelKey }) => (
+              <button
+                key={id}
+                className="behavior-option"
+                type="button"
+                aria-pressed={coreLogLevel === id}
+                disabled={controlsDisabled}
+                onClick={() => void updateCoreLogLevel(id)}
+              >
+                <span className="behavior-radio" aria-hidden="true">
+                  {coreLogLevel === id ? <span /> : null}
+                </span>
+                <span>
+                  <strong>{t(labelKey)}</strong>
+                </span>
+              </button>
+            ))}
+          </div>
+          <p className="settings-inline-hint">
+            {runtime.snapshot?.state === "connected"
+              ? t("settings.restartToApply")
+              : t("settings.appliesOnNextStart")}
+          </p>
+
+          <div className="integration-list">
+            <div className="integration-row">
+              <span className="integration-icon">
+                <ShieldCheck aria-hidden="true" size={16} />
+              </span>
+              <span className="integration-copy">
+                <strong>{t("settings.ipv6")}</strong>
+                <small>{t("settings.ipv6Hint")}</small>
+              </span>
+              <button
+                className="integration-switch"
+                type="button"
+                role="switch"
+                aria-label={t("settings.ipv6")}
+                aria-checked={ipv6}
+                disabled={controlsDisabled}
+                onClick={() => void updateIpv6(!ipv6)}
+              >
+                <span aria-hidden="true" />
+              </button>
+            </div>
           </div>
         </section>
 

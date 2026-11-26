@@ -43,6 +43,7 @@ function createRuntimeValue(
       pid: 4242,
     },
     proxyGroups: [],
+    corePreferences: { mode: "rule", log_level: "warning" },
     logs,
     isLoading: false,
     pendingAction: null,
@@ -54,6 +55,9 @@ function createRuntimeValue(
     restart: vi.fn().mockResolvedValue(undefined),
     selectProxy: vi.fn().mockResolvedValue(undefined),
     measureDelay: vi.fn().mockResolvedValue(null),
+    measureGroupDelay: vi.fn().mockResolvedValue({}),
+    setRoutingMode: vi.fn().mockResolvedValue(undefined),
+    setCoreLogLevel: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
 }

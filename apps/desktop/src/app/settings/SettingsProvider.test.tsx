@@ -145,6 +145,12 @@ describe("SettingsProvider", () => {
       theme: "warm_flow",
       close_behavior: "exit_application",
       language: "english",
+      ui_scale: 100,
+      log_level: "warning",
+      ipv6: false,
+      delay_probe_url: "http://www.gstatic.com/generate_204",
+      delay_timeout_ms: 5000,
+      subscription_update_hours: 0,
     });
     expect(localStorage.getItem(SETTINGS_MIGRATION_KEY)).toBe("1");
   });

@@ -8,16 +8,22 @@ import {
 } from "react";
 import {
   getCoreInfo,
+  getCorePreferences,
   getProxyGroups,
   getRuntimeLogs,
   getRuntimeSnapshot,
   restartRuntime,
   selectProxy as selectProxyCommand,
+  setCorePreferences,
   startRuntime,
   stopRuntime,
   subscribeRuntimeLog,
   subscribeRuntimeState,
+  testGroupDelay,
   testProxyDelay,
+  type CoreLogLevel,
+  type CorePreferences,
+  type RoutingMode,
   type RuntimeBridgeResult,
   type RuntimeError,
   type RuntimeLogEntry,
@@ -39,6 +45,7 @@ const initialState: RuntimeViewState = {
   snapshot: null,
   coreInfo: null,
   proxyGroups: [],
+  corePreferences: null,
   logs: [],
   isLoading: true,
   pendingAction: null,
@@ -63,6 +70,25 @@ function mergeLogEntries(
 
 function unexpectedError(message: string): RuntimeError {
   return { code: "internal", message, retryable: true };
+}
+
+/**
+ * Runs a bridge read and turns a missing command or a rejection into an error
+ * result, so one unavailable endpoint cannot blank the whole page.
+ */
+async function safeRead<T>(
+  read: () => Promise<RuntimeBridgeResult<T>>,
+  failureMessage: string,
+): Promise<RuntimeBridgeResult<T>> {
+  try {
+    const result = await read();
+    return result ?? {
+      status: "error",
+      error: unexpectedError(failureMessage),
+    };
+  } catch {
+    return { status: "error", error: unexpectedError(failureMessage) };
+  }
 }
 
 export function RuntimeProvider({ children }: { children: ReactNode }) {
@@ -91,15 +117,12 @@ export function RuntimeProvider({ children }: { children: ReactNode }) {
 
   const loadConnectedResources = useCallback(async () => {
     const generation = ++resourceGenerationRef.current;
-    const [coreResult, groupsResult] = await Promise.all([
-      getCoreInfo().catch(() => ({
-        status: "error" as const,
-        error: unexpectedError(i18n.t("errors.coreDetails")),
-      })),
-      getProxyGroups().catch(() => ({
-        status: "error" as const,
-        error: unexpectedError(i18n.t("errors.proxyGroups")),
-      })),
+    // Each read is best-effort: a build whose bridge lacks one command must
+    // not take the whole page down with it.
+    const [coreResult, groupsResult, preferencesResult] = await Promise.all([
+      safeRead(() => getCoreInfo(), i18n.t("errors.coreDetails")),
+      safeRead(() => getProxyGroups(), i18n.t("errors.proxyGroups")),
+      safeRead(() => getCorePreferences(), i18n.t("errors.corePreferences")),
     ]);
 
     if (!mountedRef.current || generation !== resourceGenerationRef.current) {
@@ -121,6 +144,12 @@ export function RuntimeProvider({ children }: { children: ReactNode }) {
     } else {
       updateState({ lastError: groupsResult.error });
     }
+
+    // Preferences are informational: an older core that does not answer this
+    // endpoint must not surface an error banner.
+    if (preferencesResult.status === "ok") {
+      updateState({ corePreferences: preferencesResult.data });
+    }
   }, [updateState]);
 
   const applySnapshot = useCallback(
@@ -141,7 +170,7 @@ export function RuntimeProvider({ children }: { children: ReactNode }) {
         void loadConnectedResources();
       } else {
         resourceGenerationRef.current += 1;
-        updateState({ coreInfo: null, proxyGroups: [] });
+        updateState({ coreInfo: null, proxyGroups: [], corePreferences: null });
       }
     },
     [loadConnectedResources, updateState],
@@ -373,6 +402,95 @@ export function RuntimeProvider({ children }: { children: ReactNode }) {
     [updateState],
   );
 
+  const measureGroupDelay = useCallback(
+    async (
+      group: string,
+      timeoutMs = DEFAULT_DELAY_TIMEOUT_MS,
+    ): Promise<Record<string, number> | null> => {
+      updateState({ lastError: null, notice: null });
+
+      try {
+        const result = await testGroupDelay(group, timeoutMs);
+
+        if (!mountedRef.current) {
+          return null;
+        }
+
+        if (result.status === "ok") {
+          return Object.fromEntries(
+            result.data.delays.map((sample) => [sample.proxy, sample.delay_ms]),
+          );
+        }
+
+        if (result.status === "unavailable") {
+          updateState({ notice: unavailableNotice() });
+        } else {
+          updateState({ lastError: result.error });
+        }
+      } catch {
+        if (mountedRef.current) {
+          updateState({
+            lastError: unexpectedError(i18n.t("errors.measureDelay")),
+          });
+        }
+      }
+
+      return null;
+    },
+    [updateState],
+  );
+
+  const applyCorePreferences = useCallback(
+    async (
+      mode: RoutingMode | null,
+      logLevel: CoreLogLevel | null,
+    ): Promise<CorePreferences | null> => {
+      updateState({ lastError: null, notice: null });
+
+      try {
+        const result = await setCorePreferences(mode, logLevel);
+
+        if (!mountedRef.current) {
+          return null;
+        }
+
+        if (result.status === "ok") {
+          updateState({ corePreferences: result.data });
+          return result.data;
+        }
+
+        if (result.status === "unavailable") {
+          updateState({ notice: unavailableNotice() });
+        } else {
+          updateState({ lastError: result.error });
+        }
+      } catch {
+        if (mountedRef.current) {
+          updateState({
+            lastError: unexpectedError(i18n.t("errors.corePreferences")),
+          });
+        }
+      }
+
+      return null;
+    },
+    [updateState],
+  );
+
+  const setRoutingMode = useCallback(
+    async (mode: RoutingMode) => {
+      await applyCorePreferences(mode, null);
+    },
+    [applyCorePreferences],
+  );
+
+  const setCoreLogLevel = useCallback(
+    async (level: CoreLogLevel) => {
+      await applyCorePreferences(null, level);
+    },
+    [applyCorePreferences],
+  );
+
   const value = useMemo<RuntimeContextValue>(
     () => ({
       ...state,
@@ -382,6 +500,9 @@ export function RuntimeProvider({ children }: { children: ReactNode }) {
       restart,
       selectProxy,
       measureDelay,
+      measureGroupDelay,
+      setRoutingMode,
+      setCoreLogLevel,
     }),
     [
       state,
@@ -391,6 +512,9 @@ export function RuntimeProvider({ children }: { children: ReactNode }) {
       restart,
       selectProxy,
       measureDelay,
+      measureGroupDelay,
+      setRoutingMode,
+      setCoreLogLevel,
     ],
   );
 

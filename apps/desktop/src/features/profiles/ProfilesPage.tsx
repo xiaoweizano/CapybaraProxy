@@ -3,18 +3,23 @@ import {
   FileStack,
   Link2,
   RefreshCw,
+  Timer,
   Trash2,
   Upload,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useAppSettings } from "../../app/settings/settingsContext";
 import { useRuntime } from "../../app/runtime/runtimeContext";
 import { useBridgeResource } from "../../app/runtime/useBridgeResource";
 import {
   clearSubscription,
   getProfiles,
+  getSubscriptionSnapshot,
   importSubscription,
   importSubscriptionFromUrl,
+  refreshSubscription,
+  subscribeSubscriptionUpdated,
   type ProfileInfo,
   type RuntimeError,
 } from "../../platform/runtime";
@@ -26,15 +31,24 @@ import {
 
 type ImportMode = "url" | "yaml";
 
+/** Selectable automatic update intervals, in hours; 0 disables it. */
+const AUTO_UPDATE_OPTIONS = [0, 6, 12, 24] as const;
+
 export function ProfilesPage() {
   const { t } = useTranslation();
-  const { snapshot } = useRuntime();
+  const { snapshot, measureGroupDelay } = useRuntime();
+  const { settings, updateSubscriptionUpdateHours } = useAppSettings();
   const profiles = useBridgeResource(getProfiles, true);
+  // The stored document carries the group names, which is what the bulk delay
+  // test needs; the profile metadata only has counts.
+  const stored = useBridgeResource(getSubscriptionSnapshot, true);
   const [mode, setMode] = useState<ImportMode>("url");
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   const [yaml, setYaml] = useState("");
   const [pending, setPending] = useState(false);
+  const [pendingRefresh, setPendingRefresh] = useState(false);
+  const [pendingTest, setPendingTest] = useState(false);
   const [actionError, setActionError] = useState<RuntimeError | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -42,6 +56,44 @@ export function ProfilesPage() {
     (profile): boolean => profile.source === "subscription",
   );
   const coreRunning = snapshot?.state === "connected";
+  const refreshable =
+    stored.data?.has_subscription === true &&
+    typeof stored.data.source_url === "string" &&
+    stored.data.source_url.length > 0;
+  const testableGroups = (stored.data?.groups ?? []).filter(
+    (group) => group.nodes.length > 0,
+  );
+
+  // An automatic refresh happens in the native health loop; reload when it
+  // lands so the page does not show the previous document.
+  useEffect(() => {
+    let active = true;
+    let unsubscribe: (() => void) | undefined;
+    void subscribeSubscriptionUpdated(() => {
+      if (!active) {
+        return;
+      }
+      void profiles.reload();
+      void stored.reload();
+      setNotice(t("profiles.noticeAutoRefreshed"));
+    })
+      .then((cleanup) => {
+        if (active) {
+          unsubscribe = cleanup;
+        } else {
+          cleanup();
+        }
+      })
+      .catch(() => undefined);
+
+    return () => {
+      active = false;
+      unsubscribe?.();
+    };
+    // `profiles`/`stored` expose stable reload callbacks per render; the
+    // subscription itself only needs to be created once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function submitImport(): Promise<void> {
     setActionError(null);
@@ -95,6 +147,7 @@ export function ProfilesPage() {
       }
 
       await profiles.reload();
+      await stored.reload();
       setNotice(
         coreRunning
           ? t("profiles.noticeRunning")
@@ -126,13 +179,76 @@ export function ProfilesPage() {
         return;
       }
       await profiles.reload();
+      await stored.reload();
       setNotice(t("profiles.noticeRemoved"));
     } finally {
       setPending(false);
     }
   }
 
-  const showImportForm = !hasSubscription;
+  async function refreshStoredSubscription(): Promise<void> {
+    setActionError(null);
+    setNotice(null);
+    setPendingRefresh(true);
+    try {
+      const result = await refreshSubscription();
+      if (result.status === "unavailable") {
+        setActionError({
+          code: "internal",
+          message: t("profiles.errorBridge"),
+          retryable: true,
+        });
+        return;
+      }
+      if (result.status === "error") {
+        setActionError(result.error);
+        return;
+      }
+
+      await Promise.all([profiles.reload(), stored.reload()]);
+      setNotice(
+        coreRunning
+          ? t("profiles.noticeRefreshedRunning")
+          : t("profiles.noticeRefreshedStopped"),
+      );
+    } finally {
+      setPendingRefresh(false);
+    }
+  }
+
+  /**
+   * Probes the subscription's own groups.
+   *
+   * The offline snapshot carries the node names, but latency only exists while
+   * the core runs; this reuses the live group probe and the names come from the
+   * document so a stopped core reports a clear reason instead of doing nothing.
+   */
+  async function testStoredSubscription(): Promise<void> {
+    setActionError(null);
+    setNotice(null);
+    if (!coreRunning) {
+      setActionError({
+        code: "invalid_state",
+        message: t("profiles.testNeedsCore"),
+        retryable: true,
+      });
+      return;
+    }
+
+    setPendingTest(true);
+    try {
+      let measured = 0;
+      for (const group of testableGroups) {
+        const delays = await measureGroupDelay(group.name);
+        if (delays) {
+          measured += Object.keys(delays).length;
+        }
+      }
+      setNotice(t("profiles.testFinished", { count: measured }));
+    } finally {
+      setPendingTest(false);
+    }
+  }
 
   return (
     <WorkspacePage
@@ -141,31 +257,65 @@ export function ProfilesPage() {
       badge={t("common.local")}
     >
       <ResourceFeedback
-        error={profiles.error ?? actionError}
+        error={profiles.error}
         unavailable={profiles.unavailable}
       />
-      {notice ? (
-        <div className="workspace-notice" role="status">
-          {notice}
-        </div>
-      ) : null}
 
-      <section className="workspace-panel">
+      <section className="workspace-panel subscription-status-panel">
         <div className="workspace-panel-heading">
           <div>
             <span className="workspace-kicker">{t("profiles.kicker")}</span>
             <h2>{t("profiles.heading")}</h2>
           </div>
-          <button
-            className="workspace-icon-button"
-            type="button"
-            aria-label={t("profiles.refresh")}
-            title={t("profiles.refresh")}
-            disabled={profiles.isLoading}
-            onClick={() => void profiles.reload()}
-          >
-            <RefreshCw aria-hidden="true" size={15} />
-          </button>
+          <div className="workspace-panel-actions">
+            {hasSubscription ? (
+              <>
+                <button
+                  className="workspace-action-button subscription-tool-button"
+                  type="button"
+                  disabled={pendingTest || testableGroups.length === 0}
+                  title={
+                    coreRunning
+                      ? t("profiles.testAll")
+                      : t("profiles.testNeedsCore")
+                  }
+                  onClick={() => void testStoredSubscription()}
+                >
+                  <Timer aria-hidden="true" size={14} />
+                  {pendingTest ? t("profiles.testingAll") : t("profiles.testAll")}
+                </button>
+                <button
+                  className="workspace-action-button subscription-tool-button"
+                  type="button"
+                  disabled={pendingRefresh || !refreshable}
+                  title={
+                    refreshable
+                      ? t("profiles.refreshSubscription")
+                      : t("profiles.refreshUnavailable")
+                  }
+                  onClick={() => void refreshStoredSubscription()}
+                >
+                  <RefreshCw aria-hidden="true" size={14} />
+                  {pendingRefresh
+                    ? t("profiles.refreshing")
+                    : t("profiles.refreshSubscription")}
+                </button>
+              </>
+            ) : null}
+            <button
+              className="workspace-icon-button"
+              type="button"
+              aria-label={t("profiles.refresh")}
+              title={t("profiles.refresh")}
+              disabled={profiles.isLoading}
+              onClick={() => {
+                void profiles.reload();
+                void stored.reload();
+              }}
+            >
+              <RefreshCw aria-hidden="true" size={15} />
+            </button>
+          </div>
         </div>
 
         {profiles.isLoading && profiles.data === null ? (
@@ -193,18 +343,14 @@ export function ProfilesPage() {
         )}
       </section>
 
-      {showImportForm ? (
-        <section className="workspace-panel">
-          <div className="workspace-panel-heading">
-            <div>
-              <span className="workspace-kicker">
-                {t("profiles.subscriptionKicker")}
-              </span>
-              <h2>{t("profiles.subscriptionHeading")}</h2>
-            </div>
+      <section className="workspace-panel">
+        <div className="workspace-panel-heading subscription-heading">
+          <div>
+            <span className="workspace-kicker">
+              {t("profiles.subscriptionKicker")}
+            </span>
+            <h2>{t("profiles.subscriptionHeading")}</h2>
           </div>
-          <p className="workspace-hint">{t("profiles.subscriptionHint")}</p>
-
           <div className="subscription-tabs" role="tablist">
             <button
               type="button"
@@ -225,60 +371,101 @@ export function ProfilesPage() {
               <Upload aria-hidden="true" size={14} /> {t("profiles.tabYaml")}
             </button>
           </div>
+        </div>
+        <p className="workspace-hint">{t("profiles.subscriptionHint")}</p>
+        {hasSubscription ? (
+          <p className="workspace-hint subscription-replace-hint">
+            {t("profiles.replacesCurrent")}
+          </p>
+        ) : null}
 
           <div className="subscription-form">
+          <label className="subscription-field">
+            <span>{t("profiles.name")}</span>
+            <input
+              type="text"
+              value={name}
+              maxLength={120}
+              placeholder={t("profiles.namePlaceholder")}
+              disabled={pending}
+              onChange={(event) => setName(event.target.value)}
+            />
+          </label>
+
+          {mode === "url" ? (
             <label className="subscription-field">
-              <span>{t("profiles.name")}</span>
+              <span>{t("profiles.url")}</span>
               <input
-                type="text"
-                value={name}
-                maxLength={120}
-                placeholder={t("profiles.namePlaceholder")}
+                type="url"
+                value={url}
+                placeholder={t("profiles.urlPlaceholder")}
+                spellCheck={false}
+                autoComplete="off"
                 disabled={pending}
-                onChange={(event) => setName(event.target.value)}
+                onChange={(event) => setUrl(event.target.value)}
               />
             </label>
+          ) : (
+            <label className="subscription-field subscription-field-wide">
+              <span>{t("profiles.yaml")}</span>
+              <textarea
+                rows={8}
+                value={yaml}
+                placeholder={t("profiles.yamlPlaceholder")}
+                spellCheck={false}
+                disabled={pending}
+                onChange={(event) => setYaml(event.target.value)}
+              />
+            </label>
+          )}
+        </div>
 
-            {mode === "url" ? (
-              <label className="subscription-field">
-                <span>{t("profiles.url")}</span>
-                <input
-                  type="url"
-                  value={url}
-                  placeholder={t("profiles.urlPlaceholder")}
-                  spellCheck={false}
-                  autoComplete="off"
-                  disabled={pending}
-                  onChange={(event) => setUrl(event.target.value)}
-                />
-              </label>
-            ) : (
-              <label className="subscription-field subscription-field-wide">
-                <span>{t("profiles.yaml")}</span>
-                <textarea
-                  rows={8}
-                  value={yaml}
-                  placeholder={t("profiles.yamlPlaceholder")}
-                  spellCheck={false}
-                  disabled={pending}
-                  onChange={(event) => setYaml(event.target.value)}
-                />
-              </label>
-            )}
+        {actionError ? (
+          <ResourceFeedback error={actionError} unavailable={false} />
+        ) : null}
+        {notice ? (
+          <div className="workspace-notice" role="status">
+            {notice}
           </div>
+        ) : null}
 
-          <div className="subscription-actions">
-            <button
-              type="button"
-              className="workspace-primary-button"
-              disabled={pending}
-              onClick={() => void submitImport()}
-            >
-              {pending ? t("profiles.importing") : t("profiles.import")}
-            </button>
+        {hasSubscription && refreshable ? (
+          <div className="subscription-auto-update">
+            <span className="subscription-auto-update-label">
+              {t("profiles.autoUpdate")}
+            </span>
+            <div className="choice-chips" role="group" aria-label={t("profiles.autoUpdate")}>
+              {AUTO_UPDATE_OPTIONS.map((hours) => (
+                <button
+                  key={hours}
+                  type="button"
+                  className="choice-chip"
+                  aria-pressed={settings.subscriptionUpdateHours === hours}
+                  onClick={() => void updateSubscriptionUpdateHours(hours)}
+                >
+                  {hours === 0
+                    ? t("profiles.autoUpdateOff")
+                    : t("profiles.autoUpdateHours", { hours })}
+                </button>
+              ))}
+            </div>
           </div>
-        </section>
-      ) : null}
+        ) : null}
+
+        <div className="subscription-actions">
+          <span className="subscription-actions-note">
+            {t("profiles.importSupport")}
+          </span>
+          <button
+            type="button"
+            className="workspace-primary-button"
+            disabled={pending}
+            onClick={() => void submitImport()}
+          >
+            {pending ? t("profiles.importing") : t("profiles.import")}
+          </button>
+        </div>
+      </section>
     </WorkspacePage>
   );
 }

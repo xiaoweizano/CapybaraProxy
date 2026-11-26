@@ -88,6 +88,7 @@ function runtimeValue(
     snapshot: connectedSnapshot,
     coreInfo: { backend: "mihomo", version: "v1.19.33", pid: 42 },
     proxyGroups,
+    corePreferences: { mode: "rule", log_level: "warning" },
     logs: [],
     isLoading: false,
     pendingAction: null,
@@ -99,6 +100,9 @@ function runtimeValue(
     restart: vi.fn(async () => undefined),
     selectProxy: vi.fn(async () => undefined),
     measureDelay: vi.fn(async () => 88),
+    measureGroupDelay: vi.fn(async () => ({})),
+    setRoutingMode: vi.fn(async () => undefined),
+    setCoreLogLevel: vi.fn(async () => undefined),
     ...overrides,
   };
 }

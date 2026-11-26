@@ -1,7 +1,8 @@
 use crate::validate_loopback_endpoint;
 use flowproxy_contracts::{
-    ConnectionPage, ConnectionSummary, ProxyGroup, ProxyNode, RuleItem, RuntimeError,
-    RuntimeErrorCode,
+    ConnectionPage, ConnectionSummary, CorePreferences, DelayProbeSettings, DelaySample,
+    GroupDelayResult, LogLevel, ProxyGroup, ProxyNode, RoutingMode, RuleItem, RuntimeError,
+    RuntimeErrorCode, MAX_DELAY_TIMEOUT_MS, MIN_DELAY_TIMEOUT_MS,
 };
 use serde_json::{json, Value};
 use std::io::{Read, Write};
@@ -522,11 +523,13 @@ pub(crate) fn test_delay(
     client: &LoopbackApiClient,
     proxy: &str,
     timeout_ms: u32,
+    probe: &DelayProbeSettings,
 ) -> Result<u32, RuntimeError> {
     let payload = client.get_json(&format!(
-        "/proxies/{}/delay?url=http%3A%2F%2Fwww.gstatic.com%2Fgenerate_204&timeout={}",
+        "/proxies/{}/delay?url={}&timeout={}",
         encode_path_segment(proxy),
-        timeout_ms.clamp(1_000, 10_000)
+        encode_query_value(probe.url.trim()),
+        timeout_ms.clamp(MIN_DELAY_TIMEOUT_MS, MAX_DELAY_TIMEOUT_MS)
     ))?;
     payload
         .get("delay")
@@ -535,8 +538,107 @@ pub(crate) fn test_delay(
         .ok_or_else(|| api_error("The Mihomo delay response was invalid."))
 }
 
+/// Probes every node in `group` with one request.
+///
+/// Mihomo answers `{"<node>": <delay>}` for the nodes that replied. The
+/// response can be large: a group with many nodes still fits comfortably in
+/// the client's response cap, and nodes that timed out are simply absent.
+pub(crate) fn test_group_delay(
+    client: &LoopbackApiClient,
+    group: &str,
+    timeout_ms: u32,
+    probe: &DelayProbeSettings,
+) -> Result<GroupDelayResult, RuntimeError> {
+    let payload = client.get_json(&format!(
+        "/group/{}/delay?url={}&timeout={}",
+        encode_path_segment(group),
+        encode_query_value(probe.url.trim()),
+        timeout_ms.clamp(MIN_DELAY_TIMEOUT_MS, MAX_DELAY_TIMEOUT_MS)
+    ))?;
+
+    let entries = payload
+        .as_object()
+        .ok_or_else(|| api_error("The Mihomo group delay response was invalid."))?;
+
+    let mut delays: Vec<DelaySample> = entries
+        .iter()
+        .filter_map(|(proxy, value)| {
+            let delay = value.as_u64().and_then(|delay| u32::try_from(delay).ok())?;
+            (delay > 0).then(|| DelaySample {
+                proxy: proxy.clone(),
+                delay_ms: delay,
+            })
+        })
+        .collect();
+    delays.sort_by(|left, right| left.proxy.cmp(&right.proxy));
+
+    Ok(GroupDelayResult {
+        group: group.to_owned(),
+        delays,
+    })
+}
+
+/// Reads the routing mode and log level the core is running with.
+pub(crate) fn read_core_preferences(
+    client: &LoopbackApiClient,
+) -> Result<CorePreferences, RuntimeError> {
+    let payload = client.get_json("/configs")?;
+    Ok(CorePreferences {
+        mode: payload
+            .get("mode")
+            .and_then(Value::as_str)
+            .and_then(RoutingMode::parse),
+        log_level: payload
+            .get("log-level")
+            .and_then(Value::as_str)
+            .and_then(LogLevel::parse),
+        ipv6: payload.get("ipv6").and_then(Value::as_bool),
+    })
+}
+
+/// Applies routing mode and/or log level, then reports the values the core
+/// actually holds.
+///
+/// Both keys are hot-reloadable in Mihomo, so no restart is involved. The
+/// value is read back instead of echoing the request, which would hide a core
+/// that silently rejected the change.
+pub(crate) fn update_core_preferences(
+    client: &LoopbackApiClient,
+    mode: Option<RoutingMode>,
+    log_level: Option<LogLevel>,
+) -> Result<CorePreferences, RuntimeError> {
+    if mode.is_none() && log_level.is_none() {
+        return read_core_preferences(client);
+    }
+
+    let mut body = serde_json::Map::new();
+    if let Some(mode) = mode {
+        body.insert("mode".to_owned(), json!(mode.as_wire_value()));
+    }
+    if let Some(log_level) = log_level {
+        body.insert("log-level".to_owned(), json!(log_level.as_wire_value()));
+    }
+
+    client.put_json("/configs", &Value::Object(body))?;
+    read_core_preferences(client)
+}
+
 fn encode_path_segment(value: &str) -> String {
     let mut encoded = String::with_capacity(value.len());
+    for byte in value.bytes() {
+        if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b'~') {
+            encoded.push(char::from(byte));
+        } else {
+            encoded.push_str(&format!("%{byte:02X}"));
+        }
+    }
+    encoded
+}
+
+/// Percent-encodes a query value so a probe URL's own `?`/`&` cannot break out
+/// of the `url=` parameter.
+fn encode_query_value(value: &str) -> String {
+    let mut encoded = String::with_capacity(value.len() * 3);
     for byte in value.bytes() {
         if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b'~') {
             encoded.push(char::from(byte));

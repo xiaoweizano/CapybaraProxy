@@ -172,7 +172,7 @@
   color: #04101f;
   cursor: pointer;
   font-family: var(--font-display);
-  font-size: 12px;
+  font-size: 1rem;
   font-weight: 650;
   letter-spacing: 0.04em;
   padding: 7px 16px;
@@ -201,7 +201,7 @@
   gap: 8px;
   color: var(--text-primary);
   font-family: var(--font-display);
-  font-size: 12px;
+  font-size: 1rem;
   font-variation-settings: "wght" 620;
 }
 
@@ -238,7 +238,7 @@
 .hero-duration {
   color: var(--text-secondary);
   font-family: var(--font-display);
-  font-size: 10px;
+  font-size: 0.875rem;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.035em;
 }
@@ -301,7 +301,7 @@
   display: block;
   margin-bottom: 1px;
   color: var(--text-secondary);
-  font-size: 8px;
+  font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -310,7 +310,7 @@
 .hero-speed strong {
   color: var(--text-primary);
   font-family: var(--font-display);
-  font-size: 20px;
+  font-size: 1.5rem;
   font-variation-settings: "wght" 550;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0;
@@ -319,7 +319,7 @@
 .hero-speed em {
   margin-left: 4px;
   color: var(--text-secondary);
-  font-size: 9px;
+  font-size: 0.8125rem;
   font-style: normal;
   font-weight: 650;
 }
@@ -334,7 +334,7 @@
   margin: 0;
   place-items: center;
   color: var(--text-faint);
-  font-size: 9px;
+  font-size: 0.8125rem;
 }
 
 .overview-feedback {
@@ -347,7 +347,7 @@
   border-radius: var(--radius-sm);
   background: var(--panel-soft);
   color: var(--text-secondary);
-  font-size: 10px;
+  font-size: 0.875rem;
 }
 
 .overview-feedback-error {
@@ -361,7 +361,7 @@
   justify-content: space-between;
   margin-bottom: -1px;
   color: var(--text-secondary);
-  font-size: 8px;
+  font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.055em;
   text-transform: uppercase;
@@ -369,7 +369,7 @@
 
 .hero-traffic-heading > span:last-child {
   color: var(--text-faint);
-  font-size: 7px;
+  font-size: 0.6875rem;
 }
 
 .traffic-legend {
@@ -377,7 +377,7 @@
   align-items: center;
   gap: 9px;
   color: var(--text-faint);
-  font-size: 7px;
+  font-size: 0.6875rem;
   letter-spacing: 0.05em;
 }
 
@@ -426,14 +426,14 @@
   justify-content: space-between;
   padding-top: 1px;
   color: var(--text-secondary);
-  font-size: 9px;
+  font-size: 0.8125rem;
   font-weight: 650;
 }
 
 .hero-today strong {
   color: var(--accent-cyan);
   font-family: var(--font-display);
-  font-size: 11px;
+  font-size: 0.9375rem;
   font-variation-settings: "wght" 600;
 }
 
@@ -474,7 +474,7 @@
   display: block;
   margin-bottom: 3px;
   color: var(--text-faint);
-  font-size: 8px;
+  font-size: 0.75rem;
   font-weight: 750;
   letter-spacing: 0.09em;
   text-transform: uppercase;
@@ -484,7 +484,7 @@
   margin: 0;
   color: var(--text-primary);
   font-family: var(--font-display);
-  font-size: 13px;
+  font-size: 1.0625rem;
   font-variation-settings: "wght" 570;
   letter-spacing: 0;
 }
@@ -511,7 +511,7 @@
   padding: 10px 0;
   border-top: 1px solid var(--border);
   color: var(--text-secondary);
-  font-size: 9px;
+  font-size: 0.8125rem;
   font-weight: 650;
 }
 
@@ -530,7 +530,7 @@
   appearance: none;
   background: var(--input-bg);
   color: var(--text-primary);
-  font-size: 9px;
+  font-size: 0.8125rem;
   font-weight: 650;
   cursor: pointer;
 }
@@ -570,7 +570,7 @@
 .proxy-node-name strong {
   overflow: hidden;
   color: var(--text-primary);
-  font-size: 10px;
+  font-size: 0.875rem;
   font-variation-settings: "wght" 640;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -675,7 +675,7 @@
 .latency-gauge-value strong {
   color: var(--text-primary);
   font-family: var(--font-display);
-  font-size: 27px;
+  font-size: 1.75rem;
   font-variation-settings: "wght" 540;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0;
@@ -683,7 +683,7 @@
 
 .latency-gauge-value span {
   color: var(--text-secondary);
-  font-size: 8px;
+  font-size: 0.75rem;
   font-weight: 700;
 }
 
@@ -692,7 +692,7 @@
   grid-column: 1;
   padding-bottom: 7px;
   color: var(--text-faint);
-  font-size: 8px;
+  font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.025em;
 }
@@ -725,7 +725,7 @@
   border-radius: 7px;
   background: var(--input-bg);
   color: var(--text-secondary);
-  font-size: 8px;
+  font-size: 0.75rem;
   font-weight: 700;
   cursor: pointer;
 }
@@ -755,7 +755,7 @@
 
 .overview-card-note {
   color: var(--text-faint);
-  font-size: 8px;
+  font-size: 0.75rem;
 }
 
 .node-map-canvas {
@@ -823,7 +823,7 @@
 .node-map-region {
   position: absolute;
   color: var(--map-label);
-  font-size: 6px;
+  font-size: 0.625rem;
   font-weight: 750;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -872,7 +872,7 @@
 .connections-card-body > strong {
   color: var(--text-primary);
   font-family: var(--font-display);
-  font-size: 34px;
+  font-size: 2.25rem;
   font-variation-settings: "wght" 520;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0;
@@ -890,7 +890,7 @@
   align-items: center;
   gap: 6px;
   color: var(--text-secondary);
-  font-size: 8px;
+  font-size: 0.75rem;
 }
 
 .connections-active-dot {

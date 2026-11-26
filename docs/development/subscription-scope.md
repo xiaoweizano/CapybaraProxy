@@ -7,6 +7,24 @@
 - 管理员在 Profiles 页面通过两种方式导入一份订阅：
   - 粘贴 YAML
   - 提供 `http://` 或 `https://` 订阅 URL
+- **链接格式转换**：机场对非 Clash 客户端下发的订阅是 base64 包装的分享链接列表，
+  直接粘贴分享链接也可以。以下形式会被转换成 Clash YAML（其余文本原样返回）：
+
+  | 协议 | 链接形式 |
+  | --- | --- |
+  | Shadowsocks | `ss://`（SIP002 与旧式 base64 两种写法，含 `plugin=obfs`/`v2ray-plugin`） |
+  | VMess | `vmess://`（base64 JSON） |
+  | VLESS | `vless://`（含 TLS、REALITY、ws/grpc/h2 传输） |
+  | Trojan | `trojan://` |
+  | Hysteria2 | `hysteria2://`、`hy2://` |
+  | TUIC | `tuic://` |
+
+  转换结果补一个 `Proxy` 选择组与 `GEOIP,CN,DIRECT` / `MATCH,Proxy` 规则；
+  节点名重复时按 `名称 2`、`名称 3` 去重。下载请求的 `User-Agent` 为
+  `clash.meta/<版本> (FlowProxy)`，机场据此下发 Clash YAML。
+- **系统代理**：下载订阅时若 Windows 已配置系统代理（Clash 等客户端常见），
+  请求会走该代理；代理连接失败时自动用一次 15 秒超时的直连重试。旁路列表
+  （`ProxyOverride`，含 `<local>` 与 `*` 通配）会被遵守，回环地址始终直连。
 - **离线预览**：Runtime 停止时，Proxies 与 Rules 页面仍会列出订阅里的分组、节点与规则。
   这份数据由 `subscription_preview` 从订阅原文做浅层解析得到，只用于展示，
   不参与路由，也不会被当成运行中的真实状态（界面会明确标注「Mihomo 未运行」）。
@@ -33,7 +51,7 @@
 - URL 长度上限 2048 字符，禁止控制字符。
 - 下载超时 30 秒，重定向上限 5 跳，`https` 不允许降级重定向到 `http`。
 - 下载体积上限 8 MiB，流式计数，超限立即中止。
-- 响应必须为 UTF-8 文本，且包含 `proxies:` 或 `proxy-providers:`。
+- 响应必须为 UTF-8 文本；转换后必须包含 `proxies:` 或 `proxy-providers:`，否则报错说明支持的格式。
 - **订阅 URL 通常内嵌令牌，因此不会出现在任何日志或错误消息中**；错误信息只报告分类（超时、连接失败、HTTP 状态码、体积超限）。
 - 即使订阅里写了 `allow-lan: true` 与 `0.0.0.0` 绑定，实际端口仍只监听 `127.0.0.1`（已实测确认）。
 

@@ -23,7 +23,11 @@ vi.mock("../platform/runtime", () => ({
   getCoreInfo: vi.fn(),
   getProfiles: vi.fn(),
   getSubscriptionSnapshot: vi.fn(),
+  subscribeSubscriptionUpdated: vi.fn(async () => () => undefined),
   getProxyGroups: vi.fn(),
+  getCorePreferences: vi.fn(),
+  testGroupDelay: vi.fn(),
+  setCorePreferences: vi.fn(),
   getRules: vi.fn(),
   getRuntimeLogs: vi.fn(),
   getRuntimeSnapshot: vi.fn(),
@@ -161,10 +165,10 @@ describe("App shell", () => {
 
     for (const label of [
       "Overview",
-      "Proxies",
+      "Proxy groups",
       "Rules",
       "Connections",
-      "Profiles",
+      "Subscriptions",
       "Logs",
       "Settings",
     ]) {
@@ -187,9 +191,9 @@ describe("App shell", () => {
     await screen.findAllByText("Tokyo 01");
     expect(screen.queryByText("UI shell")).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("link", { name: "Proxies" }));
+    await user.click(screen.getByRole("link", { name: "Proxy groups" }));
     expect(
-      await screen.findByRole("heading", { name: "Proxies" }),
+      await screen.findByRole("heading", { name: "Proxy groups" }),
     ).toBeInTheDocument();
     expect(await screen.findByText("Tokyo 01")).toBeInTheDocument();
 
@@ -204,9 +208,9 @@ describe("App shell", () => {
       await screen.findByRole("heading", { name: "Connections" }),
     ).toBeInTheDocument();
 
-    await user.click(screen.getByRole("link", { name: "Profiles" }));
+    await user.click(screen.getByRole("link", { name: "Subscriptions" }));
     expect(
-      await screen.findByRole("heading", { name: "Profiles" }),
+      await screen.findByRole("heading", { name: "Subscriptions" }),
     ).toBeInTheDocument();
     expect(await screen.findByText("Primary profile")).toBeInTheDocument();
 

@@ -35,6 +35,31 @@ pub(crate) enum Language {
     SimplifiedChinese,
 }
 
+/// Core log verbosity written into every generated profile.
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum CoreLogLevel {
+    Silent,
+    Error,
+    #[default]
+    Warning,
+    Info,
+    Debug,
+}
+
+impl CoreLogLevel {
+    #[allow(dead_code)] // Kept for settings fixtures and future profile writers.
+    pub(crate) fn as_wire_value(self) -> &'static str {
+        match self {
+            Self::Silent => "silent",
+            Self::Error => "error",
+            Self::Warning => "warning",
+            Self::Info => "info",
+            Self::Debug => "debug",
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub(crate) struct DesktopSettings {
     pub version: u32,
@@ -44,6 +69,87 @@ pub(crate) struct DesktopSettings {
     /// `settings.json` files loadable without a version bump.
     #[serde(default)]
     pub language: Language,
+    /// Interface scale in percent. Stored as a plain integer so a hand-edited
+    /// file cannot smuggle in a fractional value; the UI clamps it on load.
+    #[serde(default = "default_ui_scale")]
+    pub ui_scale: u32,
+    /// Core log verbosity; written into the generated profile.
+    #[serde(default)]
+    pub log_level: CoreLogLevel,
+    /// Whether the core may use IPv6 for outbound connections.
+    #[serde(default)]
+    pub ipv6: bool,
+    /// URL the core requests to measure node latency.
+    #[serde(default = "default_delay_probe_url")]
+    pub delay_probe_url: String,
+    /// Latency probe timeout in milliseconds.
+    #[serde(default = "default_delay_timeout_ms")]
+    pub delay_timeout_ms: u32,
+    /// Automatic subscription refresh interval in hours. `0` disables it.
+    #[serde(default)]
+    pub subscription_update_hours: u32,
+    /// Remembered window size for the next launch, in physical pixels. `None`
+    /// means the window has never been resized by the operator.
+    #[serde(default)]
+    pub window_width: Option<u32>,
+    #[serde(default)]
+    pub window_height: Option<u32>,
+}
+
+pub(crate) const MIN_UI_SCALE: u32 = 85;
+pub(crate) const MAX_UI_SCALE: u32 = 140;
+pub(crate) const MIN_DELAY_TIMEOUT_MS: u32 = 1_000;
+pub(crate) const MAX_DELAY_TIMEOUT_MS: u32 = 10_000;
+pub(crate) const DEFAULT_DELAY_PROBE_URL: &str = "http://www.gstatic.com/generate_204";
+
+fn default_ui_scale() -> u32 {
+    100
+}
+
+fn default_delay_probe_url() -> String {
+    DEFAULT_DELAY_PROBE_URL.to_owned()
+}
+
+fn default_delay_timeout_ms() -> u32 {
+    5_000
+}
+
+fn clamp_ui_scale(value: u32) -> u32 {
+    value.clamp(MIN_UI_SCALE, MAX_UI_SCALE)
+}
+
+/// A probe URL must be an http(s) target the core can request.
+fn is_valid_probe_url(value: &str) -> bool {
+    let trimmed = value.trim();
+    (trimmed.starts_with("http://") || trimmed.starts_with("https://"))
+        && trimmed.len() <= 2048
+        && !trimmed.chars().any(char::is_control)
+}
+
+impl DesktopSettings {
+    /// Returns the settings with every value forced into its valid range.
+    ///
+    /// `settings.json` is a user-editable file, so validation happens on load
+    /// and on save rather than trusting the caller.
+    pub(crate) fn normalized(mut self) -> Self {
+        self.ui_scale = clamp_ui_scale(self.ui_scale);
+        self.delay_timeout_ms = self
+            .delay_timeout_ms
+            .clamp(MIN_DELAY_TIMEOUT_MS, MAX_DELAY_TIMEOUT_MS);
+        // 0 disables automatic refresh; anything else is bounded so a
+        // hand-edited file cannot trigger a refresh storm.
+        self.subscription_update_hours = self.subscription_update_hours.min(24 * 7);
+        if !is_valid_probe_url(&self.delay_probe_url) {
+            self.delay_probe_url = DEFAULT_DELAY_PROBE_URL.to_owned();
+        }
+        self.window_width = self.window_width.map(|width| width.clamp(820, 7680));
+        self.window_height = self.window_height.map(|height| height.clamp(680, 4320));
+        if self.window_width.is_none() || self.window_height.is_none() {
+            self.window_width = None;
+            self.window_height = None;
+        }
+        self
+    }
 }
 
 impl Default for DesktopSettings {
@@ -53,6 +159,14 @@ impl Default for DesktopSettings {
             theme: Theme::CyberFlow,
             close_behavior: CloseBehavior::HideToTray,
             language: Language::English,
+            ui_scale: default_ui_scale(),
+            log_level: CoreLogLevel::Warning,
+            ipv6: false,
+            delay_probe_url: default_delay_probe_url(),
+            delay_timeout_ms: default_delay_timeout_ms(),
+            subscription_update_hours: 0,
+            window_width: None,
+            window_height: None,
         }
     }
 }
@@ -116,7 +230,7 @@ impl SettingsStore {
         };
 
         LoadedSettings {
-            settings,
+            settings: settings.normalized(),
             warning: None,
         }
     }
@@ -128,6 +242,7 @@ impl SettingsStore {
                 settings.version
             )));
         }
+        let settings = &settings.clone().normalized();
 
         let parent = self.path.parent().ok_or_else(|| {
             SettingsStoreError::new("FlowProxy settings path has no parent directory.")
@@ -232,8 +347,8 @@ impl Drop for TemporaryFileGuard {
 #[cfg(test)]
 mod tests {
     use super::{
-        CloseBehavior, DesktopSettings, Language, SettingsStore, Theme, SETTINGS_FILE_NAME,
-        SETTINGS_VERSION,
+        CloseBehavior, CoreLogLevel, DesktopSettings, Language, SettingsStore, Theme,
+        SETTINGS_FILE_NAME, SETTINGS_VERSION,
     };
     use std::fs;
     use tempfile::TempDir;
@@ -286,6 +401,14 @@ mod tests {
             theme: Theme::CyberFlow,
             close_behavior: CloseBehavior::HideToTray,
             language: Language::SimplifiedChinese,
+            ui_scale: 120,
+            log_level: CoreLogLevel::Info,
+            ipv6: true,
+            delay_probe_url: "https://cp.cloudflare.com/generate_204".to_owned(),
+            delay_timeout_ms: 3_000,
+            subscription_update_hours: 12,
+            window_width: Some(1280),
+            window_height: Some(820),
         };
 
         store.save(&expected).expect("save settings");

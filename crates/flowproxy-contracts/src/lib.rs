@@ -116,6 +116,157 @@ pub struct ProxyGroup {
     pub nodes: Vec<ProxyNode>,
 }
 
+/// Routing mode exposed by the core.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RoutingMode {
+    Rule,
+    Global,
+    Direct,
+}
+
+impl RoutingMode {
+    pub fn as_wire_value(self) -> &'static str {
+        match self {
+            Self::Rule => "rule",
+            Self::Global => "global",
+            Self::Direct => "direct",
+        }
+    }
+
+    pub fn parse(value: &str) -> Option<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "rule" => Some(Self::Rule),
+            "global" => Some(Self::Global),
+            "direct" => Some(Self::Direct),
+            _ => None,
+        }
+    }
+}
+
+/// Core log verbosity exposed by the control API.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LogLevel {
+    Silent,
+    Error,
+    Warning,
+    Info,
+    Debug,
+}
+
+impl LogLevel {
+    pub fn as_wire_value(self) -> &'static str {
+        match self {
+            Self::Silent => "silent",
+            Self::Error => "error",
+            Self::Warning => "warning",
+            Self::Info => "info",
+            Self::Debug => "debug",
+        }
+    }
+
+    pub fn parse(value: &str) -> Option<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "silent" => Some(Self::Silent),
+            "error" => Some(Self::Error),
+            "warning" | "warn" => Some(Self::Warning),
+            "info" => Some(Self::Info),
+            "debug" => Some(Self::Debug),
+            _ => None,
+        }
+    }
+}
+
+/// Runtime settings an operator can change without restarting the core.
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+pub struct CorePreferences {
+    /// `None` when the core has not reported a mode yet (for example while it
+    /// is stopped).
+    pub mode: Option<RoutingMode>,
+    pub log_level: Option<LogLevel>,
+    /// `None` on a core too old to report it.
+    pub ipv6: Option<bool>,
+}
+
+/// Values baked into every generated profile.
+///
+/// Unlike [`CorePreferences`] these are known while the core is stopped, so
+/// they can be written into the next configuration file.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct StartupPreferences {
+    pub log_level: LogLevel,
+    pub ipv6: bool,
+}
+
+impl Default for StartupPreferences {
+    fn default() -> Self {
+        Self {
+            log_level: LogLevel::Warning,
+            ipv6: false,
+        }
+    }
+}
+
+/// Target used for latency probes.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct DelayProbeSettings {
+    /// URL the core requests through a proxy to measure its latency.
+    pub url: String,
+    pub timeout_ms: u32,
+}
+
+pub const DEFAULT_DELAY_PROBE_URL: &str = "http://www.gstatic.com/generate_204";
+pub const DEFAULT_DELAY_TIMEOUT_MS: u32 = 5_000;
+pub const MIN_DELAY_TIMEOUT_MS: u32 = 1_000;
+pub const MAX_DELAY_TIMEOUT_MS: u32 = 10_000;
+
+impl Default for DelayProbeSettings {
+    fn default() -> Self {
+        Self {
+            url: DEFAULT_DELAY_PROBE_URL.to_owned(),
+            timeout_ms: DEFAULT_DELAY_TIMEOUT_MS,
+        }
+    }
+}
+
+impl DelayProbeSettings {
+    /// Returns the settings with the timeout inside the supported range.
+    pub fn normalized(mut self) -> Self {
+        self.timeout_ms = self
+            .timeout_ms
+            .clamp(MIN_DELAY_TIMEOUT_MS, MAX_DELAY_TIMEOUT_MS);
+        if self.url.trim().is_empty() {
+            self.url = DEFAULT_DELAY_PROBE_URL.to_owned();
+        }
+        self
+    }
+
+    /// True when the URL can be sent to the core as a probe target.
+    pub fn has_valid_url(&self) -> bool {
+        let url = self.url.trim();
+        (url.starts_with("http://") || url.starts_with("https://"))
+            && url.len() <= 2048
+            && !url.chars().any(char::is_control)
+    }
+}
+
+/// One node's measured delay.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct DelaySample {
+    pub proxy: String,
+    pub delay_ms: u32,
+}
+
+/// Result of probing every node in a proxy group.
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+pub struct GroupDelayResult {
+    pub group: String,
+    /// Nodes that answered the probe. Nodes that timed out are absent rather
+    /// than reported as zero.
+    pub delays: Vec<DelaySample>,
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct TelemetrySnapshot {
     pub state: RuntimeState,
@@ -151,6 +302,13 @@ pub struct SubscriptionSnapshot {
     pub rules: Vec<RuleItem>,
     /// True when a subscription is stored on disk.
     pub has_subscription: bool,
+    /// Where the document was downloaded from, when it was imported by URL.
+    /// `None` for a pasted document, which cannot be refreshed automatically.
+    #[serde(default)]
+    pub source_url: Option<String>,
+    /// Timestamp of the last successful import, in epoch milliseconds.
+    #[serde(default)]
+    pub updated_at_ms: Option<i64>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

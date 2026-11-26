@@ -11,7 +11,7 @@
 //! dependency. Line-level rewriting keeps the operator's file recognisable and
 //! makes the injection rules easy to audit.
 
-use flowproxy_contracts::{RuntimeError, RuntimeErrorCode};
+use flowproxy_contracts::{RuntimeError, RuntimeErrorCode, StartupPreferences};
 use std::fmt::Write as _;
 
 /// Maximum accepted size of a subscription document.
@@ -79,7 +79,9 @@ pub fn preflight(yaml: &str) -> Result<(), RuntimeError> {
     });
     if !has_proxies {
         return Err(invalid(
-            "The subscription document has no proxies or proxy-providers section.",
+            "The subscription document has no proxies or proxy-providers section. \
+             A Clash/Mihomo YAML profile is required; share links in ss://, vmess://, \
+             vless://, trojan://, hysteria2:// or tuic:// form are converted automatically.",
         ));
     }
     Ok(())
@@ -92,6 +94,20 @@ pub fn preflight(yaml: &str) -> Result<(), RuntimeError> {
 /// the command line by the adapter, so only the proxy port and the
 /// loopback-only binding are written here.
 pub fn prepare_profile(yaml: &str, proxy_port: u16) -> Result<PreparedSubscription, RuntimeError> {
+    prepare_profile_with(yaml, proxy_port, StartupPreferences::default())
+}
+
+/// Same as [`prepare_profile`], with the operator's startup settings applied.
+///
+/// `mode`, `log-level` and `ipv6` are not part of the safety policy, so they
+/// are only overridden when the operator changed them from the defaults. The
+/// subscription's own value survives when it matches the default, which keeps
+/// the rewritten document as close to the provider's as possible.
+pub fn prepare_profile_with(
+    yaml: &str,
+    proxy_port: u16,
+    preferences: StartupPreferences,
+) -> Result<PreparedSubscription, RuntimeError> {
     preflight(yaml)?;
     if proxy_port == 0 {
         return Err(invalid("The Mihomo proxy port must be non-zero."));
@@ -102,6 +118,23 @@ pub fn prepare_profile(yaml: &str, proxy_port: u16) -> Result<PreparedSubscripti
     writeln!(output, "mixed-port: {proxy_port}").expect("writing to a String cannot fail");
     output.push_str("allow-lan: false\n");
     output.push_str("bind-address: 127.0.0.1\n");
+
+    let default_preferences = StartupPreferences::default();
+    let overrides: Vec<(&str, String)> = if preferences == default_preferences {
+        Vec::new()
+    } else {
+        vec![
+            (
+                "log-level",
+                preferences.log_level.as_wire_value().to_owned(),
+            ),
+            ("ipv6", preferences.ipv6.to_string()),
+        ]
+    };
+    let overridden_keys: Vec<&str> = overrides.iter().map(|(key, _)| *key).collect();
+    for (key, value) in &overrides {
+        writeln!(output, "{key}: {value}").expect("writing to a String cannot fail");
+    }
 
     let mut skipping_continuation = false;
     let mut proxy_count = 0_usize;
@@ -119,7 +152,7 @@ pub fn prepare_profile(yaml: &str, proxy_port: u16) -> Result<PreparedSubscripti
         }
 
         if let Some((key, rest)) = split_top_level_key(line) {
-            if CONTROLLED_TOP_LEVEL_KEYS.contains(&key) {
+            if CONTROLLED_TOP_LEVEL_KEYS.contains(&key) || overridden_keys.contains(&key) {
                 // Inline values (`key: value`) end here. A bare `key:` may be
                 // followed by an indented block, which is skipped in the next
                 // iterations.

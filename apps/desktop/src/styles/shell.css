@@ -67,7 +67,7 @@
 .sidebar-brand-copy strong {
   color: var(--text-primary);
   font-family: var(--font-display);
-  font-size: 16px;
+  font-size: 1.25rem;
   font-variation-settings: "wght" 620;
   letter-spacing: 0;
   white-space: nowrap;
@@ -76,7 +76,7 @@
 .sidebar-brand-copy span {
   overflow: hidden;
   color: var(--text-faint);
-  font-size: 9px;
+  font-size: 0.8125rem;
   font-weight: 650;
   letter-spacing: 0.025em;
   text-overflow: ellipsis;
@@ -104,7 +104,7 @@
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 1rem;
   font-variation-settings: "wght" 580;
   transition:
     color 160ms ease,
@@ -168,7 +168,7 @@
   margin: auto 18px 18px;
   color: var(--text-faint);
   font-family: var(--font-display);
-  font-size: 8px;
+  font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.12em;
 }
@@ -224,7 +224,7 @@
   min-width: 0;
   padding: 0 20px;
   color: var(--text-faint);
-  font-size: 10px;
+  font-size: 0.875rem;
   font-weight: 650;
   letter-spacing: 0.03em;
   user-select: none;
@@ -255,7 +255,7 @@
 .titlebar-mock-badge {
   min-height: 20px;
   padding-inline: 7px;
-  font-size: 8px;
+  font-size: 0.75rem;
 }
 
 .theme-toggle {
@@ -349,7 +349,7 @@
   display: block;
   margin-bottom: 4px;
   color: var(--accent-cyan);
-  font-size: 9px;
+  font-size: 0.8125rem;
   font-weight: 750;
   letter-spacing: 0.11em;
   text-transform: uppercase;
@@ -363,7 +363,7 @@
   margin: 0;
   color: var(--text-primary);
   font-family: var(--font-display);
-  font-size: 28px;
+  font-size: 1.875rem;
   font-variation-settings: "wght" 580;
   letter-spacing: 0;
   /* 1.05 was tight enough to clip CJK glyphs, whose ink box is taller than a
@@ -410,14 +410,14 @@
   margin: 0 0 5px;
   color: var(--text-primary);
   font-family: var(--font-display);
-  font-size: 17px;
+  font-size: 1.3125rem;
   font-variation-settings: "wght" 570;
 }
 
 .module-empty p {
   margin: 0;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 1rem;
 }
 
 .module-empty-state {
@@ -426,7 +426,7 @@
   border: 1px solid var(--border);
   border-radius: 999px;
   color: var(--text-faint);
-  font-size: 9px;
+  font-size: 0.8125rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;

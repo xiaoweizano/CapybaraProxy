@@ -1,13 +1,14 @@
 use crate::binary::{random_hex, resolve_verified_binary, VerifiedMihomoBinary};
 use crate::config::ConfigStore;
 use crate::control_api::{
-    close_connection, parse_connections, parse_proxy_groups, parse_rules, select_proxy, test_delay,
-    LoopbackApiClient,
+    close_connection, parse_connections, parse_proxy_groups, parse_rules, read_core_preferences,
+    select_proxy, test_delay, test_group_delay, update_core_preferences, LoopbackApiClient,
 };
 use crate::MihomoAdapter;
 use flowproxy_contracts::{
-    ConnectionPage, CoreInfo, ProfileInfo, ProxyGroup, RuleItem, RuntimeBackend, RuntimeError,
-    RuntimeErrorCode, RuntimeState, SubscriptionSnapshot, TelemetrySnapshot,
+    ConnectionPage, CoreInfo, CorePreferences, DelayProbeSettings, GroupDelayResult, LogLevel,
+    ProfileInfo, ProxyGroup, RoutingMode, RuleItem, RuntimeBackend, RuntimeError, RuntimeErrorCode,
+    RuntimeState, StartupPreferences, SubscriptionSnapshot, TelemetrySnapshot,
 };
 use std::collections::VecDeque;
 use std::io::{BufRead, BufReader, Read};
@@ -32,6 +33,13 @@ pub struct MihomoCoreAdapter {
     proxy_port: Option<u16>,
     telemetry_sample: Option<TelemetrySample>,
     pending_logs: VecDeque<String>,
+    /// Values written into the next generated profile.
+    startup_preferences: StartupPreferences,
+    /// Target used by latency probes.
+    delay_probe: DelayProbeSettings,
+    /// URL of the subscription being imported. Taken once by the next
+    /// successful import so the document can be refreshed later.
+    pending_subscription_url: Option<String>,
 }
 
 struct TelemetrySample {
@@ -64,6 +72,9 @@ impl MihomoCoreAdapter {
             proxy_port: None,
             telemetry_sample: None,
             pending_logs: VecDeque::new(),
+            startup_preferences: StartupPreferences::default(),
+            delay_probe: DelayProbeSettings::default(),
+            pending_subscription_url: None,
         }
     }
 
@@ -114,9 +125,19 @@ impl MihomoCoreAdapter {
 
         let profile = match self.config_store.read_subscription()? {
             Some(subscription) => {
-                crate::subscription::prepare_profile(&subscription, proxy_port)?.profile
+                crate::subscription::prepare_profile_with(
+                    &subscription,
+                    proxy_port,
+                    self.startup_preferences,
+                )?
+                .profile
             }
-            None => crate::render_direct_profile(api_port, proxy_port, &secret)?,
+            None => crate::config::render_direct_profile_with(
+                api_port,
+                proxy_port,
+                &secret,
+                self.startup_preferences,
+            )?,
         };
 
         self.config_store.activate(&profile, |candidate| {
@@ -408,6 +429,18 @@ impl MihomoAdapter for MihomoCoreAdapter {
         parse_proxy_groups(&payload)
     }
 
+    fn set_startup_preferences(&mut self, preferences: StartupPreferences) {
+        self.startup_preferences = preferences;
+    }
+
+    fn set_delay_probe(&mut self, probe: DelayProbeSettings) {
+        self.delay_probe = probe.normalized();
+    }
+
+    fn set_pending_subscription_url(&mut self, url: Option<String>) {
+        self.pending_subscription_url = url;
+    }
+
     fn select_proxy(&mut self, group: &str, proxy: &str) -> Result<(), RuntimeError> {
         self.ensure_healthy()?;
         select_proxy(self.client()?, group, proxy)
@@ -415,7 +448,30 @@ impl MihomoAdapter for MihomoCoreAdapter {
 
     fn test_proxy_delay(&mut self, proxy: &str, timeout_ms: u32) -> Result<u32, RuntimeError> {
         self.ensure_healthy()?;
-        test_delay(self.client()?, proxy, timeout_ms)
+        test_delay(self.client()?, proxy, timeout_ms, &self.delay_probe)
+    }
+
+    fn test_group_delay(
+        &mut self,
+        group: &str,
+        timeout_ms: u32,
+    ) -> Result<GroupDelayResult, RuntimeError> {
+        self.ensure_healthy()?;
+        test_group_delay(self.client()?, group, timeout_ms, &self.delay_probe)
+    }
+
+    fn core_preferences(&mut self) -> Result<CorePreferences, RuntimeError> {
+        self.ensure_healthy()?;
+        read_core_preferences(self.client()?)
+    }
+
+    fn update_core_preferences(
+        &mut self,
+        mode: Option<RoutingMode>,
+        log_level: Option<LogLevel>,
+    ) -> Result<CorePreferences, RuntimeError> {
+        self.ensure_healthy()?;
+        update_core_preferences(self.client()?, mode, log_level)
     }
 
     fn connections(&mut self) -> Result<ConnectionPage, RuntimeError> {
@@ -485,6 +541,8 @@ impl MihomoAdapter for MihomoCoreAdapter {
             name: sanitize_subscription_name(name),
             imported_at_ms: now_ms(),
             proxy_count: prepared.proxy_count,
+            source_url: self.pending_subscription_url.take(),
+            update_interval_minutes: None,
         };
         write_subscription_metadata(&self.config_store, &metadata)?;
         Ok(())
@@ -502,16 +560,23 @@ impl MihomoAdapter for MihomoCoreAdapter {
         };
 
         let parsed = crate::subscription_preview::preview(&subscription);
+        let metadata = read_subscription_metadata(&self.config_store);
         Ok(SubscriptionSnapshot {
             groups: parsed.groups,
             rules: parsed.rules,
             has_subscription: true,
+            source_url: metadata.as_ref().and_then(|m| m.source_url.clone()),
+            updated_at_ms: metadata.as_ref().map(|m| m.imported_at_ms),
         })
     }
 
     fn take_logs(&mut self) -> Vec<String> {
         self.drain_core_logs();
         self.pending_logs.drain(..).collect()
+    }
+
+    fn subscription_source_url(&mut self) -> Option<String> {
+        read_subscription_metadata(&self.config_store).and_then(|metadata| metadata.source_url)
     }
 }
 
@@ -602,6 +667,16 @@ fn validate_prepared_subscription(
     working_directory: &Path,
     profile: &str,
 ) -> Result<(), RuntimeError> {
+    // Import can be the first thing a fresh install does, before any core start
+    // has created the runtime directory, so it is created here as well.
+    std::fs::create_dir_all(working_directory).map_err(|error| {
+        RuntimeError::new(
+            RuntimeErrorCode::ConfigInvalid,
+            format!("The Mihomo runtime directory could not be created: {error}"),
+            true,
+        )
+    })?;
+
     let candidate = working_directory.join(format!(
         ".flowproxy-subscription-check.{}.yaml",
         std::process::id()
@@ -880,6 +955,11 @@ fn build_binary_candidates(
 /// working, and a subscription that does need it will fail validation with a
 /// clear Mihomo error.
 fn deploy_bundled_geodata(working_directory: &Path) {
+    // The runtime directory may not exist yet on a fresh install, and every
+    // copy below would then fail silently.
+    if std::fs::create_dir_all(working_directory).is_err() {
+        return;
+    }
     let executable = std::env::current_exe().ok();
     for candidate in bundled_geodata_candidates(executable.as_deref()) {
         if !candidate.is_dir() {
@@ -949,6 +1029,13 @@ struct SubscriptionMetadata {
     name: String,
     imported_at_ms: i64,
     proxy_count: usize,
+    /// URL the document was downloaded from. Absent when it was pasted, which
+    /// also means the subscription cannot be refreshed automatically.
+    #[serde(default)]
+    source_url: Option<String>,
+    /// Automatic refresh interval in minutes. `None` disables it.
+    #[serde(default)]
+    update_interval_minutes: Option<u32>,
 }
 
 const SUBSCRIPTION_METADATA_SUFFIX: &str = ".subscription.json";
@@ -996,13 +1083,15 @@ fn remove_subscription_metadata(config_store: &ConfigStore) -> std::io::Result<(
 }
 
 fn subscription_name(config_store: &ConfigStore) -> Option<String> {
+    read_subscription_metadata(config_store)
+        .map(|metadata| metadata.name)
+        .filter(|name| !name.trim().is_empty())
+}
+
+fn read_subscription_metadata(config_store: &ConfigStore) -> Option<SubscriptionMetadata> {
     let path = subscription_metadata_path(config_store)?;
     let raw = std::fs::read_to_string(path).ok()?;
-    let metadata: SubscriptionMetadata = serde_json::from_str(&raw).ok()?;
-    if metadata.name.trim().is_empty() {
-        return None;
-    }
-    Some(metadata.name)
+    serde_json::from_str(&raw).ok()
 }
 
 fn sanitize_subscription_name(name: &str) -> String {
@@ -1036,8 +1125,9 @@ fn hide_console_window(_command: &mut Command) {}
 #[cfg(test)]
 mod tests {
     use super::{
-        build_binary_candidates, profile_validation_detail, rate_per_second, read_lines,
-        reserve_loopback_ports, run_profile_validator, LogPump, MihomoCoreAdapter,
+        build_binary_candidates, deploy_bundled_geodata, profile_validation_detail,
+        rate_per_second, read_lines, reserve_loopback_ports, run_profile_validator,
+        validate_prepared_subscription, LogPump, MihomoCoreAdapter,
     };
     use crate::binary::VerifiedMihomoBinary;
     use crate::config::ConfigStore;
@@ -1279,6 +1369,40 @@ mod tests {
 
         assert!(started.elapsed() < Duration::from_secs(2));
         assert!(adapter.child.is_none());
+    }
+
+    #[test]
+    fn staging_creates_the_runtime_directory_on_a_fresh_install() {
+        // First import on a new install runs before any core start has created
+        // the directory; staging used to fail with `os error 3`.
+        let directory = tempfile::tempdir().expect("temporary config directory");
+        let runtime_directory = directory.path().join("mihomo");
+        assert!(!runtime_directory.exists());
+
+        // The fixture binary does not exist, so validation itself fails — what
+        // matters here is that staging got far enough to write the candidate.
+        let error = validate_prepared_subscription(
+            &PathBuf::from("mihomo-test.exe"),
+            &runtime_directory,
+            "proxies: []\n",
+        )
+        .expect_err("the fixture binary cannot run");
+        assert!(
+            error.message.contains("validator could not start"),
+            "{}",
+            error.message
+        );
+        assert!(runtime_directory.is_dir());
+    }
+
+    #[test]
+    fn geodata_deployment_creates_the_runtime_directory() {
+        let directory = tempfile::tempdir().expect("temporary config directory");
+        let runtime_directory = directory.path().join("mihomo");
+
+        deploy_bundled_geodata(&runtime_directory);
+
+        assert!(runtime_directory.is_dir());
     }
 
     #[test]

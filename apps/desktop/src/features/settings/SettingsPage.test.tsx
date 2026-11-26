@@ -21,6 +21,7 @@ import { SettingsPage } from "./SettingsPage";
 vi.mock("../../platform/settings", () => ({
   getSettings: vi.fn(),
   saveSettings: vi.fn(),
+  applyNativeUiScale: vi.fn(),
 }));
 
 const getSettingsMock = vi.mocked(getSettings);
@@ -30,6 +31,7 @@ const runtimeValue: RuntimeContextValue = {
   snapshot: null,
   coreInfo: null,
   proxyGroups: [],
+  corePreferences: null,
   logs: [],
   isLoading: false,
   pendingAction: null,
@@ -41,6 +43,9 @@ const runtimeValue: RuntimeContextValue = {
   restart: vi.fn().mockResolvedValue(undefined),
   selectProxy: vi.fn().mockResolvedValue(undefined),
   measureDelay: vi.fn().mockResolvedValue(null),
+  measureGroupDelay: vi.fn().mockResolvedValue({}),
+  setRoutingMode: vi.fn().mockResolvedValue(undefined),
+  setCoreLogLevel: vi.fn().mockResolvedValue(undefined),
 };
 
 const availableIntegrationStatus: SystemIntegrationStatus = {

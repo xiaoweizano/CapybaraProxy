@@ -15,6 +15,9 @@ export type NativeCommandName =
   | "get_proxy_groups"
   | "select_proxy"
   | "test_proxy_delay"
+  | "test_group_delay"
+  | "get_core_preferences"
+  | "set_core_preferences"
   | "get_connections"
   | "close_connection"
   | "get_rules"
@@ -22,9 +25,11 @@ export type NativeCommandName =
   | "get_subscription_snapshot"
   | "import_subscription"
   | "clear_subscription"
+  | "refresh_subscription"
   | "get_runtime_logs"
   | "get_settings"
   | "save_settings"
+  | "apply_ui_scale"
   | "get_system_integration_status"
   | "set_system_proxy_enabled"
   | "set_launch_at_login_enabled"
@@ -34,7 +39,8 @@ export type NativeEventName =
   | "app-visibility"
   | "runtime-state-changed"
   | "runtime-log"
-  | "system-integration-changed";
+  | "system-integration-changed"
+  | "subscription-updated";
 
 export type NativeBridgeError = {
   code: string;

@@ -3,19 +3,22 @@ mod config;
 mod control_api;
 mod core_adapter;
 pub mod subscription;
+pub mod subscription_convert;
 pub mod subscription_fetch;
 pub mod subscription_preview;
+mod system_proxy;
 
 use flowproxy_contracts::{
-    ConnectionPage, CoreInfo, ProfileInfo, ProxyGroup, RuleItem, RuntimeError, RuntimeErrorCode,
-    SubscriptionSnapshot, TelemetrySnapshot,
+    ConnectionPage, CoreInfo, CorePreferences, DelayProbeSettings, GroupDelayResult, LogLevel,
+    ProfileInfo, ProxyGroup, RoutingMode, RuleItem, RuntimeError, RuntimeErrorCode,
+    StartupPreferences, SubscriptionSnapshot, TelemetrySnapshot,
 };
 
 pub use binary::{
     resolve_verified_binary, verify_binary_file, verify_binary_version, VerifiedMihomoBinary,
     LOCKED_MIHOMO_SHA256, LOCKED_MIHOMO_VERSION,
 };
-pub use config::{render_direct_profile, ConfigStore};
+pub use config::{render_direct_profile, render_direct_profile_with, ConfigStore};
 pub use control_api::{parse_connections, parse_proxy_groups, parse_rules, LoopbackApiClient};
 pub use core_adapter::MihomoCoreAdapter;
 
@@ -91,6 +94,43 @@ pub trait MihomoAdapter: Send {
         Err(unsupported_adapter_data("proxy delay checks"))
     }
 
+    /// Probes every node of one group in a single request.
+    fn test_group_delay(
+        &mut self,
+        _group: &str,
+        _timeout_ms: u32,
+    ) -> Result<GroupDelayResult, RuntimeError> {
+        Err(unsupported_adapter_data("group delay checks"))
+    }
+
+    /// Reads the routing mode and log level the core is running with.
+    fn core_preferences(&mut self) -> Result<CorePreferences, RuntimeError> {
+        Err(unsupported_adapter_data("core preferences"))
+    }
+
+    /// Changes routing mode and/or log level without restarting the core.
+    fn update_core_preferences(
+        &mut self,
+        _mode: Option<RoutingMode>,
+        _log_level: Option<LogLevel>,
+    ) -> Result<CorePreferences, RuntimeError> {
+        Err(unsupported_adapter_data("core preference updates"))
+    }
+
+    /// Sets the values written into the next generated profile.
+    ///
+    /// Adapters that cannot render a profile keep the no-op default.
+    fn set_startup_preferences(&mut self, _preferences: StartupPreferences) {}
+
+    /// Sets the target used by latency probes.
+    ///
+    /// Adapters without a control API keep the no-op default.
+    fn set_delay_probe(&mut self, _probe: DelayProbeSettings) {}
+
+    /// Records the URL the next import came from, so the document can be
+    /// refreshed later. A pasted document has no source and passes `None`.
+    fn set_pending_subscription_url(&mut self, _url: Option<String>) {}
+
     fn connections(&mut self) -> Result<ConnectionPage, RuntimeError> {
         Err(unsupported_adapter_data("active connections"))
     }
@@ -128,6 +168,11 @@ pub trait MihomoAdapter: Send {
         Err(unsupported_adapter_data("subscription summary"))
     }
 
+    /// Returns the URL the stored subscription was imported from, if any.
+    fn subscription_source_url(&mut self) -> Option<String> {
+        None
+    }
+
     fn take_logs(&mut self) -> Vec<String> {
         Vec::new()
     }
@@ -151,6 +196,18 @@ where
 
     fn is_running(&mut self) -> bool {
         self.as_mut().is_running()
+    }
+
+    fn set_startup_preferences(&mut self, preferences: StartupPreferences) {
+        self.as_mut().set_startup_preferences(preferences)
+    }
+
+    fn set_delay_probe(&mut self, probe: DelayProbeSettings) {
+        self.as_mut().set_delay_probe(probe)
+    }
+
+    fn set_pending_subscription_url(&mut self, url: Option<String>) {
+        self.as_mut().set_pending_subscription_url(url)
     }
 
     fn health(&mut self) -> Result<(), RuntimeError> {
@@ -181,6 +238,26 @@ where
         self.as_mut().test_proxy_delay(proxy, timeout_ms)
     }
 
+    fn test_group_delay(
+        &mut self,
+        group: &str,
+        timeout_ms: u32,
+    ) -> Result<GroupDelayResult, RuntimeError> {
+        self.as_mut().test_group_delay(group, timeout_ms)
+    }
+
+    fn core_preferences(&mut self) -> Result<CorePreferences, RuntimeError> {
+        self.as_mut().core_preferences()
+    }
+
+    fn update_core_preferences(
+        &mut self,
+        mode: Option<RoutingMode>,
+        log_level: Option<LogLevel>,
+    ) -> Result<CorePreferences, RuntimeError> {
+        self.as_mut().update_core_preferences(mode, log_level)
+    }
+
     fn connections(&mut self) -> Result<ConnectionPage, RuntimeError> {
         self.as_mut().connections()
     }
@@ -207,6 +284,10 @@ where
 
     fn subscription_snapshot(&mut self) -> Result<SubscriptionSnapshot, RuntimeError> {
         self.as_mut().subscription_snapshot()
+    }
+
+    fn subscription_source_url(&mut self) -> Option<String> {
+        self.as_mut().subscription_source_url()
     }
 
     fn take_logs(&mut self) -> Vec<String> {

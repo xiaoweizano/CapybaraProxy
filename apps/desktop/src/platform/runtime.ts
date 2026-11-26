@@ -78,6 +78,25 @@ export type ProxyGroup = {
   nodes: ProxyNode[];
 };
 
+export type RoutingMode = "rule" | "global" | "direct";
+
+export type CoreLogLevel = "silent" | "error" | "warning" | "info" | "debug";
+
+export type CorePreferences = {
+  mode: RoutingMode | null;
+  log_level: CoreLogLevel | null;
+};
+
+export type DelaySample = {
+  proxy: string;
+  delay_ms: number;
+};
+
+export type GroupDelayResult = {
+  group: string;
+  delays: DelaySample[];
+};
+
 export type TelemetrySnapshot = {
   state: RuntimeState;
   timestamp_ms: number;
@@ -134,6 +153,10 @@ export type SubscriptionSnapshot = {
   groups: ProxyGroup[];
   rules: RuleItem[];
   has_subscription: boolean;
+  /** Set when the subscription was imported from a URL. */
+  source_url?: string | null;
+  /** Import timestamp in epoch milliseconds. */
+  updated_at_ms?: number | null;
 };
 
 const runtimeStates = new Set<RuntimeState>([
@@ -256,6 +279,40 @@ function isProxyGroup(value: unknown): value is ProxyGroup {
   );
 }
 
+const routingModes = new Set<RoutingMode>(["rule", "global", "direct"]);
+const coreLogLevels = new Set<CoreLogLevel>([
+  "silent",
+  "error",
+  "warning",
+  "info",
+  "debug",
+]);
+
+function isCorePreferences(value: unknown): value is CorePreferences {
+  return (
+    isRecord(value) &&
+    (value.mode === null ||
+      (typeof value.mode === "string" && routingModes.has(value.mode as RoutingMode))) &&
+    (value.log_level === null ||
+      (typeof value.log_level === "string" &&
+        coreLogLevels.has(value.log_level as CoreLogLevel)))
+  );
+}
+
+function isGroupDelayResult(value: unknown): value is GroupDelayResult {
+  return (
+    isRecord(value) &&
+    isString(value.group) &&
+    Array.isArray(value.delays) &&
+    value.delays.every(
+      (sample) =>
+        isRecord(sample) &&
+        isString(sample.proxy) &&
+        isNonNegativeInteger(sample.delay_ms),
+    )
+  );
+}
+
 function isTelemetrySnapshot(value: unknown): value is TelemetrySnapshot {
   return (
     isRecord(value) &&
@@ -365,13 +422,17 @@ async function executeRuntimeCommand<T>(
     | "get_proxy_groups"
     | "select_proxy"
     | "test_proxy_delay"
+    | "test_group_delay"
+    | "get_core_preferences"
+    | "set_core_preferences"
     | "get_connections"
     | "close_connection"
     | "get_rules"
     | "get_profiles"
     | "get_subscription_snapshot"
     | "import_subscription"
-    | "clear_subscription",
+    | "clear_subscription"
+    | "refresh_subscription",
   isValidData: (value: unknown) => value is T,
   args?: Record<string, unknown>,
 ): Promise<RuntimeBridgeResult<T>> {
@@ -439,6 +500,33 @@ export function testProxyDelay(
   );
 }
 
+export function testGroupDelay(
+  group: string,
+  timeoutMs: number,
+): Promise<RuntimeBridgeResult<GroupDelayResult>> {
+  return executeRuntimeCommand(
+    "test_group_delay",
+    isGroupDelayResult,
+    { group, timeoutMs },
+  );
+}
+
+export function getCorePreferences(): Promise<
+  RuntimeBridgeResult<CorePreferences>
+> {
+  return executeRuntimeCommand("get_core_preferences", isCorePreferences);
+}
+
+export function setCorePreferences(
+  mode: RoutingMode | null,
+  logLevel: CoreLogLevel | null,
+): Promise<RuntimeBridgeResult<CorePreferences>> {
+  return executeRuntimeCommand("set_core_preferences", isCorePreferences, {
+    mode,
+    logLevel,
+  });
+}
+
 export function getConnections(): Promise<
   RuntimeBridgeResult<ConnectionPage>
 > {
@@ -481,7 +569,13 @@ function isSubscriptionSnapshot(value: unknown): value is SubscriptionSnapshot {
     Array.isArray(value.groups) &&
     value.groups.every(isProxyGroup) &&
     Array.isArray(value.rules) &&
-    value.rules.every(isRuleItem)
+    value.rules.every(isRuleItem) &&
+    (value.source_url === undefined ||
+      value.source_url === null ||
+      isString(value.source_url)) &&
+    (value.updated_at_ms === undefined ||
+      value.updated_at_ms === null ||
+      Number.isInteger(value.updated_at_ms))
   );
 }
 
@@ -519,6 +613,23 @@ export function clearSubscription(): Promise<
   RuntimeBridgeResult<ProfileInfo[]>
 > {
   return executeRuntimeCommand("clear_subscription", isProfileList);
+}
+
+/// Re-downloads the stored subscription from its recorded source URL.
+export function refreshSubscription(): Promise<
+  RuntimeBridgeResult<ProfileInfo[]>
+> {
+  return executeRuntimeCommand("refresh_subscription", isProfileList);
+}
+
+/**
+ * Notifies the page when the native side refreshed the subscription itself,
+ * for example from the automatic update check in the background loop.
+ */
+export function subscribeSubscriptionUpdated(
+  listener: () => void,
+): Promise<() => void> {
+  return listenNativeEvent("subscription-updated", () => listener());
 }
 
 export function startRuntime(): Promise<RuntimeBridgeResult<RuntimeSnapshot>> {

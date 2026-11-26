@@ -858,12 +858,15 @@ dependencies = [
 name = "flowproxy-mihomo-manager"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "flowproxy-contracts",
  "reqwest",
  "rustls",
  "serde",
  "serde_json",
  "tempfile",
+ "url",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

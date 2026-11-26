@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import {
+  applyNativeUiScale,
   getSettings,
   saveSettings,
   type DesktopSettings,
@@ -16,6 +17,13 @@ import {
   writeStoredCloseBehavior,
   type CloseBehavior,
 } from "../../shared/closeBehavior";
+import {
+  DEFAULT_UI_SCALE,
+  applyUiScale,
+  normalizeUiScale,
+  readStoredUiScale,
+  writeStoredUiScale,
+} from "../../shared/uiScale";
 import {
   isTheme,
   readStoredTheme,
@@ -32,6 +40,12 @@ import {
 } from "../../i18n/language";
 import { applyLanguage } from "../../i18n";
 import {
+  DEFAULT_DELAY_PROBE_URL,
+  DEFAULT_DELAY_TIMEOUT_MS,
+  normalizeDelayTimeout,
+} from "../../shared/delayProbe";
+import type { CoreLogLevel } from "../../platform/runtime";
+import {
   AppSettingsContext,
   SETTINGS_MIGRATION_KEY,
   type AppPreferences,
@@ -47,12 +61,24 @@ function readPreviewPreferences(): AppPreferences {
       theme: readStoredTheme(window.localStorage),
       closeBehavior: readStoredCloseBehavior(window.localStorage),
       language: readStoredLanguage(window.localStorage),
+      uiScale: readStoredUiScale(window.localStorage),
+      coreLogLevel: "warning",
+      ipv6: false,
+      delayProbeUrl: DEFAULT_DELAY_PROBE_URL,
+      delayTimeoutMs: DEFAULT_DELAY_TIMEOUT_MS,
+      subscriptionUpdateHours: 0,
     };
   } catch {
     return {
       theme: "cyber_flow",
       closeBehavior: "hide_to_tray",
       language: DEFAULT_LANGUAGE,
+      uiScale: DEFAULT_UI_SCALE,
+      coreLogLevel: "warning",
+      ipv6: false,
+      delayProbeUrl: DEFAULT_DELAY_PROBE_URL,
+      delayTimeoutMs: DEFAULT_DELAY_TIMEOUT_MS,
+      subscriptionUpdateHours: 0,
     };
   }
 }
@@ -64,6 +90,12 @@ function fromNativeSettings(settings: DesktopSettings): AppPreferences {
     // A `settings.json` written before the field existed has no language;
     // follow the system locale instead of forcing English on a fresh upgrade.
     language: settings.language ?? detectSystemLanguage(),
+    uiScale: normalizeUiScale(settings.ui_scale),
+    coreLogLevel: settings.log_level ?? "warning",
+    ipv6: settings.ipv6 ?? false,
+    delayProbeUrl: settings.delay_probe_url ?? DEFAULT_DELAY_PROBE_URL,
+    delayTimeoutMs: settings.delay_timeout_ms ?? DEFAULT_DELAY_TIMEOUT_MS,
+    subscriptionUpdateHours: settings.subscription_update_hours ?? 0,
   };
 }
 
@@ -73,6 +105,12 @@ function toNativeSettings(settings: AppPreferences): DesktopSettings {
     theme: settings.theme,
     close_behavior: settings.closeBehavior,
     language: settings.language,
+    ui_scale: settings.uiScale,
+    log_level: settings.coreLogLevel,
+    ipv6: settings.ipv6,
+    delay_probe_url: settings.delayProbeUrl,
+    delay_timeout_ms: settings.delayTimeoutMs,
+    subscription_update_hours: settings.subscriptionUpdateHours,
   };
 }
 
@@ -84,6 +122,7 @@ function writePreferenceCache(settings: AppPreferences): void {
       settings.closeBehavior,
     );
     writeStoredLanguage(window.localStorage, settings.language);
+    writeStoredUiScale(window.localStorage, settings.uiScale);
   } catch {
     // The native settings store remains authoritative when cache writes fail.
   }
@@ -139,6 +178,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     setSettings(nextSettings);
     writePreferenceCache(nextSettings);
     applyLanguage(nextSettings.language);
+    applyUiScale(nextSettings.uiScale);
   }, []);
 
   useEffect(() => {
@@ -301,6 +341,45 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     [enqueueUpdate],
   );
 
+  const updateUiScale = useCallback(
+    (scale: number): Promise<SettingsUpdateResult> => {
+      const uiScale = normalizeUiScale(scale);
+      // Zoom immediately so dragging a slider feels responsive; the persisted
+      // value is applied again from `applySettings` once the save completes.
+      applyUiScale(uiScale);
+      void applyNativeUiScale(uiScale);
+      return enqueueUpdate({ uiScale });
+    },
+    [enqueueUpdate],
+  );
+
+  const updateCoreLogLevel = useCallback(
+    (coreLogLevel: CoreLogLevel): Promise<SettingsUpdateResult> =>
+      enqueueUpdate({ coreLogLevel }),
+    [enqueueUpdate],
+  );
+
+  const updateIpv6 = useCallback(
+    (ipv6: boolean): Promise<SettingsUpdateResult> =>
+      enqueueUpdate({ ipv6 }),
+    [enqueueUpdate],
+  );
+
+  const updateDelayProbe = useCallback(
+    (url: string, timeoutMs: number): Promise<SettingsUpdateResult> =>
+      enqueueUpdate({
+        delayProbeUrl: url.trim() === "" ? DEFAULT_DELAY_PROBE_URL : url.trim(),
+        delayTimeoutMs: normalizeDelayTimeout(timeoutMs),
+      }),
+    [enqueueUpdate],
+  );
+
+  const updateSubscriptionUpdateHours = useCallback(
+    (hours: number): Promise<SettingsUpdateResult> =>
+      enqueueUpdate({ subscriptionUpdateHours: Math.max(0, Math.round(hours)) }),
+    [enqueueUpdate],
+  );
+
   const clearError = useCallback(() => setError(null), []);
 
   const value = useMemo(
@@ -312,6 +391,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       updateTheme,
       updateCloseBehavior,
       updateLanguage,
+      updateUiScale,
+      updateCoreLogLevel,
+      updateIpv6,
+      updateDelayProbe,
+      updateSubscriptionUpdateHours,
       clearError,
     }),
     [
@@ -322,6 +406,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       updateTheme,
       updateCloseBehavior,
       updateLanguage,
+      updateUiScale,
+      updateCoreLogLevel,
+      updateIpv6,
+      updateDelayProbe,
+      updateSubscriptionUpdateHours,
       clearError,
     ],
   );

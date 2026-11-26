@@ -1,5 +1,5 @@
 use crate::binary::map_io_error;
-use flowproxy_contracts::{RuntimeError, RuntimeErrorCode};
+use flowproxy_contracts::{RuntimeError, RuntimeErrorCode, StartupPreferences};
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -203,6 +203,16 @@ pub fn render_direct_profile(
     proxy_port: u16,
     secret: &str,
 ) -> Result<String, RuntimeError> {
+    render_direct_profile_with(api_port, proxy_port, secret, StartupPreferences::default())
+}
+
+/// Renders the built-in direct profile with the operator's startup settings.
+pub fn render_direct_profile_with(
+    api_port: u16,
+    proxy_port: u16,
+    secret: &str,
+    preferences: StartupPreferences,
+) -> Result<String, RuntimeError> {
     if api_port == 0 || proxy_port == 0 || api_port == proxy_port {
         return Err(RuntimeError::new(
             RuntimeErrorCode::ConfigInvalid,
@@ -230,8 +240,8 @@ pub fn render_direct_profile(
             "allow-lan: false\n",
             "bind-address: 127.0.0.1\n",
             "mode: rule\n",
-            "log-level: warning\n",
-            "ipv6: false\n",
+            "log-level: {log_level}\n",
+            "ipv6: {ipv6}\n",
             "mixed-port: {proxy_port}\n",
             "listeners: []\n",
             "tun:\n",
@@ -247,6 +257,8 @@ pub fn render_direct_profile(
         api_port = api_port,
         secret = secret,
         proxy_port = proxy_port,
+        log_level = preferences.log_level.as_wire_value(),
+        ipv6 = preferences.ipv6,
     ))
 }
 

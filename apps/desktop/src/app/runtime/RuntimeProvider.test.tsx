@@ -23,6 +23,10 @@ import { useRuntime } from "./runtimeContext";
 vi.mock("../../platform/runtime", () => ({
   getCoreInfo: vi.fn(),
   getProxyGroups: vi.fn(),
+  subscribeSubscriptionUpdated: vi.fn(async () => () => undefined),
+  getCorePreferences: vi.fn(),
+  testGroupDelay: vi.fn(),
+  setCorePreferences: vi.fn(),
   getRuntimeLogs: vi.fn(),
   getRuntimeSnapshot: vi.fn(),
   restartRuntime: vi.fn(),

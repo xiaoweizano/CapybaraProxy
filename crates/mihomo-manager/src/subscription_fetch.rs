@@ -7,13 +7,21 @@
 //! writes the URL into a log or an error message.
 
 use crate::subscription::{preflight, MAX_SUBSCRIPTION_BYTES};
+use crate::subscription_convert;
+use crate::system_proxy;
 use flowproxy_contracts::{RuntimeError, RuntimeErrorCode};
 use std::io::Read;
 use std::time::Duration;
 
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
+/// A direct retry after a failed system-proxy attempt should not stack a full
+/// request timeout on top of the first wait.
+const DIRECT_RETRY_TIMEOUT: Duration = Duration::from_secs(15);
 const MAX_REDIRECTS: usize = 5;
-const USER_AGENT: &str = concat!("FlowProxy/", env!("CARGO_PKG_VERSION"));
+/// Providers decide the response format from the client name. A Clash
+/// identifier is required to get a YAML profile; anything else is served the
+/// base64 share-link list that phone clients consume.
+const USER_AGENT: &str = concat!("clash.meta/", env!("CARGO_PKG_VERSION"), " (FlowProxy)");
 
 /// Validates a subscription URL without revealing it in the error message.
 pub fn validate_url(url: &str) -> Result<(), RuntimeError> {
@@ -43,38 +51,35 @@ pub fn validate_url(url: &str) -> Result<(), RuntimeError> {
 pub fn fetch(url: &str) -> Result<String, RuntimeError> {
     validate_url(url)?;
 
-    let client = reqwest::blocking::Client::builder()
-        .timeout(REQUEST_TIMEOUT)
-        .redirect(reqwest::redirect::Policy::custom(|attempt| {
-            // Keep the redirect chain short and refuse cross-scheme hops, so
-            // an `https://` subscription cannot be bounced to plain HTTP.
-            if attempt.previous().len() >= MAX_REDIRECTS {
-                return attempt.error(RedirectAbort::TooMany);
-            }
-            let previous_https = attempt
-                .previous()
-                .last()
-                .is_some_and(|url| url.scheme() == "https");
-            if previous_https && attempt.url().scheme() != "https" {
-                return attempt.error(RedirectAbort::DownGrade);
-            }
-            attempt.follow()
-        }))
-        .user_agent(USER_AGENT)
-        .build()
-        .map_err(|error| {
-            invalid(format!(
-                "The download client could not start: {}",
-                redact(&error.to_string())
-            ))
-        })?;
+    // Subscription hosts are usually only reachable through the proxy client
+    // the operator already runs, so the system proxy is consulted before the
+    // first attempt. It is a hint, not a requirement: an unparsable setting
+    // falls back to reqwest's own configuration.
+    let proxy = system_proxy::proxy_url_for(url);
+    let client = build_client(proxy.as_deref())?;
 
-    let mut response = client.get(url).send().map_err(|error| {
-        invalid(format!(
-            "The subscription could not be downloaded: {}",
-            describe_request_error(&error)
-        ))
-    })?;
+    let mut response = match client.get(url).send() {
+        Ok(response) => response,
+        Err(error) if proxy.is_some() && is_transport_error(&error) => {
+            // A proxy client can exit without clearing the system proxy. One
+            // short direct attempt keeps the import working in that case.
+            build_direct_client()?
+                .get(url)
+                .send()
+                .map_err(|error| {
+                    invalid(format!(
+                        "The subscription could not be downloaded: {} (tried the system proxy and a direct connection)",
+                        describe_request_error(&error)
+                    ))
+                })?
+        }
+        Err(error) => {
+            return Err(invalid(format!(
+                "The subscription could not be downloaded: {}",
+                describe_request_error(&error)
+            )))
+        }
+    };
 
     if !response.status().is_success() {
         return Err(invalid(format!(
@@ -115,8 +120,65 @@ pub fn fetch(url: &str) -> Result<String, RuntimeError> {
 
     let text = String::from_utf8(body)
         .map_err(|_| invalid("The subscription is not valid UTF-8 text."))?;
+    // Providers answer a non-Clash client with a base64 share-link list. The
+    // conversion only rewrites text that is not already a Clash document, so a
+    // normal profile passes through untouched.
+    let text = subscription_convert::normalize(&text);
     preflight(&text)?;
     Ok(text)
+}
+
+fn build_client(proxy: Option<&str>) -> Result<reqwest::blocking::Client, RuntimeError> {
+    let mut builder = client_builder(REQUEST_TIMEOUT);
+
+    // An unusable proxy entry is ignored rather than turned into an import
+    // error: the request can still succeed directly. Without a system proxy
+    // reqwest stays on its default behaviour, which includes the
+    // `HTTP_PROXY`/`HTTPS_PROXY` environment variables.
+    if let Some(proxy) = proxy.and_then(|proxy| reqwest::Proxy::all(proxy).ok()) {
+        builder = builder.proxy(proxy);
+    }
+
+    builder.build().map_err(client_start_error)
+}
+
+fn build_direct_client() -> Result<reqwest::blocking::Client, RuntimeError> {
+    client_builder(DIRECT_RETRY_TIMEOUT)
+        .no_proxy()
+        .build()
+        .map_err(client_start_error)
+}
+
+fn client_builder(timeout: Duration) -> reqwest::blocking::ClientBuilder {
+    reqwest::blocking::Client::builder()
+        .timeout(timeout)
+        .redirect(reqwest::redirect::Policy::custom(|attempt| {
+            // Keep the redirect chain short and refuse cross-scheme hops, so
+            // an `https://` subscription cannot be bounced to plain HTTP.
+            if attempt.previous().len() >= MAX_REDIRECTS {
+                return attempt.error(RedirectAbort::TooMany);
+            }
+            let previous_https = attempt
+                .previous()
+                .last()
+                .is_some_and(|url| url.scheme() == "https");
+            if previous_https && attempt.url().scheme() != "https" {
+                return attempt.error(RedirectAbort::DownGrade);
+            }
+            attempt.follow()
+        }))
+        .user_agent(USER_AGENT)
+}
+
+fn client_start_error(error: reqwest::Error) -> RuntimeError {
+    invalid(format!(
+        "The download client could not start: {}",
+        redact(&error.to_string())
+    ))
+}
+
+fn is_transport_error(error: &reqwest::Error) -> bool {
+    error.is_connect() || error.is_timeout()
 }
 
 #[derive(Debug)]

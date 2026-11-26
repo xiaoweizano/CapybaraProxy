@@ -7,6 +7,7 @@ import {
   RuntimeContext,
   type RuntimeContextValue,
 } from "../../app/runtime/runtimeContext";
+import { SettingsProvider } from "../../app/settings/SettingsProvider";
 import {
   clearSubscription,
   closeConnection,
@@ -37,6 +38,9 @@ vi.mock("../../platform/runtime", async (importOriginal) => {
     getConnections: vi.fn(),
     getProfiles: vi.fn(),
     getRules: vi.fn(),
+    getSubscriptionSnapshot: vi.fn(),
+    subscribeSubscriptionUpdated: vi.fn(async () => () => undefined),
+    refreshSubscription: vi.fn(),
     importSubscription: vi.fn(),
     importSubscriptionFromUrl: vi.fn(),
   };
@@ -129,6 +133,7 @@ function runtimeValue(
     snapshot: connectedSnapshot,
     coreInfo: { backend: "mihomo", version: "v1.19.33", pid: 42 },
     proxyGroups,
+    corePreferences: { mode: "rule", log_level: "warning" },
     logs: [
       {
         sequence: 1,
@@ -148,15 +153,20 @@ function runtimeValue(
     restart: vi.fn(async () => undefined),
     selectProxy: vi.fn(async () => undefined),
     measureDelay: vi.fn(async () => 88),
+    measureGroupDelay: vi.fn(async () => ({})),
+    setRoutingMode: vi.fn(async () => undefined),
+    setCoreLogLevel: vi.fn(async () => undefined),
     ...overrides,
   };
 }
 
 function renderWithRuntime(node: ReactNode, value = runtimeValue()) {
   return render(
-    <RuntimeContext.Provider value={value}>
-      <MemoryRouter>{node}</MemoryRouter>
-    </RuntimeContext.Provider>,
+    <SettingsProvider>
+      <RuntimeContext.Provider value={value}>
+        <MemoryRouter>{node}</MemoryRouter>
+      </RuntimeContext.Provider>
+    </SettingsProvider>,
   );
 }
 
@@ -201,7 +211,9 @@ describe("real data workspace pages", () => {
     const value = runtimeValue();
     renderWithRuntime(<ProxiesPage />, value);
 
-    expect(screen.getByRole("heading", { name: "Proxies" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Proxy groups" }),
+    ).toBeInTheDocument();
     expect(screen.getByText("Tokyo 01")).toBeInTheDocument();
 
     await user.click(
@@ -290,7 +302,7 @@ describe("real data workspace pages", () => {
     expect(getProfilesMock).toHaveBeenCalledTimes(1);
   });
 
-  it("imports a subscription from a pasted URL and hides the form afterwards", async () => {
+  it("imports a subscription from a pasted URL and keeps the form available", async () => {
     const user = userEvent.setup();
     renderWithRuntime(<ProfilesPage />);
     await screen.findByText("Primary profile");
@@ -318,8 +330,11 @@ describe("real data workspace pages", () => {
     });
     expect(await screen.findByText("Imported subscription")).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Import subscription" }),
-    ).not.toBeInTheDocument();
+      screen.getByRole("button", { name: "Import subscription" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Importing a subscription replaces the current one."),
+    ).toBeInTheDocument();
   });
 
   it("reports a subscription import failure without hiding the form", async () => {

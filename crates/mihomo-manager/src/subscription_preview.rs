@@ -160,7 +160,10 @@ pub fn preview(yaml: &str) -> SubscriptionPreview {
         preview.groups.push(ProxyGroup {
             name: "Subscription".to_owned(),
             group_type: "Selector".to_owned(),
-            selected: loose_nodes.first().map(|n| n.name.clone()).unwrap_or_default(),
+            selected: loose_nodes
+                .first()
+                .map(|n| n.name.clone())
+                .unwrap_or_default(),
             nodes: loose_nodes,
         });
     } else if let Some(group) = preview.groups.first_mut() {
@@ -345,9 +348,8 @@ rules:
 
     #[test]
     fn nodes_without_groups_still_appear() {
-        let parsed = preview(
-            "proxies:\n  - name: Solo\n    type: trojan\nrules:\n  - MATCH,DIRECT\n",
-        );
+        let parsed =
+            preview("proxies:\n  - name: Solo\n    type: trojan\nrules:\n  - MATCH,DIRECT\n");
 
         assert_eq!(parsed.groups.len(), 1);
         assert_eq!(parsed.groups[0].nodes[0].name, "Solo");
@@ -356,9 +358,7 @@ rules:
 
     #[test]
     fn handles_inline_list_items_and_quotes() {
-        let parsed = preview(
-            "proxies:\n  - {name: \"Quoted Node\", type: vless}\n",
-        );
+        let parsed = preview("proxies:\n  - {name: \"Quoted Node\", type: vless}\n");
 
         // Inline mappings are skipped rather than mis-parsed.
         assert!(parsed.is_empty() || parsed.groups[0].nodes.is_empty());

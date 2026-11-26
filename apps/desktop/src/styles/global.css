@@ -19,6 +19,9 @@ html {
   color: var(--text-primary);
   color-scheme: dark;
   font-family: var(--font-body);
+  /* Set by `shared/uiScale.ts`; every stylesheet size is in rem so this one
+     value scales the whole interface. */
+  font-size: var(--ui-root-font-size, 16px);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
@@ -100,7 +103,7 @@ a {
   border-radius: 999px;
   background: rgba(var(--accent-rgb), 0.08);
   color: var(--text-secondary);
-  font-size: 10px;
+  font-size: 0.875rem;
   font-weight: 700;
   letter-spacing: 0.02em;
   text-transform: uppercase;

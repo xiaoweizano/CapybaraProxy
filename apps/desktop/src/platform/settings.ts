@@ -9,6 +9,21 @@ export type DesktopSettings = {
   close_behavior: CloseBehavior;
   /** Optional because builds before the field existed do not send it. */
   language?: LanguageId;
+  /** Interface scale in percent; 100 is the default. */
+  ui_scale?: number;
+  /** Core log verbosity baked into the generated profile. */
+  log_level?: "silent" | "error" | "warning" | "info" | "debug";
+  /** Whether the core may use IPv6. */
+  ipv6?: boolean;
+  /** URL the core requests to measure node latency. */
+  delay_probe_url?: string;
+  /** Latency probe timeout in milliseconds. */
+  delay_timeout_ms?: number;
+  /** Automatic subscription refresh interval in hours; 0 disables it. */
+  subscription_update_hours?: number;
+  /** Remembered window size in physical pixels. */
+  window_width?: number | null;
+  window_height?: number | null;
 };
 
 export type SettingsBridgeResult<T> =
@@ -29,7 +44,27 @@ function isDesktopSettings(value: unknown): value is DesktopSettings {
       value.close_behavior === "exit_application") &&
     (value.language === undefined ||
       value.language === "english" ||
-      value.language === "simplified_chinese")
+      value.language === "simplified_chinese") &&
+    (value.ui_scale === undefined || typeof value.ui_scale === "number") &&
+    (value.log_level === undefined ||
+      value.log_level === "silent" ||
+      value.log_level === "error" ||
+      value.log_level === "warning" ||
+      value.log_level === "info" ||
+      value.log_level === "debug") &&
+    (value.ipv6 === undefined || typeof value.ipv6 === "boolean") &&
+    (value.delay_probe_url === undefined ||
+      typeof value.delay_probe_url === "string") &&
+    (value.delay_timeout_ms === undefined ||
+      typeof value.delay_timeout_ms === "number") &&
+    (value.subscription_update_hours === undefined ||
+      typeof value.subscription_update_hours === "number") &&
+    (value.window_width === undefined ||
+      value.window_width === null ||
+      typeof value.window_width === "number") &&
+    (value.window_height === undefined ||
+      value.window_height === null ||
+      typeof value.window_height === "number")
   );
 }
 
@@ -85,4 +120,15 @@ export async function saveSettings(
   return parseSettingsResult(
     await invokeNativeCommand("save_settings", { settings }),
   );
+}
+
+/**
+ * Asks the native shell to zoom the webview.
+ *
+ * The stylesheets already scale off the root font size; this keeps scrollbars
+ * and pointer targets in step. It is best-effort: a preview build has no
+ * webview to zoom, and the CSS scale still applies.
+ */
+export async function applyNativeUiScale(scale: number): Promise<void> {
+  await invokeNativeCommand("apply_ui_scale", { scale }).catch(() => undefined);
 }

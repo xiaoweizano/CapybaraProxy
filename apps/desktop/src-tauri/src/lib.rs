@@ -3,8 +3,9 @@ mod tray_strings;
 mod system_integration;
 
 use flowproxy_contracts::{
-    CommandResult, ConnectionPage, CoreInfo, ProfileInfo, ProxyGroup, RuleItem, RuntimeBackend,
-    RuntimeError, RuntimeErrorCode, RuntimeLogEntry, RuntimeSnapshot, SubscriptionSnapshot,
+    CommandResult, ConnectionPage, CoreInfo, CorePreferences, GroupDelayResult, LogLevel,
+    ProfileInfo, ProxyGroup, RoutingMode, RuleItem, RuntimeBackend, RuntimeError, RuntimeErrorCode,
+    DelayProbeSettings, RuntimeLogEntry, RuntimeSnapshot, StartupPreferences, SubscriptionSnapshot,
     TelemetrySnapshot,
 };
 use flowproxy_mihomo_manager::{MihomoAdapter, MihomoCoreAdapter, UnavailableMihomoAdapter};
@@ -31,6 +32,7 @@ const APP_VISIBILITY_EVENT: &str = "app-visibility";
 const RUNTIME_STATE_EVENT: &str = "runtime-state-changed";
 const RUNTIME_LOG_EVENT: &str = "runtime-log";
 const SYSTEM_INTEGRATION_EVENT: &str = "system-integration-changed";
+const SUBSCRIPTION_UPDATED_EVENT: &str = "subscription-updated";
 const RUNTIME_HEALTH_VISIBLE_INTERVAL: Duration = Duration::from_millis(1_500);
 const RUNTIME_HEALTH_HIDDEN_INTERVAL: Duration = Duration::from_millis(5_000);
 const MAX_IDENTIFIER_LENGTH: usize = 512;
@@ -87,12 +89,39 @@ impl AppState {
             .settings
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let settings = settings.normalized();
         self.settings_store.save(&settings)?;
         *current = settings.clone();
+        // The core's log level and IPv6 switch are baked into the profile, so
+        // the adapter needs them before the next start or restart.
+        self.runtime.apply_startup_preferences(startup_preferences(&settings));
+        self.runtime.apply_delay_probe(delay_probe_settings(&settings));
         Ok(settings)
     }
 }
 
+/// Maps persisted desktop settings onto the values the adapter bakes into the
+/// next generated profile.
+fn delay_probe_settings(settings: &DesktopSettings) -> DelayProbeSettings {
+    DelayProbeSettings {
+        url: settings.delay_probe_url.clone(),
+        timeout_ms: settings.delay_timeout_ms,
+    }
+    .normalized()
+}
+
+fn startup_preferences(settings: &DesktopSettings) -> StartupPreferences {
+    StartupPreferences {
+        log_level: match settings.log_level {
+            settings::CoreLogLevel::Silent => LogLevel::Silent,
+            settings::CoreLogLevel::Error => LogLevel::Error,
+            settings::CoreLogLevel::Warning => LogLevel::Warning,
+            settings::CoreLogLevel::Info => LogLevel::Info,
+            settings::CoreLogLevel::Debug => LogLevel::Debug,
+        },
+        ipv6: settings.ipv6,
+    }
+}
 #[derive(Default)]
 struct ExitGate {
     started: AtomicBool,
@@ -265,6 +294,54 @@ fn show_main_window(app: &tauri::AppHandle) {
         if let Err(error) = window.emit(APP_VISIBILITY_EVENT, false) {
             log_native_error("notifying the webview that the window is visible", error);
         }
+    }
+}
+
+/// Restores the interface scale and the window size remembered from the last
+/// session.
+///
+/// Every step is best-effort: a window that cannot be resized or zoomed simply
+/// keeps its configured default, and the operator can change both again from
+/// Settings.
+fn restore_window_preferences(app: &tauri::AppHandle, settings: &DesktopSettings) {
+    if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
+        if let Err(error) = window.set_zoom(f64::from(settings.ui_scale) / 100.0) {
+            log_native_error("restoring the interface scale", error);
+        }
+
+        if let (Some(width), Some(height)) = (settings.window_width, settings.window_height) {
+            if let Err(error) = window.set_size(tauri::PhysicalSize::new(width, height)) {
+                log_native_error("restoring the main window size", error);
+            }
+        }
+    }
+}
+
+/// Persists the current window size so the next launch reopens at the same
+/// size. Minimized and maximized sizes are skipped — they describe the window
+/// state, not the operator's preferred size.
+fn remember_window_size(window: &tauri::Window) {
+    if window.is_minimized().unwrap_or(true) || window.is_maximized().unwrap_or(false) {
+        return;
+    }
+    let Ok(size) = window.inner_size() else {
+        return;
+    };
+    if size.width == 0 || size.height == 0 {
+        return;
+    }
+
+    let app = window.app_handle();
+    let state = app.state::<AppState>();
+    let mut current = state.settings();
+    if current.window_width == Some(size.width) && current.window_height == Some(size.height) {
+        return;
+    }
+    current.window_width = Some(size.width);
+    current.window_height = Some(size.height);
+
+    if let Err(error) = state.update_settings(current) {
+        log_native_error("remembering the main window size", &error);
     }
 }
 
@@ -518,6 +595,49 @@ fn test_proxy_delay(
 }
 
 #[tauri::command]
+fn test_group_delay(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    group: String,
+    timeout_ms: u32,
+) -> CommandResult<GroupDelayResult> {
+    if let Err(error) = validate_identifier(
+        "proxy group name",
+        &group,
+        RuntimeErrorCode::SelectionFailed,
+    ) {
+        return CommandResult::failure(error);
+    }
+    run_data_command(
+        &app,
+        state
+            .runtime
+            .test_group_delay(&group, bounded_delay_timeout(timeout_ms)),
+    )
+}
+
+#[tauri::command]
+fn get_core_preferences(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> CommandResult<CorePreferences> {
+    run_data_command(&app, state.runtime.core_preferences())
+}
+
+#[tauri::command]
+fn set_core_preferences(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    mode: Option<RoutingMode>,
+    log_level: Option<LogLevel>,
+) -> CommandResult<CorePreferences> {
+    run_data_command(
+        &app,
+        state.runtime.update_core_preferences(mode, log_level),
+    )
+}
+
+#[tauri::command]
 fn get_connections(
     app: tauri::AppHandle,
     state: State<'_, AppState>,
@@ -576,9 +696,18 @@ fn import_subscription(
     url: Option<String>,
 ) -> CommandResult<Vec<ProfileInfo>> {
     let document = match (yaml, url) {
-        (Some(yaml), _) if !yaml.trim().is_empty() => yaml,
+        (Some(yaml), _) if !yaml.trim().is_empty() => {
+            // Pasted text goes through the same normalisation as a download so
+            // a base64 share-link list works either way.
+            flowproxy_mihomo_manager::subscription_convert::normalize(&yaml)
+        }
         (_, Some(url)) => match flowproxy_mihomo_manager::subscription_fetch::fetch(&url) {
-            Ok(document) => document,
+            Ok(document) => {
+                // Remembered so the subscription can be refreshed automatically
+                // and re-downloaded on demand.
+                state.runtime.set_pending_subscription_url(Some(url));
+                document
+            }
             Err(error) => return CommandResult::failure(error),
         },
         _ => {
@@ -609,6 +738,68 @@ fn import_subscription(
         return CommandResult::failure(error);
     }
 
+    if let Err(failure) = state.runtime.import_subscription(&name, &document) {
+        emit_runtime_change(&app, &failure.change);
+        return CommandResult::failure(failure.error);
+    }
+
+    CommandResult::success(state.runtime.profiles().unwrap_or_default())
+}
+
+/// Re-downloads the stored subscription from the URL it was imported from.
+///
+/// Unlike [`import_subscription`] this takes no arguments: the URL comes from
+/// the stored subscription metadata, so a provider token is never sent back to
+/// the webview. A subscription that was pasted rather than downloaded has no
+/// source URL and reports a clear error.
+#[tauri::command]
+fn refresh_subscription(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> CommandResult<Vec<ProfileInfo>> {
+    let Some(url) = state.runtime.subscription_source_url() else {
+        return CommandResult::failure(RuntimeError::new(
+            RuntimeErrorCode::SubscriptionInvalid,
+            "This subscription was pasted rather than downloaded, so it has no URL to refresh from. Import it again with its URL to enable refreshing.",
+            false,
+        ));
+    };
+
+    let document = match flowproxy_mihomo_manager::subscription_fetch::fetch(&url) {
+        Ok(document) => document,
+        Err(error) => return CommandResult::failure(error),
+    };
+
+    if document.len() > MAX_SUBSCRIPTION_YAML_BYTES {
+        return CommandResult::failure(RuntimeError::new(
+            RuntimeErrorCode::SubscriptionInvalid,
+            format!(
+                "The subscription is larger than the {} MiB limit.",
+                MAX_SUBSCRIPTION_YAML_BYTES / (1024 * 1024)
+            ),
+            false,
+        ));
+    }
+
+    // Reuse the stored name so the profile keeps its identity across refreshes.
+    let name = state
+        .runtime
+        .profiles()
+        .ok()
+        .and_then(|profiles| profiles.into_iter().next())
+        .map(|profile| profile.name)
+        .unwrap_or_else(|| "Imported subscription".to_owned());
+    if let Err(error) = validate_identifier(
+        "subscription name",
+        &name,
+        RuntimeErrorCode::SubscriptionInvalid,
+    ) {
+        return CommandResult::failure(error);
+    }
+
+    // The import path stores the source URL again; keep it so a second refresh
+    // still knows where the document came from.
+    state.runtime.set_pending_subscription_url(Some(url));
     if let Err(failure) = state.runtime.import_subscription(&name, &document) {
         emit_runtime_change(&app, &failure.change);
         return CommandResult::failure(failure.error);
@@ -678,6 +869,31 @@ fn save_settings(
     }
 }
 
+/// Applies the interface scale to the main webview.
+///
+/// The stylesheets size everything in `rem` off the root font size, but zooming
+/// the webview as well keeps native scrollbars, pointer targets and the OS
+/// font-metrics baseline in step with the text.
+#[tauri::command]
+fn apply_ui_scale(app: tauri::AppHandle, scale: u32) -> CommandResult<u32> {
+    let scale = scale.clamp(settings::MIN_UI_SCALE, settings::MAX_UI_SCALE);
+    let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) else {
+        return CommandResult::failure(RuntimeError::new(
+            RuntimeErrorCode::Internal,
+            "The main window is unavailable.",
+            true,
+        ));
+    };
+    match window.set_zoom(f64::from(scale) / 100.0) {
+        Ok(()) => CommandResult::success(scale),
+        Err(error) => CommandResult::failure(RuntimeError::new(
+            RuntimeErrorCode::Internal,
+            format!("The interface scale could not be applied: {error}"),
+            true,
+        )),
+    }
+}
+
 #[tauri::command]
 fn request_application_exit(
     app: tauri::AppHandle,
@@ -717,30 +933,97 @@ fn request_controlled_exit(app: &tauri::AppHandle, state: &AppState) -> Result<(
 fn spawn_runtime_health_loop(app: tauri::AppHandle) {
     let result = std::thread::Builder::new()
         .name("flowproxy-runtime-health".to_owned())
-        .spawn(move || loop {
-            let window_visible = app
-                .get_webview_window(MAIN_WINDOW_LABEL)
-                .and_then(|window| window.is_visible().ok())
-                .unwrap_or(true);
-            std::thread::sleep(runtime_health_interval(window_visible));
-            let state = app.state::<AppState>();
-            let outcome = state.system_integration.poll_health();
-            let runtime_changed = outcome.runtime_change.is_some();
-            if let Some(change) = outcome.runtime_change {
-                emit_runtime_change(&app, &change);
-            }
-            if let Some(error) = outcome.integration_error {
-                emit_system_integration_event(&app, SystemIntegrationEvent::Error { error });
-            } else if outcome.integration_changed {
-                emit_integration_status(&app, state.system_integration.as_ref());
-            }
-            if runtime_changed {
-                refresh_tray_menu(&app);
+        .spawn(move || {
+            let mut last_subscription_refresh =
+                std::time::Instant::now() - AUTO_REFRESH_INITIAL_DELAY;
+            loop {
+                let window_visible = app
+                    .get_webview_window(MAIN_WINDOW_LABEL)
+                    .and_then(|window| window.is_visible().ok())
+                    .unwrap_or(true);
+                std::thread::sleep(runtime_health_interval(window_visible));
+                let state = app.state::<AppState>();
+                let outcome = state.system_integration.poll_health();
+                let runtime_changed = outcome.runtime_change.is_some();
+                if let Some(change) = outcome.runtime_change {
+                    emit_runtime_change(&app, &change);
+                }
+                if let Some(error) = outcome.integration_error {
+                    emit_system_integration_event(&app, SystemIntegrationEvent::Error { error });
+                } else if outcome.integration_changed {
+                    emit_integration_status(&app, state.system_integration.as_ref());
+                }
+                if runtime_changed {
+                    refresh_tray_menu(&app);
+                }
+                maybe_refresh_subscription(&app, state.inner(), &mut last_subscription_refresh);
             }
         });
 
     if let Err(error) = result {
         log_native_error("starting the Runtime health monitor", error);
+    }
+}
+
+/// How long after launch the first automatic refresh check may run.
+const AUTO_REFRESH_INITIAL_DELAY: Duration = Duration::from_secs(30);
+/// Minimum spacing between checks, so a short interval cannot spin the loop.
+const AUTO_REFRESH_MIN_SPACING: Duration = Duration::from_secs(60);
+
+/// Re-downloads the stored subscription once its configured interval elapsed.
+///
+/// The check runs from the health loop because that is the only place with a
+/// periodic wake-up; the download itself uses the same fetch path as an import,
+/// so a provider failure surfaces as a Runtime log entry rather than a panic.
+fn maybe_refresh_subscription(
+    app: &tauri::AppHandle,
+    state: &AppState,
+    last_refresh: &mut std::time::Instant,
+) {
+    let settings = state.settings();
+    if settings.subscription_update_hours == 0 {
+        return;
+    }
+    let interval = Duration::from_secs(u64::from(settings.subscription_update_hours) * 60 * 60);
+    if last_refresh.elapsed() < interval.max(AUTO_REFRESH_MIN_SPACING) {
+        return;
+    }
+
+    let Some(url) = state.runtime.subscription_source_url() else {
+        return;
+    };
+    *last_refresh = std::time::Instant::now();
+
+    let Ok(document) = flowproxy_mihomo_manager::subscription_fetch::fetch(&url) else {
+        // A failed refresh keeps the last good document; the next tick retries.
+        return;
+    };
+    if document.len() > MAX_SUBSCRIPTION_YAML_BYTES {
+        return;
+    }
+
+    let name = state
+        .runtime
+        .profiles()
+        .ok()
+        .and_then(|profiles| profiles.into_iter().next())
+        .map(|profile| profile.name)
+        .unwrap_or_else(|| "Imported subscription".to_owned());
+
+    state.runtime.set_pending_subscription_url(Some(url));
+    match state.runtime.import_subscription(&name, &document) {
+        Ok(()) => {
+            // The webview re-reads profiles and the offline snapshot when this
+            // event arrives, so an automatic refresh shows up without a click.
+            if let Err(error) = app.emit(SUBSCRIPTION_UPDATED_EVENT, &name) {
+                log_native_error("publishing the subscription update", error);
+            }
+        }
+        Err(failure) => {
+            // A stale upstream that produces an invalid document must not
+            // replace the working one; the next tick retries.
+            log_native_error("refreshing the subscription automatically", &failure.error);
+        }
     }
 }
 
@@ -757,6 +1040,9 @@ pub fn run() {
             get_proxy_groups,
             select_proxy,
             test_proxy_delay,
+            test_group_delay,
+            get_core_preferences,
+            set_core_preferences,
             get_connections,
             close_connection,
             get_rules,
@@ -764,9 +1050,11 @@ pub fn run() {
             get_subscription_snapshot,
             import_subscription,
             clear_subscription,
+            refresh_subscription,
             get_runtime_logs,
             get_settings,
             save_settings,
+            apply_ui_scale,
             get_system_integration_status,
             set_system_proxy_enabled,
             set_launch_at_login_enabled,
@@ -789,6 +1077,8 @@ pub fn run() {
                     }
                 };
             let runtime = Arc::new(RuntimeManager::new(RuntimeBackend::Mihomo, adapter));
+            runtime.apply_startup_preferences(startup_preferences(&loaded_settings.settings));
+            runtime.apply_delay_probe(delay_probe_settings(&loaded_settings.settings));
             let executable = std::env::current_exe()?;
             let system_integration = Arc::new(SystemIntegration::new(
                 runtime.clone(),
@@ -802,10 +1092,11 @@ pub fn run() {
                 runtime,
                 system_integration,
                 settings_store,
-                loaded_settings.settings,
+                loaded_settings.settings.clone(),
             ));
             install_tray(app)?;
             spawn_runtime_health_loop(app.handle().clone());
+            restore_window_preferences(app.handle(), &loaded_settings.settings);
             show_main_window(app.handle());
             Ok(())
         })
@@ -849,6 +1140,7 @@ pub fn run() {
                         log_native_error("reading main window minimized state", error);
                     }
                 }
+                remember_window_size(window);
             } else if let WindowEvent::Focused(true) = event {
                 if let Err(error) = window.emit(APP_VISIBILITY_EVENT, false) {
                     log_native_error("publishing main window focus state", error);
