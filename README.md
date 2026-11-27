@@ -1,198 +1,329 @@
-# FlowProxy V1 — 产品设计与开发规范
+# FlowProxy
 
-> 品牌主张：**Your Network. Your Flow.**  
-> 中文表达：让网络自由流动。  
-> 文档状态：V1 设计基线（可实施，技术细节以 POC 验证结果为准）
+> **Your Network. Your Flow.** / 让网络自由流动。
+>
+> English: [README.en.md](README.en.md)
 
-## 本仓库文档
+FlowProxy 是一个跨平台的网络代理客户端。它自带并托管 Mihomo 核心，用统一的界面管理订阅、代理组、规则、连接与系统代理，而不是让用户直接编辑 YAML 或操作命令行。
 
-- `docs/product/product-requirements.md`：产品范围、平台、核心功能与行为约定
-- `docs/ui-design/design-reference.md`：两张用户确认的 UI 参考图和还原原则
-- `docs/ui-design/theme-cyber-flow.md`：A 主题规范（默认）
-- `docs/ui-design/theme-warm-flow.md`：C 主题规范（可切换）
-- `docs/ui-design/mascot-guidelines.md`：C 主题吉祥物规范
-- `docs/ui-design/component-specification.md`：首页布局、组件和交互规格
-- `docs/architecture/system-architecture.md`：系统整体架构与模块边界
-- `docs/architecture/desktop-tauri-rust.md`：桌面端架构
-- `docs/architecture/android-architecture.md`：Android 架构
-- `docs/architecture/performance-requirements.md`：性能与资源预算原则
-- `docs/development/codex-development-guide.md`：Codex 执行说明、阶段任务与验收标准
-- `docs/development/technical-spike-report.md`：第一阶段技术检查与 Windows 验证结果
-- `docs/development/stage-2-runtime-report.md`：第二阶段 Runtime 骨架、构建、自动验收与残余风险
-- `docs/development/stage-3-mihomo-report.md`：第三阶段真实 Mihomo 集成、安全检查、验收证据与残余风险
-- `docs/development/stage-4-system-integration-report.md`：第四阶段 Windows 系统集成、验收证据与残余风险
-- `docs/architecture/platform-support-matrix.md`：桌面与 Android 的平台能力状态矩阵
-- `docs/architecture/adr-0001-desktop-stack.md`：桌面端首批依赖选型记录
-- `assets/design-reference/`：用户提供的 A/C 主题视觉参考图
+当前代码库包含可运行的 Windows 桌面端，以及 Android 端的界面与服务骨架。
 
-## 已确认决策
+---
 
-1. 产品名：FlowProxy。
-2. 目标平台：Windows、macOS、Linux、Android。
-3. 代理核心：Mihomo，由 FlowProxy 自行分发、启动、监控和管理。
-4. 桌面方向：React + TypeScript + Tauri + Rust，先做技术验证再锁定具体依赖。
-5. Android：Kotlin + Jetpack Compose，使用 Android `VpnService`。
-6. 主题：A Cyber Flow 默认；C Warm Flow 可切换。桌面和 Android 均支持。
-7. 关闭主窗口：默认隐藏到系统托盘并继续运行代理；设置中可改为退出程序。
-8. 性能优先：控制 CPU、内存、后台轮询、动画和高频 UI 更新。
-9. UI 以参考图为视觉基准；适配不同分辨率时保持布局关系、视觉层级和组件比例，不机械固定像素。
-10. Android 与桌面共享设计 tokens、配置格式和数据契约，不强求共享 UI 代码。
+## 目录
 
-## 给 Codex 的第一条指令
+- [能力概览](#能力概览)
+- [快速开始](#快速开始)
+- [界面说明](#界面说明)
+- [设置项](#设置项)
+- [数据存放位置](#数据存放位置)
+- [系统集成与安全边界](#系统集成与安全边界)
+- [本地开发](#本地开发)
+- [检查与构建](#检查与构建)
+- [仓库结构](#仓库结构)
+- [文档索引](#文档索引)
+- [已确认的产品决策](#已确认的产品决策)
+- [当前阶段与边界](#当前阶段与边界)
 
-先完整阅读本目录所有 Markdown 规范和两张参考图。第一阶段建立可运行的项目骨架与静态 UI 原型；第二阶段建立隔离的 Fake Runtime 骨架、原生设置和受控退出；第三阶段完成 Windows 上的真实 Mihomo 受控集成；第四阶段完成 Windows 当前用户系统代理、开机启动和系统集成状态。当前 TUN 仅做能力探测，不执行激活；订阅下载、管理员权限操作和完整 Android 功能仍未实现。macOS/Linux 的系统集成保持 `unverified`，不调用未验证的修改后端。不自行改变视觉方向，不一次性实现所有平台功能。每阶段完成后运行构建、测试并汇报实际结果。
+---
 
-## 当前阶段
+## 能力概览
 
-- 阶段 1：桌面 UI 原型已完成。
-- 阶段 2：Runtime 骨架、Runtime Demo UI、原生设置和受控退出已完成。
-- 阶段 3：Windows 上的真实 Mihomo 子进程、控制 API、真实数据页面和生命周期集成已完成。
-- 阶段 4：Windows 当前用户系统代理、开机启动、恢复 Journal、能力状态和 Settings 集成面板已完成。
-- 阶段 5：Android Compose UI、A/C 主题、VPNService 授权与前台服务、通知 Stop、网络状态同步、33 项 JVM 测试与 2 项仪器化测试已完成。
-- 阶段 6：性能采样、视觉证据、订阅导入和可分发产物。详见 `docs/development/stage-6-performance-report.md`。
-- 阶段 7：多订阅库、覆写、DNS/TUN、规则调试器、命令面板、流量记账、诊断包与 CI。详见 `docs/development/ci.md`。
-- 当前边界：TUN 仅探测，不激活；macOS/Linux 系统集成未实现；Android 真实 Mihomo Native/TUN 未接入。
-- 平台验证边界：桌面仅在 Windows 10 x64 完成运行验收；macOS 和 Linux 仍为 `unverified`。
+### 订阅
 
-## 安装与实测
+- **多订阅库**：保存多份订阅并随时切换生效项，每份独立存储、可单独删除。
+- **多种导入方式**：订阅链接、Clash / Mihomo YAML，或 `ss://` `vmess://` `vless://` `trojan://` `hysteria2://` `tuic://` 分享链接（自动转换）。
+- **流量与到期**：解析服务商的 `subscription-userinfo` 响应头，显示已用流量、总量进度与到期时间。
+- **覆写**：每份订阅可单独保存自定义规则与覆写 YAML，刷新订阅不会丢失；控制项（端口、密钥、`allow-lan` 等）始终由 FlowProxy 接管，覆写无法覆盖。
+- **自动更新**：启动时更新与定时更新（预设间隔或 1–168 小时自定义），可配置更新后自动重启核心。
+- **Sub-Store 对接**：填写后端地址与 `x-api-token`，列出并一键导入。
 
-桌面端安装包自带已校验的 Mihomo 核心与 geodata，安装后无需再手动放置文件。
+### 代理
 
-1. 运行 `FlowProxy_<version>_x64-setup.exe`，按当前用户安装（不要求管理员权限）。
-2. 启动后进入 **Profiles** 页面，粘贴订阅 YAML 或填写订阅 URL，点击 **Import subscription**。
-3. 回到 **Overview**，点击 hero 区域下方的 **Connect**。
-4. 状态变为 `Connected` 后，Proxies 页面会列出订阅里的真实节点。
-5. 需要走系统代理时，在 **Settings → System integration** 打开 **System proxy**。
-6. 界面语言在 **Settings → Appearance → Language** 切换（中文 / English），选择会持久化；旧版 `settings.json` 没有该字段时按系统语言初始化。
+- 规则 / 全局 / 直连三种模式，运行中即可切换，无需重启。
+- 代理组支持按名称搜索、按延迟或名称排序、折叠、置顶常用节点，这些视图状态会被记住。
+- 单节点测速、整组测速、一键测速全部组；测速历史按时间倒序保留在页面上。
 
-Settings 页面按 `配置模式`（简易 / 标准 / 宽松）显示不同数量的分组，全部为单列全宽卡片，顶部有分组导航。除主题、语言与系统集成外，还包括：
+### 观测
 
-- **窗口与启动**：关闭按钮行为（隐藏到托盘 / 退出）、静默启动、启动后自动连接、开机启动。
-- **订阅**：启动时更新、自动更新间隔（预设或 1–168 小时自定义）、订阅 User-Agent、
-  更新后自动重启核心；也可在此对接外部 Sub-Store 服务后一键导入（宽松模式）。
-- **日志**：Runtime 事件写入按天滚动的日志文件，可设置保留天数、打开目录、清空文件；
-  可一键导出脱敏诊断包（环境、设置摘要、日志；订阅 URL、Token 与密钥已移除）。
-- **内核版本**：可登记并切换多份 Mihomo 构建。登记时记录校验值，切换前重新核对；
-  换核在下次启动时生效，内置核心始终可回退。
-- **核心与高级内核**：日志级别、IPv6、统一延迟、并发 TCP、固定混合端口、延迟测试地址与超时。
-- **系统集成**：系统代理开关与可配置的旁路列表、TUN（已提权且装了 Wintun 时可开启）、
-  开机启动。
-  系统代理开关会被记住：退出时把三项注册表值（开关、地址、旁路列表）还原为
-  用户原值，下次启动核心连接后再自动重新应用。
-- **DNS**：以 `dns:` 块写入当前订阅的覆写（预设 Cloudflare / 阿里 / 谷歌 / 系统，
-  或自定义解析服务器与 Fake-IP 地址段），刷新订阅不会丢失。
-- **托盘**：菜单与提示中显示状态与当前节点、代理模式（规则 / 全局 / 直连，点击即切换）、
-  打开日志目录；托盘图标可绘制实时上下行速率（图标数字 / 仅提示 / 不显示）。
-- **动画效果**：完整 / 减少。
+- 概览页显示实时上下行速率、流量曲线、会话时长，以及由 FlowProxy 自己记账的**今日**与**近 7 天**累计流量（核心重启不清零）。
+- 连接页可展开单条连接的完整详情（域名、目标地址、命中规则、链路、上传量、建立时间），支持搜索与一键全部关闭。
+- 规则页显示每条规则当前命中的连接数，并列出配置里的规则集与代理集来源。
+- **规则调试器**：输入域名或 IP，按顺序评估规则表，告诉你哪条规则会决定路由；无法评估的规则类型（GEO、规则集、进程名等）会明确列出而不是假装判断。
+- 日志页支持级别筛选、搜索、暂停与清空视图。
 
-页面上的常用操作：
+### 系统
 
-- **订阅**：可保存多份订阅并随时切换；显示服务商在 `subscription-userinfo` 中给出的
-  已用流量、总量与到期时间；每份订阅可保存自定义规则与覆写 YAML。
-- **概览**：除本次会话流量外，还显示「今日」与「近 7 天」累计流量。这份统计由
-  FlowProxy 自己按天记账（`traffic.json`），核心重启后不会归零。
-- **代理组**：按名称搜索组或节点，按延迟 / 名称排序，一键测速全部组；可折叠分组，
-  可置顶常用节点；排序、折叠与置顶状态都会记住；页面底部列出已记录的测速历史。
-- **规则**：带搜索框；显示每条规则当前命中的连接数；列出配置里的规则集与代理集来源；
-  底部有规则调试器，输入域名或 IP 即可看到会命中哪条规则（仅评估域名与 IP 类规则，
-  跳过的规则会明确告知）。
-- **连接**：带搜索框；点开一行可看完整详情（域名、目标地址、规则、链路、上传量、
-  建立时间）；可一键全部关闭。
-- **日志**：带搜索框；可暂停、清空视图。清空视图只影响屏幕，磁盘上的日志文件不受影响。
-- **任意页面**：`Ctrl/Cmd + K` 打开命令面板，可跳转页面、切换代理模式、直接选中节点。
+- Windows 当前用户系统代理（注册表三项），带 journal 备份与还原，退出时恢复用户原值、下次启动自动重新应用。
+- 系统代理旁路列表可配置，同样纳入备份还原。
+- TUN 开关：进程已提权且系统装有 Wintun 驱动时可开启，以 `tun:` 块写入当前订阅的覆写。
+- 开机启动、静默启动、启动后自动连接。
+- 系统托盘：状态与当前节点、代理模式切换、打开日志目录、实时速率图标。
+- 按天滚动的日志文件，可设置保留天数；一键导出**脱敏**诊断包（不含订阅 URL、Token 与密钥，不联网）。
 
-订阅能力的完整边界见 `docs/development/subscription-scope.md`。
+### 效率
 
-安装包的内置资源：
+- `Ctrl/Cmd + K` 命令面板：跳转页面、切换代理模式、直接选中节点。
 
-- `resources/mihomo/mihomo.exe`：Mihomo `v1.19.33`，启动前校验 SHA-256。
-- `resources/geodata/geosite.dat`、`geoip.metadb`：订阅里的 `GEOIP`/`GEOSITE` 规则依赖它们；缺失时 Mihomo 会联网下载并在离线环境超时失败。
+---
 
-构建安装包前先准备资源：
+## 快速开始
+
+### 安装
+
+运行安装包 `FlowProxy_<version>_x64-setup.exe`，按当前用户安装，不需要管理员权限。安装包已捆绑校验过的 Mihomo 核心与 geodata，无需手动放置文件。
+
+### 第一次使用
+
+1. 打开 **订阅** 页面，粘贴订阅 YAML 或填写订阅链接，点击 **导入订阅**。
+2. 回到 **概览**，点击 **连接**。
+3. 状态变为「已连接」后，**代理组** 页面会列出订阅里的真实节点。
+4. 需要接管系统流量时，在 **设置 → 系统集成** 打开 **系统代理**。
+5. 界面语言在 **设置 → 外观 → 语言** 切换（中文 / English），选择会持久化。
+
+> 导入订阅或修改覆写后如果核心已在运行，需要重启核心才能加载新配置。开启「更新后重启」后，自动更新会自行完成这一步。
+
+---
+
+## 界面说明
+
+### 概览
+
+连接 / 断开、实时速率、流量曲线、会话时长、今日与近 7 天流量、当前代理组与节点选择、延迟测量、节点地图、活动连接数。
+
+### 代理组
+
+三种路由模式；组与节点的搜索、排序、折叠与置顶；单节点与整组测速；页面底部为测速历史。核心未运行时显示订阅里的离线预览，并明确标注为只读。
+
+### 规则
+
+规则表、搜索、每条规则的实时命中数、规则集与代理集来源、规则调试器。
+
+### 连接
+
+连接列表、搜索、单条详情、单条关闭、全部关闭（带确认）、分页。
+
+### 订阅
+
+订阅库（切换 / 删除）、导入表单、更新订阅、批量测速、用量面板、自定义规则与覆写 YAML 编辑。
+
+### 日志
+
+实时事件、级别筛选、搜索、暂停、清空视图、打开日志目录。
+
+### 设置
+
+按「配置模式」（简易 / 标准 / 宽松）显示不同数量的分组，全部为单列全宽卡片，顶部有分组导航。详见下一节。
+
+---
+
+## 设置项
+
+| 分组 | 内容 |
+| --- | --- |
+| 外观 | 主题（Cyber Flow / Warm Flow）、语言、界面缩放、设置模式 |
+| 窗口与启动 | 关闭按钮行为（隐藏到托盘 / 退出）、静默启动、启动后自动连接、开机启动 |
+| 系统集成 | 系统代理开关、旁路列表、TUN 开关、启动项状态 |
+| 订阅 | 启动时更新、自动更新间隔、更新后自动重启、订阅 User-Agent |
+| 日志 | 写入磁盘、保留天数、打开目录、导出诊断包、清空文件 |
+| 核心 | 日志级别、IPv6 |
+| 内核版本 | 登记、切换、回退 Mihomo 构建 |
+| 托盘 | 显示状态与节点、速率显示方式（图标数字 / 仅提示 / 不显示）、动画效果 |
+| 高级内核 | 统一延迟、并发 TCP、固定混合端口、延迟测试地址与超时 |
+| DNS | 预设或自定义解析服务器、Fake-IP 地址段 |
+| Sub-Store | 后端地址、Token、列出并导入订阅 |
+
+---
+
+## 数据存放位置
+
+| 内容 | 位置 |
+| --- | --- |
+| 设置 | 应用配置目录下的 `settings.json` |
+| 订阅原文与元数据 | `<配置目录>/mihomo/subscriptions/` |
+| 生效订阅索引 | `<配置目录>/mihomo/subscriptions.json` |
+| 生成的运行配置 | `<配置目录>/mihomo/config.yaml` |
+| 系统代理 journal | `<配置目录>/system-proxy.json` |
+| 每日流量记账 | `<配置目录>/traffic.json` |
+| 内核版本索引与构建 | `<配置目录>/cores/` |
+| 日志 | 系统应用日志目录下的按天文件 |
+
+Windows 上应用配置目录通常为 `%APPDATA%\com.flowproxy.desktop`。以上文件均为明文，**不做加密**；订阅文件里含服务商凭据，按文件权限保护。
+
+---
+
+## 系统集成与安全边界
+
+### 托管什么
+
+Mihomo 的控制端口、API 密钥、代理监听端口、`allow-lan` 与绑定地址**不由订阅决定**。导入订阅时这些顶层键会被移除，替换为 FlowProxy 在启动时生成的值：
+
+| 被移除的键 | FlowProxy 写入的值 |
+| --- | --- |
+| `mixed-port`、`port`、`socks-port`、`redir-port`、`tproxy-port` | 预留的回环端口 |
+| `external-controller` 及其变体 | 命令行 `-ext-ctl 127.0.0.1:<端口>` |
+| `secret` | 每次启动随机生成，经 `-secret` 传入 |
+| `allow-lan` | `false` |
+| `bind-address`、`lan-allowed-ips`、`lan-disallowed-ips` | `127.0.0.1` |
+| `authentication`、`external-ui` | 移除 |
+
+订阅的其余部分逐字节保留，包括注释、锚点与规则顺序。
+
+### 校验
+
+- 核心二进制在执行前同时校验 SHA-256 与 `-v` 版本输出。
+- 配置在生效前执行 `mihomo -t -d <工作目录> -f <文件>`。
+- 订阅 URL 仅允许 `http://` 与 `https://`，限制长度与字符；下载有超时、体积上限与重定向规则，`https` 不允许降级到 `http`。
+- 订阅 URL 内嵌令牌，因此**不会出现在任何日志或错误消息中**。
+- 订阅标识符经过校验，不能用于路径穿越。
+
+### 平台状态
+
+| 平台 | 状态 |
+| --- | --- |
+| Windows 10 x64 | 已实测：真实核心、系统代理、开机启动、托盘、TUN（需提权 + Wintun） |
+| macOS / Linux | 未验证：不调用未经验证的系统修改后端，能力状态显示为 `unverified` |
+| Android | 界面、主题与 `VpnService` 骨架已完成；真实 Mihomo Native 与 TUN 尚未接入 |
+
+---
+
+## 本地开发
+
+```powershell
+pnpm install
+pnpm dev          # 只启动前端，用于界面调试
+pnpm tauri:dev    # 启动完整桌面应用
+```
+
+可选的环境变量（离线或需要代理时）：
+
+```powershell
+$env:CARGO_HOME = 'F:\codex-install\cargo-home'
+$env:CARGO_TARGET_DIR = 'F:\codex-install\cargo-target'
+$env:CARGO_NET_OFFLINE = 'true'
+$env:HTTP_PROXY = 'http://127.0.0.1:7890'
+$env:HTTPS_PROXY = 'http://127.0.0.1:7890'
+$env:NO_PROXY = 'localhost,127.0.0.1'
+```
+
+如果开发构建里没有捆绑核心，可以指向一个已校验的可执行文件：
+
+```powershell
+$env:FLOWPROXY_MIHOMO_PATH = 'F:\path\to\mihomo.exe'
+```
+
+### 核心查找顺序
+
+启动时按以下顺序查找，命中后校验 SHA-256 与版本：
+
+1. `FLOWPROXY_MIHOMO_PATH` 指向的文件
+2. `flowproxy-desktop.exe` 同目录的 `mihomo.exe`
+3. 同目录 `resources\mihomo.exe`
+4. 同目录 `resources\mihomo\mihomo.exe`（安装包默认布局）
+5. 同目录 `mihomo\mihomo.exe`
+6. 配置目录下 `mihomo\mihomo.exe`
+
+若在 **内核版本** 中登记并启用了自定义构建，则优先使用该构建。
+
+### 构建安装包
 
 ```powershell
 node scripts/prepare-bundle-resources.mjs
-
-$env:CARGO_NET_OFFLINE = 'true'
-pnpm tauri build --bundles nsis
+pnpm tauri:build
 ```
 
 `apps/desktop/src-tauri/resources/` 不入库（约 74 MB 二进制），由上述脚本按固定哈希复制。
 
-
-## 本地运行
-
-依赖安装和构建缓存统一放在 `F:\codex-install`。当前网络环境访问 crates.io 不稳定时，可使用已经锁定的 Cargo 依赖离线构建。
-
-```powershell
-$env:HTTP_PROXY = 'http://192.168.1.2:7890'
-$env:HTTPS_PROXY = 'http://192.168.1.2:7890'
-$env:NO_PROXY = 'localhost,127.0.0.1'
-$env:CARGO_HOME = 'F:\codex-install\cargo-home'
-$env:CARGO_TARGET_DIR = 'F:\codex-install\cargo-target'
-
-pnpm install
-pnpm dev
-pnpm tauri:dev
-```
-
-## Mihomo 准备
-
-阶段 3 锁定 Mihomo `v1.19.33`，Windows x64 可执行文件的 SHA-256 为：
-
-```text
-1cde41cfffd3de0aedad63c0a8515e1ce5eea507e8133aed0f637d316c93800a
-```
-
-应用启动时会按以下顺序查找可执行文件，并在执行前同时校验 SHA-256 和 `-v` 版本输出：
-
-1. 环境变量 `FLOWPROXY_MIHOMO_PATH` 指向的文件。
-2. `flowproxy-desktop.exe` 同目录下的 `mihomo.exe`。
-3. `flowproxy-desktop.exe` 同目录下 `resources\mihomo.exe`。
-4. `flowproxy-desktop.exe` 同目录下 `resources\mihomo\mihomo.exe`（安装包的默认布局）。
-5. `flowproxy-desktop.exe` 同目录下 `mihomo\mihomo.exe`。
-6. Tauri 应用配置目录下 `mihomo\mihomo.exe`，Windows 通常为 `%APPDATA%\com.flowproxy.desktop\mihomo\mihomo.exe`。
-
-开发时若不想重新打包，可以直接指定已校验的文件：
-
-```powershell
-$env:FLOWPROXY_MIHOMO_PATH = 'F:\codex-install\mihomo\v1.19.33\mihomo-windows-amd64.exe'
-```
-
-安装包已捆绑 Mihomo 与 geodata，无需手动放置。开发构建（`pnpm tauri:dev`、`pnpm tauri build` 且未跑资源准备脚本）不含核心；文件缺失、哈希不符或版本不符时，应用仍可启动，但 Runtime 会显示不可用并拒绝启动核心。
-
-Mihomo 运行时使用应用配置目录下生成的 `mihomo\config.yaml`。导入订阅后，该文件由「订阅原文 + FlowProxy 受控块」生成：订阅里的端口、控制端、secret、`allow-lan`、`bind-address` 和 `authentication` 一律被移除并替换。控制端与 secret 另外通过命令行 `-ext-ctl` / `-secret` 覆盖。候选配置执行 `mihomo -t -d <工作目录> -f <文件>` 校验，`-d` 是必需的——否则带 `GEOIP`/`GEOSITE` 规则的订阅会因为找不到 geodata 而联网超时失败。Windows 系统代理只会在 Runtime 已连接、Settings 中显式启用后切换到 Mihomo 的受控回环端口；Stop、Restart、崩溃恢复、受控退出和下次启动的 Journal 恢复会按所有权规则还原或保护用户改动。本阶段不创建或激活 TUN。
+---
 
 ## 检查与构建
 
 ```powershell
 pnpm lint
 pnpm typecheck
-pnpm test
+pnpm test                      # 前端单元测试
 pnpm build
-node scripts/verify-locale-keys.mjs
+node scripts/verify-locale-keys.mjs   # 中英语言包键一致性
 
 cargo fmt --all -- --check
-cargo test --workspace
 cargo clippy --workspace --all-targets -- -D warnings
-
-pnpm audit
-& 'F:\codex-install\cargo-tools\bin\cargo-audit.exe' audit --file Cargo.lock
+cargo test --workspace
 ```
 
-已实际验证的无安装包 release 构建：
+当前状态：前端 131 项测试、Rust 223 项测试全部通过；`clippy -D warnings` 无告警；中英语言包 525 个键一致。
 
-```powershell
-$env:CARGO_NET_OFFLINE = 'true'
-pnpm tauri build --no-bundle
+仓库内配置了 GitHub Actions（`.github/workflows/verify.yml`），在推送与 PR 时运行上述检查；依赖审计只报告不阻断。详见 `docs/development/ci.md`。
+
+`scripts/` 下的其它 `verify-*.mjs` 是本地验收脚本：它们会启动已安装的程序并通过 CDP 驱动界面，不属于 CI 范围。
+
+---
+
+## 仓库结构
+
+```
+apps/
+  desktop/          Tauri 桌面端（React + TypeScript + Rust）
+  android/          Android 端（Kotlin + Jetpack Compose）
+crates/
+  flowproxy-contracts   跨端共享的数据契约
+  flowproxy-runtime     运行时状态机与日志
+  mihomo-manager        Mihomo 子进程、控制 API、订阅与配置
+  flowproxy-platform    平台能力（系统代理、开机启动、TUN 探测）
+packages/
+  design-tokens     桌面与 Android 共享的设计令牌
+docs/              产品、界面、架构与各阶段报告
+scripts/           资源准备、验收与校验脚本
 ```
 
-生成程序位于 `F:\codex-install\cargo-target\release\flowproxy-desktop.exe`。生产组合根连接真实 Mihomo adapter；Overview、Proxies、Rules、Connections、Profiles 和 Logs 的数据均来自运行时控制 API，不可用或未启动时显示明确空态/错误态，不以 Mock 数据冒充真实状态。
+---
 
-Windows 上的 `DIRECT` 延迟测试受外部测试目标影响，可能返回 HTTP 503；这是阶段 3 已记录的已知限制，不代表控制 API 或代理进程失效。
+## 文档索引
+
+- 产品：`docs/product/product-requirements.md`
+- 界面：`docs/ui-design/design-reference.md`、`theme-cyber-flow.md`、`theme-warm-flow.md`、`mascot-guidelines.md`、`component-specification.md`
+- 架构：`docs/architecture/system-architecture.md`、`desktop-tauri-rust.md`、`android-architecture.md`、`performance-requirements.md`、`platform-support-matrix.md`、`adr-0001-desktop-stack.md`
+- 开发：`docs/development/` 下的阶段报告（1–6）、`subscription-scope.md`（订阅能力边界）、`i18n-scope.md`、`ci.md`
+- 视觉参考：`assets/design-reference/`
+
+---
+
+## 已确认的产品决策
+
+1. 产品名：FlowProxy。
+2. 目标平台：Windows、macOS、Linux、Android。
+3. 代理核心：Mihomo，由 FlowProxy 自行分发、启动、监控与管理。
+4. 桌面技术栈：React + TypeScript + Tauri + Rust。
+5. Android：Kotlin + Jetpack Compose，使用 Android `VpnService`。
+6. 主题：默认 Cyber Flow，可切换 Warm Flow。
+7. 关闭主窗口默认隐藏到托盘并继续运行，可在设置中改为退出。
+8. 性能优先：控制 CPU、内存、后台轮询与动画开销。
+9. UI 以设计参考图为基准，适配分辨率时保持布局关系与视觉层级，不机械固定像素。
+10. Android 与桌面共享设计令牌与数据契约，不强求共享 UI 代码。
+
+---
+
+## 当前阶段与边界
+
+### 已完成
+
+- 阶段 1：桌面 UI 原型
+- 阶段 2：Runtime 骨架、原生设置与受控退出
+- 阶段 3：Windows 上的真实 Mihomo 子进程、控制 API 与真实数据页面
+- 阶段 4：Windows 系统代理、开机启动、恢复 journal 与能力状态
+- 阶段 5：Android Compose UI、A/C 主题、`VpnService` 授权与前台服务
+- 阶段 6：性能采样、订阅导入与可分发产物
+- 阶段 7：多订阅库、覆写、DNS / TUN、规则调试器、命令面板、流量记账、诊断包与 CI
+
+### 当前限制
+
+- TUN 需要进程已提权且系统装有 Wintun；未满足时开关禁用并说明原因。
+- macOS / Linux 的系统集成保持 `unverified`，不调用未验证的修改后端。
+- Android 的真实 Mihomo Native 与 TUN 尚未接入。
+- 只支持一份生效订阅；订阅库是并列的多份配置，没有「同一订阅的上一版」回滚。
+- 应用自身不自动更新；内核版本需要手动放入并登记。
+
+---
 
 ## 维护说明
 
-提交以远程仓库贡献者身份为准；文档更新与对应阶段报告的改动请一并提交，保持 README 与 `docs/` 内容同步。
-
-阶段 2 的具体测试结果、截图和残余风险见 `docs/development/stage-2-runtime-report.md`。阶段 3 的完整验收结果、截图与残余风险见 `docs/development/stage-3-mihomo-report.md`。阶段 4 的系统集成结果、A/C 截图和残余风险见 `docs/development/stage-4-system-integration-report.md`。
+文档更新请与对应代码改动一并提交，保持本 README 与 `docs/` 内容同步。中文版为默认版本，英文版（`README.en.md`）需同步修改。
