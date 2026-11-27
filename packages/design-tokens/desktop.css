@@ -58,6 +58,54 @@
   --hero-grid: rgba(121, 158, 255, 0.08);
 }
 
+/* Cyber Flow, light appearance: the same cool accent family on a light canvas.
+   Selected by the appearance preference, not by the theme picker. */
+:root[data-theme="cyber_flow"][data-appearance="light"] {
+  --canvas: #eef2fb;
+  --canvas-soft: #f5f8ff;
+  --canvas-deep: #e3e9f7;
+  --sidebar: #fafcff;
+  --sidebar-border: rgba(60, 88, 160, 0.12);
+  --panel: rgba(255, 255, 255, 0.94);
+  --panel-strong: #ffffff;
+  --panel-soft: #edf2fb;
+  --panel-highlight: rgba(22, 140, 255, 0.1);
+  --text-primary: #16213d;
+  --text-secondary: #5c6b8c;
+  --text-faint: #8a95ad;
+  --accent: #0b6fe0;
+  --accent-rgb: 11, 111, 224;
+  --accent-cyan: #0d99c4;
+  --accent-cyan-rgb: 13, 153, 196;
+  --accent-violet: #5b47c9;
+  --accent-violet-rgb: 91, 71, 201;
+  --success: #0f9e6e;
+  --success-rgb: 15, 158, 110;
+  --warning: #d98214;
+  --danger: #d63f5c;
+  --border: rgba(60, 88, 160, 0.14);
+  --border-strong: rgba(60, 88, 160, 0.24);
+  --border-subtle: rgba(60, 88, 160, 0.09);
+  --shadow-card: 0 18px 44px rgba(40, 62, 110, 0.12);
+  --shadow-soft: 0 10px 26px rgba(40, 62, 110, 0.09);
+  --nav-active: rgba(11, 111, 224, 0.12);
+  --nav-active-text: #0b5cb4;
+  --nav-icon: #71819f;
+  --titlebar: rgba(250, 252, 255, 0.78);
+  --chart-grid: rgba(70, 100, 170, 0.12);
+  --chart-upload: #0d99c4;
+  --chart-download: #4f5fd0;
+  --map-water: #e7f0fb;
+  --map-land: #c6d8f0;
+  --map-land-secondary: #d7e4f5;
+  --map-line: rgba(50, 90, 170, 0.2);
+  --map-label: #6f81a1;
+  --input-bg: #f3f6fc;
+  --backdrop: #dfe6f4;
+  --theme-card-radius: 14px;
+  --hero-grid: rgba(60, 100, 180, 0.07);
+}
+
 :root[data-theme="warm_flow"] {
   --canvas: #f3efed;
   --canvas-soft: #f8f5f3;

@@ -160,6 +160,7 @@ describe("SettingsProvider", () => {
       settings_mode: "standard",
       silent_start: false,
       motion: "full",
+      appearance: "system",
       tray_show_info: true,
       tray_speed_display: "icon",
       log_to_file: true,

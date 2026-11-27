@@ -9,6 +9,7 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   SunMedium,
+  SunMoon,
   Timer,
   Waves,
   Wifi,
@@ -39,6 +40,7 @@ import {
 } from "../../shared/settingsLimits";
 import type { TraySpeedDisplay } from "../../platform/settings";
 import type { MotionPreference } from "../../shared/motion";
+import type { AppearancePreference } from "../../shared/appearance";
 import { useBridgeResource } from "../../app/runtime/useBridgeResource";
 import { getSubscriptionSnapshot, setSubscriptionOverrideYaml } from "../../platform/runtime";
 import { applyOverrideBlock } from "./overrideBlock";
@@ -128,6 +130,28 @@ const closeOptions: Array<{
   },
 ];
 
+const appearanceOptions: Array<{
+  id: AppearancePreference;
+  labelKey: string;
+  captionKey: string;
+}> = [
+  {
+    id: "system",
+    labelKey: "settings.appearanceSystem",
+    captionKey: "settings.appearanceSystemCaption",
+  },
+  {
+    id: "light",
+    labelKey: "settings.appearanceLight",
+    captionKey: "settings.appearanceLightCaption",
+  },
+  {
+    id: "dark",
+    labelKey: "settings.appearanceDark",
+    captionKey: "settings.appearanceDarkCaption",
+  },
+];
+
 const logLevelOptions: Array<{ id: CoreLogLevel; labelKey: string }> = [
   { id: "silent", labelKey: "settings.logSilent" },
   { id: "error", labelKey: "settings.logError" },
@@ -169,6 +193,7 @@ export function SettingsPage() {
     updateSettingsMode,
     updateSilentStart,
     updateMotion,
+    updateAppearance,
     updateTrayShowInfo,
     updateTraySpeedDisplay,
   } = useAppSettings();
@@ -311,6 +336,29 @@ export function SettingsPage() {
               />
             ))}
           </div>
+
+          <SettingsSubheading
+            kicker={t("settings.appearanceKicker2")}
+            title={t("settings.appearanceMode")}
+            icon={<SunMoon aria-hidden="true" size={16} />}
+          />
+          <div
+            className="workspace-option-grid"
+            role="group"
+            aria-label={t("settings.appearanceMode")}
+          >
+            {appearanceOptions.map(({ id, labelKey, captionKey }) => (
+              <SettingsOption
+                key={id}
+                pressed={settings.appearance === id}
+                disabled={controlsDisabled}
+                onClick={() => void updateAppearance(id)}
+                title={t(labelKey)}
+                caption={t(captionKey)}
+              />
+            ))}
+          </div>
+          <p className="settings-inline-hint">{t("settings.appearanceHint")}</p>
 
           <SettingsSubheading
             kicker={t("settings.uiScaleLabel")}

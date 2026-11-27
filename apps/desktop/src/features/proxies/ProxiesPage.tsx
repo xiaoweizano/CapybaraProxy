@@ -1,14 +1,13 @@
 import {
   ChevronDown,
-  CircleCheck,
-  Star,
   CircleDashed,
-  Gauge,
   History,
+  LayoutGrid,
   Radio,
   Search,
   Server,
   Timer,
+  Rows3,
 } from "lucide-react";
 import { useDeferredValue, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -20,13 +19,20 @@ import {
   type ProxyNode,
   type RoutingMode,
 } from "../../platform/runtime";
+import { ProxyNodeList } from "./ProxyNodeList";
+import { LatencySparkline } from "./LatencyChart";
+import { ConnectionsSidePane } from "./ConnectionsSidePane";
+import { nodeHistory } from "./latencySeries";
 import {
   readStoredCollapsed,
   readStoredFavorites,
+  readStoredLayout,
   readStoredSort,
   writeStoredCollapsed,
   writeStoredFavorites,
+  writeStoredLayout,
   writeStoredSort,
+  type NodeLayout,
   type NodeSort,
 } from "../../shared/proxyView";
 import {
@@ -144,6 +150,12 @@ export function ProxiesPage() {
   const [favorites, setFavorites] = useState<Set<string>>(() =>
     readStoredFavorites(window.localStorage),
   );
+  const [nodeLayout, setNodeLayout] = useState<NodeLayout>(() =>
+    readStoredLayout(window.localStorage),
+  );
+  // Split view pins the live connections beside the groups, so selecting a
+  // node and watching what flows happen on one screen.
+  const [splitView, setSplitView] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const deferredQuery = useDeferredValue(query);
   const [testedDelays, setTestedDelays] = useState<Record<string, number | null>>(
@@ -206,6 +218,11 @@ export function ProxiesPage() {
   const setSort = (next: NodeSort) => {
     setSortState(next);
     writeStoredSort(window.localStorage, next);
+  };
+
+  const changeLayout = (next: NodeLayout) => {
+    setNodeLayout(next);
+    writeStoredLayout(window.localStorage, next);
   };
 
   const toggleFavorite = (name: string) => {
@@ -320,6 +337,7 @@ export function ProxiesPage() {
       </section>
 
       {(isConnected ? proxyGroups.length : offlineGroups.length) > 0 ? (
+        <>
         <div className="proxy-toolbar">
           <label className="proxy-search">
             <Search aria-hidden="true" size={15} />
@@ -348,6 +366,46 @@ export function ProxiesPage() {
               </button>
             ))}
           </div>
+          <button
+            className="workspace-action-button"
+            type="button"
+            aria-pressed={splitView}
+            title={
+              splitView ? t("proxies.splitOff") : t("proxies.splitOn")
+            }
+            onClick={() => setSplitView((current) => !current)}
+          >
+            {t("proxies.splitToggle")}
+          </button>
+          <div
+            className="workspace-segmented"
+            role="group"
+            aria-label={t("proxies.layoutLabel")}
+          >
+            {([
+              ["list", Rows3],
+              ["cards", LayoutGrid],
+            ] as const).map(([value, Icon]) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={nodeLayout === value}
+                aria-label={
+                  value === "list"
+                    ? t("proxies.layoutList")
+                    : t("proxies.layoutCards")
+                }
+                title={
+                  value === "list"
+                    ? t("proxies.layoutList")
+                    : t("proxies.layoutCards")
+                }
+                onClick={() => changeLayout(value)}
+              >
+                <Icon aria-hidden="true" size={14} />
+              </button>
+            ))}
+          </div>
           {isConnected && proxyGroups.length > 0 ? (
             <button
               className="workspace-action-button proxy-toolbar-action"
@@ -362,6 +420,8 @@ export function ProxiesPage() {
             </button>
           ) : null}
         </div>
+        <p className="proxy-keyboard-hint">{t("proxies.keyboardHint")}</p>
+        </>
       ) : null}
 
       {notice ? (
@@ -443,7 +503,8 @@ export function ProxiesPage() {
           {t("proxies.searchEmpty", { query: deferredQuery.trim() })}
         </p>
       ) : (
-        <div className="proxy-groups">
+        <div className={splitView ? "proxy-split" : undefined}>
+          <div className="proxy-groups">
           {visibleGroups.map((group) => (
             <section
               className="workspace-panel proxy-group-panel"
@@ -502,110 +563,28 @@ export function ProxiesPage() {
               </div>
 
               <div
-                className="proxy-node-list"
                 id={`group-nodes-${group.name}`}
                 hidden={collapsedGroups.has(group.name)}
               >
-                {sortNodes(group.nodes, sort, testedDelays, favorites).map((node) => {
-                  const selected = node.name === group.selected;
-                  const delay = testedDelays[node.name] ?? node.delay_ms;
-
-                  return (
-                    <div
-                      className={`proxy-node${selected ? " is-selected" : ""}`}
-                      key={node.name}
-                    >
-                      <span className="proxy-node-state" aria-hidden="true">
-                        {selected ? (
-                          <CircleCheck size={16} />
-                        ) : (
-                          <Radio size={15} />
-                        )}
-                      </span>
-                      <span className="proxy-node-details">
-                        <strong>
-                          {favorites.has(node.name) ? (
-                            <Star
-                              className="proxy-node-favorite-mark"
-                              aria-hidden="true"
-                              size={12}
-                            />
-                          ) : null}
-                          {node.name}
-                        </strong>
-                        <small>
-                          {node.proxy_type} / UDP {node.udp ? "on" : "off"}
-                        </small>
-                      </span>
-                      <span
-                        className="proxy-delay"
-                        data-quality={
-                          delay === null
-                            ? "unknown"
-                            : delay < 100
-                              ? "good"
-                              : delay < 200
-                                ? "medium"
-                                : "poor"
-                        }
-                      >
-                        {delay === null ? t("proxies.notTested") : `${delay} ms`}
-                      </span>
-                      <button
-                        className={
-                          favorites.has(node.name)
-                            ? "workspace-icon-button proxy-favorite is-favorite"
-                            : "workspace-icon-button proxy-favorite"
-                        }
-                        type="button"
-                        aria-pressed={favorites.has(node.name)}
-                        aria-label={
-                          favorites.has(node.name)
-                            ? t("proxies.unfavorite", { name: node.name })
-                            : t("proxies.favorite", { name: node.name })
-                        }
-                        title={
-                          favorites.has(node.name)
-                            ? t("proxies.unfavorite", { name: node.name })
-                            : t("proxies.favorite", { name: node.name })
-                        }
-                        onClick={() => toggleFavorite(node.name)}
-                      >
-                        <Star
-                          aria-hidden="true"
-                          size={15}
-                          fill={favorites.has(node.name) ? "currentColor" : "none"}
-                        />
-                      </button>
-                      <button
-                        className="workspace-icon-button"
-                        type="button"
-                        aria-label={t("proxies.testDelay", { name: node.name })}
-                        title={t("proxies.testDelay", { name: node.name })}
-                        disabled={pendingDelay !== null || pendingGroup !== null}
-                        onClick={() => void testDelay(node)}
-                      >
-                        <Gauge aria-hidden="true" size={15} />
-                      </button>
-                      <button
-                        className="workspace-action-button"
-                        type="button"
-                        aria-label={t("proxies.selectNode", { name: node.name })}
-                        disabled={pendingSelection !== null || selected}
-                        onClick={() => void chooseProxy(group.name, node)}
-                      >
-                        {selected
-                          ? t("proxies.selected")
-                          : pendingSelection === node.name
-                            ? t("proxies.selecting")
-                            : t("proxies.select")}
-                      </button>
-                    </div>
-                  );
-                })}
+                <ProxyNodeList
+                  groupName={group.name}
+                  nodes={sortNodes(group.nodes, sort, testedDelays, favorites)}
+                  selectedName={group.selected}
+                  favorites={favorites}
+                  delays={testedDelays}
+                  pendingSelection={pendingSelection}
+                  pendingDelay={pendingDelay}
+                  pendingGroupTest={pendingGroup !== null}
+                  layout={nodeLayout}
+                  onSelect={(node) => void chooseProxy(group.name, node)}
+                  onTest={(node) => void testDelay(node)}
+                  onToggleFavorite={toggleFavorite}
+                />
               </div>
             </section>
           ))}
+          </div>
+          {splitView ? <ConnectionsSidePane /> : null}
         </div>
       )}
     </WorkspacePage>
@@ -621,8 +600,13 @@ export function ProxiesPage() {
 function LatencyHistoryCard() {
   const { t } = useTranslation();
   const history = useBridgeResource(getDelayHistory, true);
-  const entries = [...(history.data?.entries ?? [])].reverse().slice(0, 40);
+  const all = history.data?.entries ?? [];
+  const entries = [...all].reverse().slice(0, 40);
   const now = history.data?.now_ms ?? 0;
+  // Chart the node measured most recently: it is the one the operator is
+  // looking at, and charting every node at once is unreadable.
+  const chartedNode = entries[0]?.proxy ?? null;
+  const points = chartedNode === null ? [] : nodeHistory(all, chartedNode);
 
   const when = (timestamp: number): string => {
     if (now <= 0 || timestamp <= 0) {
@@ -664,6 +648,17 @@ function LatencyHistoryCard() {
       {entries.length === 0 ? (
         <p className="workspace-hint">{t("proxies.historyEmpty")}</p>
       ) : (
+        <>
+        <div className="latency-history-chart">
+          <span className="workspace-kicker">
+            {t("proxies.historyChartFor", { name: chartedNode })}
+          </span>
+          <LatencySparkline
+            points={points}
+            label={t("proxies.historyChartLabel", { name: chartedNode })}
+            emptyLabel={t("proxies.historyEmpty")}
+          />
+        </div>
         <div className="workspace-table-wrap">
           <table className="workspace-table">
             <thead>
@@ -697,6 +692,7 @@ function LatencyHistoryCard() {
             </tbody>
           </table>
         </div>
+        </>
       )}
     </section>
   );

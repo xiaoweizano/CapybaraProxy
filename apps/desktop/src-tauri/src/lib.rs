@@ -602,6 +602,13 @@ fn restore_window_preferences(app: &tauri::AppHandle, settings: &DesktopSettings
                 log_native_error("restoring the main window size", error);
             }
         }
+        // Position is restored after the size: setting one can reflow the
+        // other on some window managers.
+        if let (Some(x), Some(y)) = (settings.window_x, settings.window_y) {
+            if let Err(error) = window.set_position(tauri::PhysicalPosition::new(x, y)) {
+                log_native_error("restoring the main window position", error);
+            }
+        }
     }
 }
 
@@ -619,14 +626,27 @@ fn remember_window_size(window: &tauri::Window) {
         return;
     }
 
+    let position = window.outer_position().ok();
     let app = window.app_handle();
     let state = app.state::<AppState>();
     let mut current = state.settings();
-    if current.window_width == Some(size.width) && current.window_height == Some(size.height) {
+    let same_size =
+        current.window_width == Some(size.width) && current.window_height == Some(size.height);
+    let same_position = match position {
+        Some(position) => {
+            current.window_x == Some(position.x) && current.window_y == Some(position.y)
+        }
+        None => true,
+    };
+    if same_size && same_position {
         return;
     }
     current.window_width = Some(size.width);
     current.window_height = Some(size.height);
+    if let Some(position) = position {
+        current.window_x = Some(position.x);
+        current.window_y = Some(position.y);
+    }
 
     if let Err(error) = state.update_settings(current) {
         log_native_error("remembering the main window size", &error);

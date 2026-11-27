@@ -445,32 +445,65 @@
   }
 }
 
+/* One collapsed look, driven either by the window width or by the operator's
+   toggle. The selectors are listed together so the two paths cannot drift. */
+:root[data-sidebar="collapsed"] {
+  --sidebar-width: 78px;
+}
+
+:root[data-sidebar="collapsed"] .sidebar-brand {
+  justify-content: center;
+  padding-inline: 10px;
+}
+
+:root[data-sidebar="collapsed"] .sidebar-brand-mark {
+  width: 36px;
+  height: 28px;
+}
+
+:root[data-sidebar="collapsed"] .sidebar-brand-copy,
+:root[data-sidebar="collapsed"] .sidebar-link-label,
+:root[data-sidebar="collapsed"] .sidebar-foot,
+:root[data-sidebar="collapsed"] .sidebar-collapse-label {
+  display: none;
+}
+
+:root[data-sidebar="collapsed"] .sidebar-nav {
+  padding-inline: 10px;
+}
+
+:root[data-sidebar="collapsed"] .sidebar-link {
+  justify-content: center;
+  padding: 0;
+}
+
 @media (max-width: 900px) {
-  :root {
+  :root:not([data-sidebar="expanded"]) {
     --sidebar-width: 78px;
   }
 
-  .sidebar-brand {
+  :root:not([data-sidebar="expanded"]) .sidebar-brand {
     justify-content: center;
     padding-inline: 10px;
   }
 
-  .sidebar-brand-mark {
+  :root:not([data-sidebar="expanded"]) .sidebar-brand-mark {
     width: 36px;
     height: 28px;
   }
 
-  .sidebar-brand-copy,
-  .sidebar-link-label,
-  .sidebar-foot {
+  :root:not([data-sidebar="expanded"]) .sidebar-brand-copy,
+  :root:not([data-sidebar="expanded"]) .sidebar-link-label,
+  :root:not([data-sidebar="expanded"]) .sidebar-foot,
+  :root:not([data-sidebar="expanded"]) .sidebar-collapse-label {
     display: none;
   }
 
-  .sidebar-nav {
+  :root:not([data-sidebar="expanded"]) .sidebar-nav {
     padding-inline: 10px;
   }
 
-  .sidebar-link {
+  :root:not([data-sidebar="expanded"]) .sidebar-link {
     justify-content: center;
     padding: 0;
   }
@@ -587,4 +620,79 @@
   color: var(--text-faint);
   font-size: 0.875rem;
   text-align: center;
+}
+
+.sidebar-collapse {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: auto;
+  padding: 5px 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--input-bg);
+  color: var(--text-faint);
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: none;
+  cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    color 150ms ease;
+}
+
+.sidebar-collapse:hover {
+  border-color: var(--border-strong);
+  color: var(--accent-cyan);
+}
+
+/* Collapsed: the button keeps its icon and drops the label. */
+:root[data-sidebar="collapsed"] .sidebar-collapse {
+  margin-inline: auto;
+  padding: 5px;
+}
+
+/* --- Wide and high-density displays ------------------------------------- */
+
+/* Ultra-wide: cap the reading width so a 3440px window does not stretch rows
+   into an unreadable line, and centre what is left. */
+.page-viewport {
+  container-type: inline-size;
+}
+
+@media (min-width: 2200px) {
+  .page-viewport > * {
+    max-width: 1840px;
+    margin-inline: auto;
+  }
+}
+
+/* 4K at 150–200% scaling: card grids already auto-fit, but the minimum track
+   is too narrow at these sizes, producing more columns than can be scanned. */
+@media (min-width: 1700px) {
+  .proxy-groups {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr));
+  }
+
+  .overview-middle-grid,
+  .overview-bottom-grid {
+    gap: 18px;
+    grid-template-columns: minmax(0, 1.9fr) minmax(300px, 0.7fr);
+  }
+}
+
+/* Fractional scaling (125%, 150%) makes 1px borders vanish, so hairlines get a
+   slightly stronger colour on the smallest effective sizes. */
+@media (min-resolution: 1.25dppx) and (max-width: 1600px) {
+  :root {
+    --border: rgba(132, 159, 255, 0.2);
+    --border-subtle: rgba(132, 159, 255, 0.14);
+  }
+
+  :root[data-theme="warm_flow"] {
+    --border: rgba(72, 91, 129, 0.14);
+    --border-subtle: rgba(72, 91, 129, 0.1);
+  }
 }

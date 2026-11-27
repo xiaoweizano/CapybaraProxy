@@ -10,6 +10,13 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import {
+  OVERVIEW_CARDS,
+  readHiddenCards,
+  toggleCard,
+  writeHiddenCards,
+  type OverviewCardId,
+} from "../../shared/overviewView";
 import { useBridgeResource } from "../../app/runtime/useBridgeResource";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -20,6 +27,7 @@ import {
 import { useTelemetry } from "../../app/runtime/telemetryStore";
 import { useTheme } from "../../app/theme/themeContext";
 import {
+  getProfiles,
   getTrafficSummary,
   type ProxyGroup,
   type ProxyNode,
@@ -450,6 +458,9 @@ export function OverviewPage() {
     Record<string, number>
   >({});
   const [isMeasuring, setIsMeasuring] = useState(false);
+  const [hiddenCards, setHiddenCards] = useState<Set<OverviewCardId>>(() =>
+    readHiddenCards(window.localStorage),
+  );
   const mountedRef = useRef(true);
   const groups = runtime.proxyGroups;
   const selectedGroup =
@@ -466,6 +477,15 @@ export function OverviewPage() {
     ? (measuredDelays[selectedNode.name] ?? selectedNode.delay_ms)
     : null;
   const isConnected = runtime.snapshot?.state === "connected";
+
+  const toggleCardVisibility = (card: OverviewCardId) => {
+    setHiddenCards((current) => {
+      const next = toggleCard(current, card);
+      writeHiddenCards(window.localStorage, next);
+      return next;
+    });
+  };
+  const shows = (card: OverviewCardId) => !hiddenCards.has(card);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -539,6 +559,8 @@ export function OverviewPage() {
         </p>
       ) : null}
 
+      <FirstRunGuide />
+
       <div className="overview-dashboard">
         <ConnectionHero
           snapshot={runtime.snapshot}
@@ -547,26 +569,38 @@ export function OverviewPage() {
           onStop={() => void runtime.stop()}
         />
         <div className="overview-middle-grid">
-          <ProxySelectionCard
-            group={selectedGroup}
-            groups={groups}
-            nodes={groupNodes}
-            selectedNodeName={selectedNode?.name ?? ""}
-            onGroupChange={selectGroup}
-            onNodeChange={selectNode}
-          />
-          <LatencyCard
-            node={selectedNode}
-            latencyMs={latencyMs}
-            canMeasure={isConnected}
-            isMeasuring={isMeasuring}
-            onMeasure={() => void measureSelectedNodeDelay()}
-          />
+          {shows("selection") ? (
+            <ProxySelectionCard
+              group={selectedGroup}
+              groups={groups}
+              nodes={groupNodes}
+              selectedNodeName={selectedNode?.name ?? ""}
+              onGroupChange={selectGroup}
+              onNodeChange={selectNode}
+            />
+          ) : null}
+          {shows("latency") ? (
+            <LatencyCard
+              node={selectedNode}
+              latencyMs={latencyMs}
+              canMeasure={isConnected}
+              isMeasuring={isMeasuring}
+              onMeasure={() => void measureSelectedNodeDelay()}
+            />
+          ) : null}
         </div>
-        <div className="overview-bottom-grid">
-          <NodeMap />
-          <ActiveConnectionsCard connected={isConnected} />
-        </div>
+        {shows("nodeMap") || shows("connections") ? (
+          <div className="overview-bottom-grid">
+            {shows("nodeMap") ? <NodeMap /> : null}
+            {shows("connections") ? (
+              <ActiveConnectionsCard connected={isConnected} />
+            ) : null}
+          </div>
+        ) : null}
+        <OverviewCardToggles
+          hidden={hiddenCards}
+          onToggle={toggleCardVisibility}
+        />
       </div>
     </section>
   );
@@ -599,5 +633,103 @@ function DailyTrafficRow() {
         <strong>{formatSessionTraffic(total(week))}</strong>
       </span>
     </div>
+  );
+}
+
+
+/** Lets the operator hide cards they do not use, remembered across launches. */
+function OverviewCardToggles({
+  hidden,
+  onToggle,
+}: {
+  hidden: ReadonlySet<OverviewCardId>;
+  onToggle: (card: OverviewCardId) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="overview-card-toggles">
+      <span className="overview-card-toggles-label">
+        {t("overview.cardsLabel")}
+      </span>
+      {OVERVIEW_CARDS.map((card) => (
+        <button
+          key={card}
+          type="button"
+          className="choice-chip"
+          aria-pressed={!hidden.has(card)}
+          aria-label={
+            hidden.has(card)
+              ? t("overview.showCard", { card: t(`overview.card.${card}`) })
+              : t("overview.hideCard", { card: t(`overview.card.${card}`) })
+          }
+          onClick={() => onToggle(card)}
+        >
+          {t(`overview.card.${card}`)}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+
+/**
+ * Three-step guide for a fresh install.
+ *
+ * Shown only while no subscription is stored: once one exists the steps are
+ * already done, and the hint would just be noise above the dashboard. Fetched
+ * separately from the runtime data so it also works while the core is stopped.
+ */
+function FirstRunGuide() {
+  const { t } = useTranslation();
+  const profiles = useBridgeResource(getProfiles, true);
+  const hasSubscription = (profiles.data ?? []).some(
+    (profile) => profile.source === "subscription",
+  );
+
+  if (profiles.isLoading || hasSubscription) {
+    return null;
+  }
+
+  const steps = [
+    {
+      title: t("overview.guideImportTitle"),
+      body: t("overview.guideImportBody"),
+      to: "/profiles",
+      action: t("overview.guideImportAction"),
+    },
+    {
+      title: t("overview.guideConnectTitle"),
+      body: t("overview.guideConnectBody"),
+    },
+    {
+      title: t("overview.guideProxyTitle"),
+      body: t("overview.guideProxyBody"),
+      to: "/settings",
+      action: t("overview.guideProxyAction"),
+    },
+  ];
+
+  return (
+    <section className="overview-guide" aria-label={t("overview.guideLabel")}>
+      <span className="workspace-kicker">{t("overview.guideKicker")}</span>
+      <ol className="overview-guide-steps">
+        {steps.map((step, index) => (
+          <li key={step.title}>
+            <span className="overview-guide-index" aria-hidden="true">
+              {index + 1}
+            </span>
+            <span className="overview-guide-copy">
+              <strong>{step.title}</strong>
+              <small>{step.body}</small>
+            </span>
+            {step.to ? (
+              <Link className="workspace-action-button" to={step.to}>
+                {step.action}
+              </Link>
+            ) : null}
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }

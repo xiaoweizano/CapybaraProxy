@@ -1099,3 +1099,91 @@
   font-size: 0.8125rem;
   font-variant-numeric: tabular-nums;
 }
+
+.overview-card-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.overview-card-toggles-label {
+  margin-right: 2px;
+  color: var(--text-faint);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.overview-card-toggles .choice-chip {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* First-run guide: three numbered steps above the dashboard. */
+.overview-guide {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid rgba(var(--accent-rgb), 0.2);
+  border-radius: var(--radius-md);
+  background: linear-gradient(
+    120deg,
+    rgba(var(--accent-rgb), 0.07),
+    rgba(var(--accent-violet-rgb), 0.04)
+  );
+}
+
+.overview-guide-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.overview-guide-steps li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.overview-guide-index {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid rgba(var(--accent-rgb), 0.3);
+  border-radius: 50%;
+  color: var(--accent-cyan);
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.overview-guide-copy {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.overview-guide-copy strong {
+  color: var(--text-primary);
+  font-size: 0.875rem;
+}
+
+.overview-guide-copy small {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+
+.overview-guide-steps .workspace-action-button {
+  margin-left: auto;
+  text-decoration: none;
+}

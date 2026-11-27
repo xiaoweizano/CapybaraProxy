@@ -26,7 +26,8 @@ html {
   text-rendering: optimizeLegibility;
 }
 
-html[data-theme="warm_flow"] {
+html[data-theme="warm_flow"],
+html[data-theme="cyber_flow"][data-appearance="light"] {
   color-scheme: light;
 }
 

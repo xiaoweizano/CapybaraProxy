@@ -3,6 +3,7 @@ import type { ThemeId } from "../theme/theme";
 import type { CloseBehavior } from "../../shared/closeBehavior";
 import type { LanguageId } from "../../i18n/language";
 import type { MotionPreference } from "../../shared/motion";
+import type { AppearancePreference } from "../../shared/appearance";
 import type { CoreLogLevel } from "../../platform/runtime";
 import type {
   SettingsMode,
@@ -46,6 +47,8 @@ export type AppPreferences = {
   silentStart: boolean;
   /** Interface animation preference. */
   motion: MotionPreference;
+  /** Light, dark, or whatever the operating system reports. */
+  appearance: AppearancePreference;
   /** Show the connection state and current node in the tray. */
   trayShowInfo: boolean;
   /** What the tray icon does with the live transfer rate. */
@@ -110,6 +113,9 @@ export type AppSettingsContextValue = {
   updateSettingsMode: (mode: SettingsMode) => Promise<SettingsUpdateResult>;
   updateSilentStart: (enabled: boolean) => Promise<SettingsUpdateResult>;
   updateMotion: (motion: MotionPreference) => Promise<SettingsUpdateResult>;
+  updateAppearance: (
+    appearance: AppearancePreference,
+  ) => Promise<SettingsUpdateResult>;
   updateTrayShowInfo: (enabled: boolean) => Promise<SettingsUpdateResult>;
   updateTraySpeedDisplay: (
     display: TraySpeedDisplay,

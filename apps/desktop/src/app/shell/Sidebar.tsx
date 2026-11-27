@@ -1,10 +1,39 @@
+import { ChevronsLeft, ChevronsRight } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { NavLink } from "react-router-dom";
 import { BrandMark } from "../../shared/components/BrandMark";
+import {
+  readStoredSidebar,
+  sidebarAttribute,
+  writeStoredSidebar,
+  type SidebarPreference,
+} from "../../shared/sidebarView";
 import { navigationItems } from "../navigation";
 
 export function Sidebar() {
   const { t } = useTranslation();
+  const [preference, setPreference] = useState<SidebarPreference>(() =>
+    readStoredSidebar(window.localStorage),
+  );
+
+  // The attribute drives the layout; an empty value means "let the window
+  // width decide".
+  useEffect(() => {
+    const attribute = sidebarAttribute(preference);
+    if (attribute === "") {
+      delete document.documentElement.dataset.sidebar;
+    } else {
+      document.documentElement.dataset.sidebar = attribute;
+    }
+  }, [preference]);
+
+  const toggle = () => {
+    const next: SidebarPreference =
+      preference === "collapsed" ? "expanded" : "collapsed";
+    setPreference(next);
+    writeStoredSidebar(window.localStorage, next);
+  };
 
   return (
     <aside className="sidebar">
@@ -42,9 +71,32 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="sidebar-foot" aria-hidden="true">
-        <span className="sidebar-foot-line" />
-        <span>FP / 01</span>
+      <div className="sidebar-foot">
+        <span className="sidebar-foot-line" aria-hidden="true" />
+        <button
+          className="sidebar-collapse"
+          type="button"
+          aria-label={
+            preference === "collapsed"
+              ? t("shell.expandSidebar")
+              : t("shell.collapseSidebar")
+          }
+          title={
+            preference === "collapsed"
+              ? t("shell.expandSidebar")
+              : t("shell.collapseSidebar")
+          }
+          onClick={toggle}
+        >
+          {preference === "collapsed" ? (
+            <ChevronsRight aria-hidden="true" size={15} />
+          ) : (
+            <ChevronsLeft aria-hidden="true" size={15} />
+          )}
+          <span className="sidebar-collapse-label">
+            {t("shell.collapseSidebar")}
+          </span>
+        </button>
       </div>
     </aside>
   );

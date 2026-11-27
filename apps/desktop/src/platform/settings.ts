@@ -43,6 +43,8 @@ export type DesktopSettings = {
   silent_start?: boolean;
   /** Interface animation preference. */
   motion?: MotionPreference;
+  /** Light, dark, or follow the operating system. */
+  appearance?: "system" | "light" | "dark";
   /** Show the connection state and current node in the tray. */
   tray_show_info?: boolean;
   /** What the tray icon does with the live transfer rate. */
@@ -122,6 +124,10 @@ function isDesktopSettings(value: unknown): value is DesktopSettings {
     (value.motion === undefined ||
       value.motion === "full" ||
       value.motion === "reduced") &&
+    (value.appearance === undefined ||
+      value.appearance === "system" ||
+      value.appearance === "light" ||
+      value.appearance === "dark") &&
     (value.tray_show_info === undefined ||
       typeof value.tray_show_info === "boolean") &&
     (value.tray_speed_display === undefined ||

@@ -38,11 +38,13 @@ The installer ships a verified Mihomo binary and geodata, so it works right afte
 **Proxying**
 - Rule, Global and Direct modes, switchable while running without a restart
 - Group search, sorting by latency or name, collapsing, and pinning favourites — the view state is remembered
-- Per-node checks, per-group checks, and one action for every group; a latency history stays on the page
+- List or card layout for nodes, with full keyboard control (arrows to move, Enter to select, T to test, F to pin)
+- Split view pins the live connections beside the groups, so a node switch and its effect are on one screen
+- Per-node checks, per-group checks, and one action for every group; a latency history with a trend chart stays on the page
 
 **Observation**
-- Overview: live rates, traffic chart, session duration, and **today** / **last 7 days** totals counted per day by the client (they survive a core restart)
-- Connections: expand a row for full detail (host, destination, matched rule, chain, upload volume, start time), with search and a confirmed "close all"
+- Overview: live rates, traffic chart, session duration, and **today** / **last 7 days** totals counted per day by the client (they survive a core restart). Each card can be hidden, and a three-step guide appears until a subscription is imported
+- Connections: expand a row for full detail (host, destination, matched rule, chain, upload volume, start time), with search and a confirmed "close all"; a top-hosts and top-rules panel shows what is moving the most traffic right now
 - Rules: live hit count per rule, plus the rule-set and proxy-set providers the profile declares
 - Rule tester: type a domain or IP and it walks the rule table to say which rule decides the route; rule types it cannot evaluate are listed rather than guessed
 - Logs: level filter, search, pause, clear view
@@ -54,6 +56,11 @@ The installer ships a verified Mihomo binary and geodata, so it works right afte
 - Launch at login, silent start, connect on launch
 - Tray: state and current node, routing-mode switching, open log folder, live speed icon
 - Rotating daily logs with a retention setting; a one-click **redacted** diagnostic bundle (no subscription URLs, tokens or secrets; nothing is uploaded)
+
+**Interface**
+- Light, dark, or follow the system; the Cyber Flow theme has both palettes, Warm Flow is light
+- Collapsible sidebar, remembered across launches
+- Laid out for standard, high-DPI and ultra-wide displays; the window reopens at its previous size and position, across monitors
 
 **Getting around**
 - `Ctrl/Cmd + K` command palette: jump to a page, switch the routing mode, or select a node

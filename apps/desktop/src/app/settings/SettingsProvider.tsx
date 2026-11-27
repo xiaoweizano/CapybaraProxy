@@ -51,6 +51,15 @@ import {
   type MotionPreference,
 } from "../../shared/motion";
 import {
+  DEFAULT_APPEARANCE,
+  applyAppearance,
+  readStoredAppearance,
+  systemPrefersDark,
+  watchSystemAppearance,
+  writeStoredAppearance,
+  type AppearancePreference,
+} from "../../shared/appearance";
+import {
   DEFAULT_DELAY_PROBE_URL,
   DEFAULT_DELAY_TIMEOUT_MS,
   normalizeDelayTimeout,
@@ -74,6 +83,7 @@ function readPreviewPreferences(): AppPreferences {
       closeBehavior: readStoredCloseBehavior(window.localStorage),
       language: readStoredLanguage(window.localStorage),
       uiScale: readStoredUiScale(window.localStorage),
+      appearance: readStoredAppearance(window.localStorage),
     };
   } catch {
     return DEFAULT_PREFERENCES;
@@ -100,6 +110,7 @@ const DEFAULT_PREFERENCES: AppPreferences = {
   settingsMode: "standard",
   silentStart: false,
   motion: DEFAULT_MOTION,
+  appearance: DEFAULT_APPEARANCE,
   trayShowInfo: true,
   traySpeedDisplay: "icon",
   logToFile: true,
@@ -137,6 +148,7 @@ function fromNativeSettings(settings: DesktopSettings): AppPreferences {
     settingsMode: settings.settings_mode ?? "standard",
     silentStart: settings.silent_start ?? false,
     motion: settings.motion ?? DEFAULT_MOTION,
+    appearance: settings.appearance ?? DEFAULT_APPEARANCE,
     trayShowInfo: settings.tray_show_info ?? true,
     traySpeedDisplay: settings.tray_speed_display ?? "icon",
     logToFile: settings.log_to_file ?? true,
@@ -173,6 +185,7 @@ function toNativeSettings(settings: AppPreferences): DesktopSettings {
     settings_mode: settings.settingsMode,
     silent_start: settings.silentStart,
     motion: settings.motion,
+    appearance: settings.appearance,
     tray_show_info: settings.trayShowInfo,
     tray_speed_display: settings.traySpeedDisplay,
     log_to_file: settings.logToFile,
@@ -198,6 +211,7 @@ function writePreferenceCache(settings: AppPreferences): void {
     );
     writeStoredLanguage(window.localStorage, settings.language);
     writeStoredUiScale(window.localStorage, settings.uiScale);
+    writeStoredAppearance(window.localStorage, settings.appearance);
   } catch {
     // The native settings store remains authoritative when cache writes fail.
   }
@@ -256,6 +270,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     applyLanguage(nextSettings.language);
     applyUiScale(nextSettings.uiScale);
     applyMotion(nextSettings.motion);
+    applyAppearance(nextSettings.appearance, systemPrefersDark());
   }, []);
 
   useEffect(() => {
@@ -515,6 +530,16 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     [enqueueUpdate],
   );
 
+  const updateAppearance = useCallback(
+    (appearance: AppearancePreference): Promise<SettingsUpdateResult> => {
+      // Flip the document attribute immediately so the change is visible
+      // before the save round-trip completes.
+      applyAppearance(appearance, systemPrefersDark());
+      return enqueueUpdate({ appearance });
+    },
+    [enqueueUpdate],
+  );
+
   const updateTrayShowInfo = useCallback(
     (trayShowInfo: boolean): Promise<SettingsUpdateResult> =>
       enqueueUpdate({ trayShowInfo }),
@@ -570,6 +595,18 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   const clearError = useCallback(() => setError(null), []);
 
+  // Seed the attribute before the first paint of any page, then keep it in
+  // step with the OS while "system" is selected.
+  useEffect(() => {
+    applyAppearance(settings.appearance, systemPrefersDark());
+    if (settings.appearance !== "system") {
+      return undefined;
+    }
+    return watchSystemAppearance((prefersDark) => {
+      applyAppearance("system", prefersDark);
+    });
+  }, [settings.appearance]);
+
   const value = useMemo(
     () => ({
       settings,
@@ -592,6 +629,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       updateSettingsMode,
       updateSilentStart,
       updateMotion,
+      updateAppearance,
       updateTrayShowInfo,
       updateTraySpeedDisplay,
       updateLogToFile,
@@ -623,6 +661,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       updateSettingsMode,
       updateSilentStart,
       updateMotion,
+      updateAppearance,
       updateTrayShowInfo,
       updateTraySpeedDisplay,
       updateLogToFile,

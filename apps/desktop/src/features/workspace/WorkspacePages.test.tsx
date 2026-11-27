@@ -304,7 +304,9 @@ describe("real data workspace pages", () => {
     const user = userEvent.setup();
     renderWithRuntime(<ConnectionsPage />);
 
-    expect(await screen.findByText("example.com")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: "Close connection example.com" }),
+    ).toBeInTheDocument();
     const closeButton = screen.getByRole("button", {
       name: "Close connection example.com",
     });
@@ -314,7 +316,7 @@ describe("real data workspace pages", () => {
     expect(closeConnectionMock).toHaveBeenCalledWith("connection-1");
     await waitFor(() => {
       expect(
-        screen.queryByText("example.com"),
+        screen.queryByRole("button", { name: "Close connection example.com" }),
       ).not.toBeInTheDocument();
     });
     expect(getConnectionsMock).toHaveBeenCalledTimes(2);
@@ -325,13 +327,17 @@ describe("real data workspace pages", () => {
     const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
     renderWithRuntime(<ConnectionsPage />);
 
-    expect(await screen.findByText("example.com")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: "Close connection example.com" }),
+    ).toBeInTheDocument();
 
     await user.type(
       screen.getByRole("searchbox", { name: "Filter connections" }),
       "nomatch",
     );
-    expect(screen.queryByText("example.com")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Close connection example.com" }),
+    ).not.toBeInTheDocument();
     expect(
       screen.getByText("No connection matches “nomatch”."),
     ).toBeInTheDocument();
@@ -361,13 +367,19 @@ describe("real data workspace pages", () => {
 
     renderWithRuntime(<ConnectionsPage />);
 
-    expect(await screen.findByText("connection-1.example.com")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", {
+        name: "Close connection connection-1.example.com",
+      }),
+    ).toBeInTheDocument();
     expect(
       screen.getAllByRole("button", { name: /^Close connection / }),
     ).toHaveLength(50);
     expect(screen.getByText("Page 1 of 4")).toBeInTheDocument();
     expect(
-      screen.queryByText("connection-51.example.com"),
+      screen.queryByRole("button", {
+        name: "Close connection connection-51.example.com",
+      }),
     ).not.toBeInTheDocument();
 
     await user.click(
@@ -375,7 +387,11 @@ describe("real data workspace pages", () => {
     );
 
     expect(screen.getByText("Page 2 of 4")).toBeInTheDocument();
-    expect(screen.getByText("connection-51.example.com")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: "Close connection connection-51.example.com",
+      }),
+    ).toBeInTheDocument();
     expect(
       screen.getAllByRole("button", { name: /^Close connection / }),
     ).toHaveLength(50);

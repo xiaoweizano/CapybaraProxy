@@ -189,6 +189,13 @@ pub(crate) struct DesktopSettings {
     pub window_width: Option<u32>,
     #[serde(default)]
     pub window_height: Option<u32>,
+    /// Remembered window origin, in physical pixels. Kept together with the
+    /// size so a multi-monitor setup reopens where it was left; both are
+    /// cleared if either is missing.
+    #[serde(default)]
+    pub window_x: Option<i32>,
+    #[serde(default)]
+    pub window_y: Option<i32>,
 }
 
 pub(crate) const MIN_UI_SCALE: u32 = 85;
@@ -340,6 +347,18 @@ impl DesktopSettings {
             self.window_width = None;
             self.window_height = None;
         }
+        // A position without a size is meaningless, and a wildly out-of-range
+        // origin would put the window off-screen after a monitor is removed.
+        self.window_x = self.window_x.filter(|x| (-32_768..=32_768).contains(x));
+        self.window_y = self.window_y.filter(|y| (-32_768..=32_768).contains(y));
+        if self.window_width.is_none()
+            || self.window_height.is_none()
+            || self.window_x.is_none()
+            || self.window_y.is_none()
+        {
+            self.window_x = None;
+            self.window_y = None;
+        }
         self
     }
 }
@@ -377,6 +396,8 @@ impl Default for DesktopSettings {
             substore_token: String::new(),
             window_width: None,
             window_height: None,
+            window_x: None,
+            window_y: None,
         }
     }
 }
@@ -639,6 +660,8 @@ mod tests {
             substore_token: "token-value".to_owned(),
             window_width: Some(1280),
             window_height: Some(820),
+            window_x: Some(120),
+            window_y: Some(60),
         };
 
         store.save(&expected).expect("save settings");

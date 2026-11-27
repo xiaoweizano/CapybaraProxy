@@ -11,6 +11,10 @@ export type NodeSort = "default" | "delay" | "name";
 const SORT_STORAGE_KEY = "capybara.proxies.sort";
 const COLLAPSED_STORAGE_KEY = "capybara.proxies.collapsed";
 const FAVORITES_STORAGE_KEY = "capybara.proxies.favorites";
+const LAYOUT_STORAGE_KEY = "capybara.proxies.layout";
+
+/** List rows or a card grid. */
+export type NodeLayout = "list" | "cards";
 
 type Reader = { getItem(key: string): string | null };
 type Writer = { setItem(key: string, value: string): void };
@@ -94,6 +98,27 @@ export function writeStoredFavorites(
 ): void {
   try {
     storage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify([...favorites].sort()));
+  } catch {
+    // A full quota only loses the preference, never the page.
+  }
+}
+
+export function isNodeLayout(value: unknown): value is NodeLayout {
+  return value === "list" || value === "cards";
+}
+
+export function readStoredLayout(storage: Reader): NodeLayout {
+  try {
+    const value = storage.getItem(LAYOUT_STORAGE_KEY);
+    return isNodeLayout(value) ? value : "list";
+  } catch {
+    return "list";
+  }
+}
+
+export function writeStoredLayout(storage: Writer, layout: NodeLayout): void {
+  try {
+    storage.setItem(LAYOUT_STORAGE_KEY, isNodeLayout(layout) ? layout : "list");
   } catch {
     // A full quota only loses the preference, never the page.
   }

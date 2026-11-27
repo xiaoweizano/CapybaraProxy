@@ -27,6 +27,7 @@ import {
   RuntimeDisconnected,
   WorkspacePage,
 } from "../workspace/WorkspaceUi";
+import { attributeConnections, shareOf } from "./attribution";
 
 const CONNECTIONS_PAGE_SIZE = 50;
 
@@ -261,6 +262,13 @@ export function ConnectionsPage() {
             </label>
           ) : null}
 
+          {visibleConnections.length > 0 ? (
+            <ConnectionsAttribution
+              connections={visibleConnections}
+              formatBytes={formatBytes}
+            />
+          ) : null}
+
           {connections.data ? (
             <div className="connections-summary">
               <span>
@@ -424,5 +432,57 @@ export function ConnectionsPage() {
         </section>
       )}
     </WorkspacePage>
+  );
+}
+
+
+/**
+ * Which hosts and rules are moving the most traffic right now.
+ *
+ * Derived from the live table only, so it reflects this moment rather than the
+ * session. The bars are relative to the busiest row, not to the session total,
+ * which keeps the shape readable even when one host dominates.
+ */
+function ConnectionsAttribution({
+  connections,
+  formatBytes,
+}: {
+  connections: readonly ConnectionSummary[];
+  formatBytes: (bytes: number) => string;
+}) {
+  const { t } = useTranslation();
+  const attribution = attributeConnections(connections, 6);
+  const busiest = attribution.byHost[0]?.bytes ?? 0;
+
+  const renderRows = (rows: typeof attribution.byHost, dimension: string) => (
+    <div className="attribution-column">
+      <span className="workspace-kicker">{dimension}</span>
+      <ul className="attribution-list">
+        {rows.map((row) => {
+          const width = busiest === 0 ? 0 : Math.max(4, (row.bytes / busiest) * 100);
+          const share = shareOf(row, attribution.total);
+          return (
+            <li key={row.key}>
+              <span className="attribution-name" title={row.key}>
+                {row.key}
+              </span>
+              <span className="attribution-bar" aria-hidden="true">
+                <span style={{ width: `${width}%` }} />
+              </span>
+              <span className="attribution-value">
+                {formatBytes(row.bytes)} · {share}%
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+
+  return (
+    <div className="connections-attribution">
+      {renderRows(attribution.byHost, t("connections.attributionHosts"))}
+      {renderRows(attribution.byRule, t("connections.attributionRules"))}
+    </div>
   );
 }

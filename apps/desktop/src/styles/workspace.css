@@ -1443,3 +1443,233 @@
 .core-version-register .proxy-search {
   flex: 1 1 260px;
 }
+
+/* Card layout for a group's nodes: a grid that favours scanning many nodes at
+   once, with the same data as the list rows. */
+.proxy-node-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 168px), 1fr));
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.proxy-card-node {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--input-bg);
+  outline: none;
+}
+
+.proxy-card-node.is-selected {
+  border-color: rgba(var(--accent-rgb), 0.42);
+  background: rgba(var(--accent-rgb), 0.08);
+}
+
+.proxy-card-node:focus-visible,
+.proxy-node:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.55);
+  outline-offset: -2px;
+}
+
+.proxy-card-node-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.proxy-card-node-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.proxy-card-node-actions .workspace-action-button {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.proxy-card-node .proxy-delay {
+  flex: 0 0 auto;
+  font-size: 0.75rem;
+}
+
+.proxy-card-node .workspace-icon-button {
+  width: 28px;
+  height: 28px;
+}
+
+.proxy-keyboard-hint {
+  margin: 0;
+  color: var(--text-faint);
+  font-size: 0.75rem;
+}
+
+/* Latency trend above the history table. The SVG stretches to the panel width
+   and keeps its own aspect ratio. */
+.latency-history-chart {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.latency-sparkline svg {
+  width: 100%;
+  height: 120px;
+  overflow: visible;
+}
+
+.latency-sparkline-label {
+  fill: var(--text-faint);
+  font-family: var(--font-body);
+  font-size: 10px;
+}
+
+.latency-sparkline-range {
+  margin: 0;
+  color: var(--text-faint);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Traffic attribution: two columns of host and rule bars. */
+.connections-attribution {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 14px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel-soft);
+}
+
+.attribution-column {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.attribution-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.attribution-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(60px, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.75rem;
+}
+
+.attribution-name {
+  overflow: hidden;
+  color: var(--text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attribution-bar {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--input-bg);
+}
+
+.attribution-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(var(--accent-rgb), 0.55), var(--accent-cyan));
+}
+
+.attribution-value {
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Split view: groups on the left, live connections pinned on the right. Below
+   1200px the pane would squeeze the groups, so it drops under them instead. */
+.proxy-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
+  align-items: start;
+  gap: 14px;
+}
+
+.proxy-split .proxy-groups {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr));
+}
+
+.connections-side-pane {
+  position: sticky;
+  top: 0;
+  max-height: calc(100vh - 140px);
+  overflow: auto;
+}
+
+.connections-side-pane-totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 10px;
+  color: var(--text-faint);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.connections-side-pane-totals span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.connections-side-pane-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.connections-side-pane-list li {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+
+.connections-side-pane-list li > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.connections-side-pane-list small {
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 1200px) {
+  .proxy-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .connections-side-pane {
+    position: static;
+    max-height: none;
+  }
+}
