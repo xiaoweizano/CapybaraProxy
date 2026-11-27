@@ -1,6 +1,6 @@
 //! Sub-Store backend integration.
 //!
-//! FlowProxy does not bundle a conversion engine; when the operator already runs
+//! CapybaraProxy does not bundle a conversion engine; when the operator already runs
 //! [Sub-Store](https://github.com/sub-store-org/Sub-Store) the settings page can
 //! list its subscriptions and import one directly.
 //!
@@ -9,8 +9,8 @@
 //! is sent as `x-api-token` and never appears in an error message or a log.
 
 use crate::settings::is_valid_substore_url;
-use flowproxy_contracts::{RuntimeError, RuntimeErrorCode};
-use flowproxy_mihomo_manager::subscription_fetch;
+use capybara_contracts::{RuntimeError, RuntimeErrorCode};
+use capybara_mihomo_manager::subscription_fetch;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 

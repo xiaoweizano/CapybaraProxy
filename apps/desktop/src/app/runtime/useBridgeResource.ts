@@ -15,7 +15,7 @@ export type BridgeResourceState<T> = {
 
 const bridgeFailure: RuntimeError = {
   code: "internal",
-  message: "FlowProxy could not load live Mihomo data.",
+  message: "CapybaraProxy could not load live Mihomo data.",
   retryable: true,
 };
 

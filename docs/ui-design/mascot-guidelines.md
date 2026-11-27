@@ -1,4 +1,4 @@
-# FlowProxy 吉祥物规范
+# CapybaraProxy 吉祥物规范
 
 ## 定位
 

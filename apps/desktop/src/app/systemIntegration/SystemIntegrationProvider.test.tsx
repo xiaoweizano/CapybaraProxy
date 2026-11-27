@@ -121,7 +121,7 @@ describe("SystemIntegrationProvider", () => {
       status: "error",
       error: {
         code: "platform_integration",
-        message: "FlowProxy could not update the system proxy.",
+        message: "CapybaraProxy could not update the system proxy.",
         retryable: true,
       },
     });
@@ -138,7 +138,7 @@ describe("SystemIntegrationProvider", () => {
       ).toBeInTheDocument();
     });
     expect(
-      screen.getByText("FlowProxy could not update the system proxy."),
+      screen.getByText("CapybaraProxy could not update the system proxy."),
     ).toBeInTheDocument();
   });
 

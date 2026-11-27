@@ -103,7 +103,7 @@ function invalidNativeResponse(message: string): NativeCommandResult {
 function parseNativeCommandResult(value: unknown): NativeCommandResult {
   if (!isRecord(value) || typeof value.ok !== "boolean") {
     return invalidNativeResponse(
-      "FlowProxy received an invalid desktop response.",
+      "CapybaraProxy received an invalid desktop response.",
     );
   }
 
@@ -116,7 +116,7 @@ function parseNativeCommandResult(value: unknown): NativeCommandResult {
   }
 
   return invalidNativeResponse(
-    "FlowProxy received an invalid desktop response.",
+    "CapybaraProxy received an invalid desktop response.",
   );
 }
 
@@ -136,7 +136,7 @@ export async function invokeNativeCommand(
       status: "error",
       error: {
         code: "internal",
-        message: "FlowProxy could not contact the desktop Runtime.",
+        message: "CapybaraProxy could not contact the desktop Runtime.",
         retryable: true,
       },
     };

@@ -38,7 +38,7 @@ VPNService 建立了未被 Mihomo 接管的 VPN 接口。API 35 后台限制、�
 | Build Tools | 35.0.0 |
 | compileSdk / targetSdk | 35 / 35 |
 | minSdk | 26 |
-| AVD | `FlowProxy_API_26` |
+| AVD | `CapybaraProxy_API_26` |
 | 设备 | `emulator-5556` |
 | Android | 8.0.0，API 26，x86_64 |
 | 网络代理 | `192.168.1.2:7890`，Lint 验证期间可用 |
@@ -51,7 +51,7 @@ VPNService 建立了未被 Mihomo 接管的 VPN 接口。API 35 后台限制、�
 
 - 使用外层 `RuleChain`，在 `MainActivity` 创建前等待 Android 默认网络，
   最长 60 秒。
-- 冷启动后继续等待 `FlowProxyApplication.networkMonitor.available == true`，
+- 冷启动后继续等待 `CapybaraProxyApplication.networkMonitor.available == true`，
   再断言 UI 显示 `Online`。
 - 飞行模式测试等待系统默认网络消失、应用状态变为 Offline，再恢复网络并断言
   应用重新显示 Online。
@@ -59,7 +59,7 @@ VPNService 建立了未被 Mihomo 接管的 VPN 接口。API 35 后台限制、�
 
 对应文件：
 
-`apps/android/app/src/androidTest/kotlin/com/flowproxy/android/NetworkAvailabilityInstrumentedTest.kt`
+`apps/android/app/src/androidTest/kotlin/com/capybara/android/NetworkAvailabilityInstrumentedTest.kt`
 
 最终按真实测试顺序执行完整仪器测试套件，结果为 2/2 通过，未跳过。
 
@@ -107,9 +107,9 @@ gradle.bat -p apps/android :app:connectedDebugAndroidTest `
 
 覆盖场景：
 
-- API 26 模拟器冷启动且 Android 有默认网络时，FlowProxy 显示 `Online`。
-- 飞行模式开启后系统默认网络消失，FlowProxy 显示 `Offline`。
-- 飞行模式关闭且网络恢复后，FlowProxy 重新显示 `Online`。
+- API 26 模拟器冷启动且 Android 有默认网络时，CapybaraProxy 显示 `Online`。
+- 飞行模式开启后系统默认网络消失，CapybaraProxy 显示 `Offline`。
+- 飞行模式关闭且网络恢复后，CapybaraProxy 重新显示 `Online`。
 
 ### 4.3 Lint
 
@@ -152,7 +152,7 @@ gradle.bat -p apps/android :app:assembleDebug `
 | UTC 时间 | `2026-11-07T05:03:14.0496183Z` |
 | 大小 | `10,353,609` 字节 |
 | SHA-256 | `2F8D01ED6A8BE2CF6E4A97247B242917FC39D752E1E34E91DFF0ED29AD518562` |
-| 包名 | `com.flowproxy.android` |
+| 包名 | `com.capybara.android` |
 | versionName | `0.1.0-stage5` |
 | minSdk | 26 |
 | targetSdk / compileSdk | 35 / 35 |
@@ -175,9 +175,9 @@ Debug 证书 SHA-256：
 
 关键截图：
 
-- A 主题：`flowproxy-stage5-final-theme-a.png`
-- C 主题：`flowproxy-stage5-final-theme-c.png`
-- C 主题重新启动后持久化：`flowproxy-stage5-final-theme-c-persisted.png`
+- A 主题：`capybara-stage5-final-theme-a.png`
+- C 主题：`capybara-stage5-final-theme-c.png`
+- C 主题重新启动后持久化：`capybara-stage5-final-theme-c-persisted.png`
 - Overview、Proxies、Rules、Connections、Profiles、Logs 和 Settings 页面均有
   最终截图及 UIAutomator XML。
 
@@ -192,12 +192,12 @@ Debug 证书 SHA-256：
 
 | 场景 | 实测结果 | 证据 |
 | --- | --- | --- |
-| 授权前 | `Online / Stopped / Missing` | `flowproxy-stage5-vpn-baseline.png` |
-| 授权拒绝 | `Online / Stopped / Missing`，没有 VPN 服务或 `tun0` | `flowproxy-stage5-vpn-denied-fixed.png` |
-| 授权允许 | `Online / Ready / Missing`，VPNService 运行且 `tun0` 存在 | `flowproxy-stage5-vpn-ready.png` |
-| 前台通知 | 显示 VPN 接口就绪且代理核心不可用 | `flowproxy-stage5-vpn-notification-expanded.png` |
-| 通知 Stop | 回到 `Online / Stopped / Missing` | `flowproxy-stage5-vpn-stopped.png` |
-| 应用重新启动 | 回到 `Online / Stopped / Missing` | `flowproxy-stage5-relaunch-fixed.xml` |
+| 授权前 | `Online / Stopped / Missing` | `capybara-stage5-vpn-baseline.png` |
+| 授权拒绝 | `Online / Stopped / Missing`，没有 VPN 服务或 `tun0` | `capybara-stage5-vpn-denied-fixed.png` |
+| 授权允许 | `Online / Ready / Missing`，VPNService 运行且 `tun0` 存在 | `capybara-stage5-vpn-ready.png` |
+| 前台通知 | 显示 VPN 接口就绪且代理核心不可用 | `capybara-stage5-vpn-notification-expanded.png` |
+| 通知 Stop | 回到 `Online / Stopped / Missing` | `capybara-stage5-vpn-stopped.png` |
+| 应用重新启动 | 回到 `Online / Stopped / Missing` | `capybara-stage5-relaunch-fixed.xml` |
 
 通知正文为：
 
@@ -209,7 +209,7 @@ Debug 证书 SHA-256：
 
 原始网络证据：
 
-`docs/development/screenshots/stage5/flowproxy-stage5-vpn-connectivity.txt`
+`docs/development/screenshots/stage5/capybara-stage5-vpn-connectivity.txt`
 
 设备状态显示：
 
@@ -262,11 +262,11 @@ VpnService。
 
 原始证据：
 
-- `flowproxy-stage5-top-background.txt`
-- `flowproxy-stage5-meminfo-background.txt`
-- `flowproxy-stage5-gfxinfo-initial.txt`
-- `flowproxy-stage5-gfxinfo-foreground.txt`
-- `flowproxy-stage5-gfxinfo-background.txt`
+- `capybara-stage5-top-background.txt`
+- `capybara-stage5-meminfo-background.txt`
+- `capybara-stage5-gfxinfo-initial.txt`
+- `capybara-stage5-gfxinfo-foreground.txt`
+- `capybara-stage5-gfxinfo-background.txt`
 
 实测：
 

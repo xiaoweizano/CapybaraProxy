@@ -1,8 +1,8 @@
-# FlowProxy Phase 4 System Integration Plan
+# CapybaraProxy Phase 4 System Integration Plan
 
 ## Slice 1: Platform Proxy Ownership
 
-1. Add `flowproxy-platform` and injectable system-proxy backend tests.
+1. Add `capybara-platform` and injectable system-proxy backend tests.
 2. Implement endpoint validation, atomic journal persistence, enable, disable,
    partial-failure rollback, external-change protection, and startup recovery.
 

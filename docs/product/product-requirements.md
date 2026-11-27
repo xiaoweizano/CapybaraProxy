@@ -1,10 +1,10 @@
-# FlowProxy V1 产品需求
+# CapybaraProxy V1 产品需求
 
 ## 1. 产品定位
 
-FlowProxy 是一款跨平台个人网络代理控制中心。它以 Mihomo 为代理核心，提供配置管理、代理组和节点选择、规则管理、连接监控、流量统计、日志和系统代理/TUN 管理。
+CapybaraProxy 是一款跨平台个人网络代理控制中心。它以 Mihomo 为代理核心，提供配置管理、代理组和节点选择、规则管理、连接监控、流量统计、日志和系统代理/TUN 管理。
 
-产品不是传统 Clash 客户端的换皮。品牌识别来自 FlowProxy 波纹 Logo、A 主题 Network Orb、C 主题吉祥物，以及可定制的网络工作台。
+产品不是传统 Clash 客户端的换皮。品牌识别来自 CapybaraProxy 波纹 Logo、A 主题 Network Orb、C 主题吉祥物，以及可定制的网络工作台。
 
 ## 2. 目标平台
 

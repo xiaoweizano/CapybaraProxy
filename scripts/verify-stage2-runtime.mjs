@@ -1,6 +1,6 @@
 import process from "node:process";
 
-const browserPort = process.env.FLOWPROXY_CDP_PORT ?? "9333";
+const browserPort = process.env.CAPYBARA_CDP_PORT ?? "9333";
 const browserUrl = `http://127.0.0.1:${browserPort}`;
 const actionTimeoutMs = 15_000;
 
@@ -29,7 +29,7 @@ async function findPageTarget() {
     await delay(250);
   }
 
-  throw new Error("FlowProxy WebView2 CDP endpoint did not become available.");
+  throw new Error("CapybaraProxy WebView2 CDP endpoint did not become available.");
 }
 
 function createCdpClient(webSocketUrl) {
@@ -56,7 +56,7 @@ function createCdpClient(webSocketUrl) {
   const ready = new Promise((resolve, reject) => {
     socket.onopen = resolve;
     socket.onerror = () =>
-      reject(new Error("Could not connect to the FlowProxy WebView."));
+      reject(new Error("Could not connect to the CapybaraProxy WebView."));
   });
 
   return {
@@ -175,7 +175,7 @@ try {
     `document.readyState === "complete" &&
       document.querySelector(".app-frame") !== null &&
       document.querySelector('nav[aria-label="Primary navigation"]') !== null`,
-    "the FlowProxy application shell",
+    "the CapybaraProxy application shell",
   );
   await page.evaluate(`location.hash = "#/settings"; true`);
   await page.waitFor(

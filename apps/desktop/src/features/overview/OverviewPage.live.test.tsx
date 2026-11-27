@@ -253,13 +253,13 @@ describe("OverviewPage real runtime contract", () => {
       screen.getByRole("img", { name: "Network Orb" }),
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole("img", { name: "FlowProxy mascot" }),
+      screen.queryByRole("img", { name: "CapybaraProxy mascot" }),
     ).not.toBeInTheDocument();
     cyber.unmount();
 
     renderOverview("warm_flow", runtimeValue());
     expect(
-      screen.getByRole("img", { name: "FlowProxy mascot" }),
+      screen.getByRole("img", { name: "CapybaraProxy mascot" }),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole("img", { name: "Network Orb" }),

@@ -5,7 +5,7 @@
 //! keeps them in sync with the UI language.
 
 use crate::settings::Language;
-use flowproxy_contracts::RuntimeState;
+use capybara_contracts::RuntimeState;
 
 pub(crate) struct TrayStrings {
     pub show: &'static str,
@@ -28,9 +28,9 @@ pub(crate) struct TrayStrings {
 pub(crate) fn tray_strings(language: Language) -> TrayStrings {
     match language {
         Language::English => TrayStrings {
-            show: "Show FlowProxy",
+            show: "Show CapybaraProxy",
             exit: "Exit",
-            tooltip: "FlowProxy",
+            tooltip: "CapybaraProxy",
             status: "Status",
             node: "Node",
             no_node: "No node selected",
@@ -40,9 +40,9 @@ pub(crate) fn tray_strings(language: Language) -> TrayStrings {
             mode_direct: "Mode: Direct",
         },
         Language::SimplifiedChinese => TrayStrings {
-            show: "显示 FlowProxy",
+            show: "显示 CapybaraProxy",
             exit: "退出",
-            tooltip: "FlowProxy",
+            tooltip: "CapybaraProxy",
             status: "状态",
             node: "节点",
             no_node: "未选择节点",
@@ -109,7 +109,7 @@ pub(crate) fn tooltip(
     node: Option<&str>,
     speed: Option<&str>,
 ) -> String {
-    let mut text = format!("FlowProxy · {}", state_label(language, state));
+    let mut text = format!("CapybaraProxy · {}", state_label(language, state));
     if let Some(node) = node {
         let node = truncate_chars(node, 48);
         text.push('\n');
@@ -135,7 +135,7 @@ fn truncate_chars(value: &str, limit: usize) -> String {
 mod tests {
     use super::{connection_label, state_label, tooltip, tray_strings};
     use crate::settings::Language;
-    use flowproxy_contracts::RuntimeState;
+    use capybara_contracts::RuntimeState;
 
     #[test]
     fn english_and_chinese_differ_for_every_visible_label() {
@@ -186,7 +186,7 @@ mod tests {
     #[test]
     fn tooltip_includes_node_and_speed_when_available() {
         let idle = tooltip(Language::English, RuntimeState::Stopped, None, None);
-        assert_eq!(idle, "FlowProxy · Stopped");
+        assert_eq!(idle, "CapybaraProxy · Stopped");
 
         let live = tooltip(
             Language::SimplifiedChinese,
@@ -208,7 +208,14 @@ mod tests {
             Some(&node),
             Some("↑0 ↓0"),
         );
-        assert!(text.chars().count() < 80);
+        // Brand line + state + a 48-char node + the speed pair. The bound is
+        // the truncation limit itself, not an arbitrary total: the point is
+        // that the 200-char node came back at 48.
+        assert!(
+            text.chars().count() <= 84,
+            "got {} chars",
+            text.chars().count()
+        );
         assert!(text.contains('…'));
     }
 }

@@ -1,4 +1,4 @@
-# FlowProxy 桌面 Runtime 骨架 Implementation Plan
+# CapybaraProxy 桌面 Runtime 骨架 Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -14,8 +14,8 @@
 
 **Files:**
 - Create: `Cargo.toml`
-- Create: `crates/flowproxy-contracts/Cargo.toml`
-- Create: `crates/flowproxy-contracts/src/lib.rs`
+- Create: `crates/capybara-contracts/Cargo.toml`
+- Create: `crates/capybara-contracts/src/lib.rs`
 - Move: `apps/desktop/src-tauri/Cargo.lock` -> `Cargo.lock`
 - Modify: `apps/desktop/src-tauri/Cargo.toml`
 
@@ -25,7 +25,7 @@
 
 - [x] **Step 2: 运行测试确认失败**
 
-Run: `cargo test -p flowproxy-contracts`
+Run: `cargo test -p capybara-contracts`
 Expected: FAIL because crate and types do not exist.
 
 - [x] **Step 3: 建立 workspace 和 contracts**
@@ -34,7 +34,7 @@ Expected: FAIL because crate and types do not exist.
 
 - [x] **Step 4: 运行测试确认通过**
 
-Run: `cargo test -p flowproxy-contracts`
+Run: `cargo test -p capybara-contracts`
 Expected: PASS.
 
 ### Task 2: Mihomo adapter 与 Fake adapter
@@ -50,7 +50,7 @@ Expected: PASS.
 
 - [x] **Step 2: 运行测试确认失败**
 
-Run: `cargo test -p flowproxy-mihomo-manager`
+Run: `cargo test -p capybara-mihomo-manager`
 Expected: FAIL because adapter API does not exist.
 
 - [x] **Step 3: 实现 adapter trait 与 fake**
@@ -59,19 +59,19 @@ Expected: FAIL because adapter API does not exist.
 
 - [x] **Step 4: 运行测试确认通过**
 
-Run: `cargo test -p flowproxy-mihomo-manager`
+Run: `cargo test -p capybara-mihomo-manager`
 Expected: PASS.
 
 ### Task 3: Runtime Manager、错误与日志
 
 **Files:**
-- Create: `crates/flowproxy-runtime/Cargo.toml`
-- Create: `crates/flowproxy-runtime/src/lib.rs`
-- Create: `crates/flowproxy-runtime/src/log_buffer.rs`
-- Create: `crates/flowproxy-runtime/src/redaction.rs`
-- Test: `crates/flowproxy-runtime/src/lib.rs`
-- Test: `crates/flowproxy-runtime/src/log_buffer.rs`
-- Test: `crates/flowproxy-runtime/src/redaction.rs`
+- Create: `crates/capybara-runtime/Cargo.toml`
+- Create: `crates/capybara-runtime/src/lib.rs`
+- Create: `crates/capybara-runtime/src/log_buffer.rs`
+- Create: `crates/capybara-runtime/src/redaction.rs`
+- Test: `crates/capybara-runtime/src/lib.rs`
+- Test: `crates/capybara-runtime/src/log_buffer.rs`
+- Test: `crates/capybara-runtime/src/redaction.rs`
 
 - [x] **Step 1: 写状态机和脱敏失败测试**
 
@@ -79,7 +79,7 @@ Expected: PASS.
 
 - [x] **Step 2: 运行测试确认失败**
 
-Run: `cargo test -p flowproxy-runtime`
+Run: `cargo test -p capybara-runtime`
 Expected: FAIL because runtime crate does not exist.
 
 - [x] **Step 3: 实现 Runtime Manager**
@@ -88,7 +88,7 @@ Runtime Manager 串行化全部状态修改，生成递增 snapshot sequence；�
 
 - [x] **Step 4: 运行测试确认通过**
 
-Run: `cargo test -p flowproxy-runtime`
+Run: `cargo test -p capybara-runtime`
 Expected: PASS.
 
 ### Task 4: Rust 设置存储
@@ -103,7 +103,7 @@ Expected: PASS.
 
 - [x] **Step 2: 运行测试确认失败**
 
-Run: `cargo test -p flowproxy-desktop settings`
+Run: `cargo test -p capybara-desktop settings`
 Expected: FAIL because settings module does not exist.
 
 - [x] **Step 3: 实现 SettingsStore**
@@ -112,7 +112,7 @@ Expected: FAIL because settings module does not exist.
 
 - [x] **Step 4: 运行测试确认通过**
 
-Run: `cargo test -p flowproxy-desktop settings`
+Run: `cargo test -p capybara-desktop settings`
 Expected: PASS.
 
 ### Task 5: Tauri commands、事件和受控退出
@@ -127,7 +127,7 @@ Expected: PASS.
 
 - [x] **Step 2: 运行测试确认失败**
 
-Run: `cargo test -p flowproxy-desktop`
+Run: `cargo test -p capybara-desktop`
 Expected: FAIL because new state and commands are missing.
 
 - [x] **Step 3: 接入 Tauri**
@@ -136,7 +136,7 @@ Expected: FAIL because new state and commands are missing.
 
 - [x] **Step 4: 运行测试确认通过**
 
-Run: `cargo test -p flowproxy-desktop`
+Run: `cargo test -p capybara-desktop`
 Expected: PASS.
 
 ### Task 6: TypeScript contracts 与 bridge
@@ -154,7 +154,7 @@ Expected: PASS.
 
 - [x] **Step 2: 运行测试确认失败**
 
-Run: `pnpm --filter @flowproxy/desktop test -- src/platform`
+Run: `pnpm --filter @capybara/desktop test -- src/platform`
 Expected: FAIL because runtime/settings bridges do not exist.
 
 - [x] **Step 3: 实现 typed bridge**
@@ -163,7 +163,7 @@ Expected: FAIL because runtime/settings bridges do not exist.
 
 - [x] **Step 4: 运行测试确认通过**
 
-Run: `pnpm --filter @flowproxy/desktop test -- src/platform`
+Run: `pnpm --filter @capybara/desktop test -- src/platform`
 Expected: PASS.
 
 ### Task 7: Runtime Demo UI
@@ -181,7 +181,7 @@ Expected: PASS.
 
 - [x] **Step 2: 运行测试确认失败**
 
-Run: `pnpm --filter @flowproxy/desktop test -- RuntimeDemoPanel`
+Run: `pnpm --filter @capybara/desktop test -- RuntimeDemoPanel`
 Expected: FAIL because component does not exist.
 
 - [x] **Step 3: 实现 Runtime Demo**
@@ -190,7 +190,7 @@ Expected: FAIL because component does not exist.
 
 - [x] **Step 4: 运行测试确认通过**
 
-Run: `pnpm --filter @flowproxy/desktop test -- RuntimeDemoPanel`
+Run: `pnpm --filter @capybara/desktop test -- RuntimeDemoPanel`
 Expected: PASS.
 
 ### Task 8: 设置迁移与单一来源
@@ -210,7 +210,7 @@ Expected: PASS.
 
 - [x] **Step 2: 运行测试确认失败**
 
-Run: `pnpm --filter @flowproxy/desktop test -- App ThemeProvider SettingsPage`
+Run: `pnpm --filter @capybara/desktop test -- App ThemeProvider SettingsPage`
 Expected: FAIL on new migration expectations.
 
 - [x] **Step 3: 实现单一来源与兼容层**
@@ -219,7 +219,7 @@ Tauri 使用 Rust settings；浏览器使用 localStorage。迁移成功后移�
 
 - [x] **Step 4: 运行测试确认通过**
 
-Run: `pnpm --filter @flowproxy/desktop test -- App ThemeProvider SettingsPage`
+Run: `pnpm --filter @capybara/desktop test -- App ThemeProvider SettingsPage`
 Expected: PASS.
 
 ### Task 9: 完整验证与文档
@@ -243,7 +243,7 @@ Expected: PASS.
 - [x] **Step 3: 构建并启动 release**
 
 Run: `pnpm tauri build --no-bundle`
-Expected: PASS and `flowproxy-desktop.exe` exists.
+Expected: PASS and `capybara-desktop.exe` exists.
 
 - [x] **Step 4: 自动操作 Runtime Demo**
 

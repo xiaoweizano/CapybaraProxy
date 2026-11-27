@@ -262,6 +262,65 @@ dependencies = [
 ]
 
 [[package]]
+name = "capybara-contracts"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "capybara-desktop"
+version = "0.1.0"
+dependencies = [
+ "capybara-contracts",
+ "capybara-mihomo-manager",
+ "capybara-platform",
+ "capybara-runtime",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tempfile",
+]
+
+[[package]]
+name = "capybara-mihomo-manager"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "capybara-contracts",
+ "reqwest",
+ "rustls",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "url",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "capybara-platform"
+version = "0.1.0"
+dependencies = [
+ "capybara-contracts",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "capybara-runtime"
+version = "0.1.0"
+dependencies = [
+ "capybara-contracts",
+ "capybara-mihomo-manager",
+ "regex",
+ "serde_json",
+]
+
+[[package]]
 name = "cargo-platform"
 version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -829,65 +888,6 @@ dependencies = [
  "crc32fast",
  "miniz_oxide 0.9.1",
  "zlib-rs",
-]
-
-[[package]]
-name = "flowproxy-contracts"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "flowproxy-desktop"
-version = "0.1.0"
-dependencies = [
- "flowproxy-contracts",
- "flowproxy-mihomo-manager",
- "flowproxy-platform",
- "flowproxy-runtime",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tempfile",
-]
-
-[[package]]
-name = "flowproxy-mihomo-manager"
-version = "0.1.0"
-dependencies = [
- "base64 0.22.1",
- "flowproxy-contracts",
- "reqwest",
- "rustls",
- "serde",
- "serde_json",
- "tempfile",
- "url",
- "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "flowproxy-platform"
-version = "0.1.0"
-dependencies = [
- "flowproxy-contracts",
- "serde",
- "serde_json",
- "tempfile",
- "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "flowproxy-runtime"
-version = "0.1.0"
-dependencies = [
- "flowproxy-contracts",
- "flowproxy-mihomo-manager",
- "regex",
- "serde_json",
 ]
 
 [[package]]

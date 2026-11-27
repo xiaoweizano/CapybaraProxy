@@ -130,7 +130,7 @@ const connectedProfile: ProfileInfo = {
 };
 
 const importedProfile: ProfileInfo = {
-  id: "flowproxy-subscription",
+  id: "capybara-subscription",
   name: "Imported subscription",
   active: true,
   updated_at_ms: 1_760_000_000_000,
@@ -481,7 +481,7 @@ describe("real data workspace pages", () => {
 
     await waitFor(() => {
       expect(removeSubscriptionMock).toHaveBeenCalledWith(
-        "flowproxy-subscription",
+        "capybara-subscription",
       );
     });
     expect(

@@ -1,5 +1,6 @@
 mod diagnostics;
 mod logging;
+mod migration;
 mod settings;
 mod speed_icon;
 mod substore;
@@ -8,14 +9,14 @@ mod traffic;
 mod tray_strings;
 mod tray_summary;
 
-use flowproxy_contracts::{
+use capybara_contracts::{
     CommandResult, ConnectionPage, CoreInfo, CorePreferences, DelayHistory, DelayHistoryEntry,
     DelayProbeSettings, GroupDelayResult, LogLevel, ProfileInfo, ProviderInfo, ProxyGroup,
     RoutingMode, RuleItem, RuntimeBackend, RuntimeError, RuntimeErrorCode, RuntimeLogEntry,
     RuntimeSnapshot, RuntimeState, StartupPreferences, SubscriptionSnapshot, TelemetrySnapshot,
 };
-use flowproxy_mihomo_manager::{MihomoAdapter, MihomoCoreAdapter, UnavailableMihomoAdapter};
-use flowproxy_runtime::{RuntimeChange, RuntimeFailure, RuntimeManager};
+use capybara_mihomo_manager::{MihomoAdapter, MihomoCoreAdapter, UnavailableMihomoAdapter};
+use capybara_runtime::{RuntimeChange, RuntimeFailure, RuntimeManager};
 use logging::LogFileStore;
 use settings::{
     CloseBehavior, DesktopSettings, SettingsStore, SettingsStoreError, TraySpeedDisplay,
@@ -39,7 +40,7 @@ use tauri::{
 use tray_summary::TraySummary;
 
 const MAIN_WINDOW_LABEL: &str = "main";
-const TRAY_ID: &str = "flowproxy";
+const TRAY_ID: &str = "capybara";
 const TRAY_TOGGLE_CONNECTION_ID: &str = "toggle-connection";
 const TRAY_STATUS_ID: &str = "tray-status";
 const TRAY_NODE_ID: &str = "tray-node";
@@ -79,7 +80,7 @@ fn local_date() -> String {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|duration| duration.as_secs())
         .unwrap_or(0);
-    format_date(seconds as i64 + flowproxy_platform::local_utc_offset_seconds())
+    format_date(seconds as i64 + capybara_platform::local_utc_offset_seconds())
 }
 
 /// Converts a Unix timestamp in seconds to `YYYY-MM-DD`.
@@ -124,7 +125,7 @@ struct AppState {
     /// Per-day transfer counters that survive a core restart.
     traffic: traffic::TrafficLedger,
     /// Installed core builds, when a settings directory is known.
-    core_versions: Option<flowproxy_mihomo_manager::CoreVersionStore>,
+    core_versions: Option<capybara_mihomo_manager::CoreVersionStore>,
     /// Last connection counters seen, so the ledger only adds the delta.
     traffic_sample: Mutex<Option<(u64, u64)>>,
     /// Recent latency measurements, oldest first. Bounded so a long session
@@ -151,7 +152,7 @@ impl AppState {
             logs,
             tray_summary: Mutex::new(None),
             core_versions: settings_directory.as_ref().map(|directory| {
-                flowproxy_mihomo_manager::CoreVersionStore::new(directory.join("cores"))
+                capybara_mihomo_manager::CoreVersionStore::new(directory.join("cores"))
             }),
             traffic: traffic::TrafficLedger::new(settings_directory.unwrap_or_default()),
             traffic_sample: Mutex::new(None),
@@ -421,7 +422,7 @@ impl ExitGate {
 
 fn log_native_error(action: &str, error: impl Display) {
     let message = error.to_string();
-    eprintln!("FlowProxy native window error while {action}: {message}");
+    eprintln!("CapybaraProxy native window error while {action}: {message}");
     if let Some(logs) = LOG_SINK.get() {
         logs.write_native_error(action, &message);
     }
@@ -818,11 +819,11 @@ fn refresh_tray_menu(app: &tauri::AppHandle) {
 fn run_tray_connection_action(app: &tauri::AppHandle, state: &AppState) {
     let runtime = state.runtime.snapshot();
     let result = match runtime.state {
-        flowproxy_contracts::RuntimeState::Stopped | flowproxy_contracts::RuntimeState::Error => {
+        capybara_contracts::RuntimeState::Stopped | capybara_contracts::RuntimeState::Error => {
             Some(state.system_integration.start_runtime())
         }
-        flowproxy_contracts::RuntimeState::RunningDisconnected
-        | flowproxy_contracts::RuntimeState::Connected => {
+        capybara_contracts::RuntimeState::RunningDisconnected
+        | capybara_contracts::RuntimeState::Connected => {
             Some(state.system_integration.stop_runtime())
         }
         _ => None,
@@ -987,7 +988,7 @@ fn set_system_proxy_enabled(
     }
 }
 
-/// Remembers whether the operator wants FlowProxy to own the system proxy.
+/// Remembers whether the operator wants CapybaraProxy to own the system proxy.
 ///
 /// The OS value is restored on every exit, so without this a relaunch would
 /// leave the system proxy off even though the operator turned it on. A save
@@ -1244,11 +1245,11 @@ fn import_subscription(
             state.runtime.set_pending_subscription_usage(None);
             // Pasted text goes through the same normalisation as a download so
             // a base64 share-link list works either way.
-            flowproxy_mihomo_manager::subscription_convert::normalize(&yaml)
+            capybara_mihomo_manager::subscription_convert::normalize(&yaml)
         }
         (_, Some(url)) => {
             let user_agent = state.settings().subscription_user_agent;
-            match flowproxy_mihomo_manager::subscription_fetch::fetch_with_user_agent(
+            match capybara_mihomo_manager::subscription_fetch::fetch_with_user_agent(
                 &url,
                 user_agent.as_deref(),
             ) {
@@ -1320,14 +1321,13 @@ fn refresh_subscription(
     };
 
     let user_agent = state.settings().subscription_user_agent;
-    let (document, usage) =
-        match flowproxy_mihomo_manager::subscription_fetch::fetch_with_user_agent(
-            &url,
-            user_agent.as_deref(),
-        ) {
-            Ok(result) => result,
-            Err(error) => return CommandResult::failure(error),
-        };
+    let (document, usage) = match capybara_mihomo_manager::subscription_fetch::fetch_with_user_agent(
+        &url,
+        user_agent.as_deref(),
+    ) {
+        Ok(result) => result,
+        Err(error) => return CommandResult::failure(error),
+    };
 
     if document.len() > MAX_SUBSCRIPTION_YAML_BYTES {
         return CommandResult::failure(RuntimeError::new(
@@ -1578,7 +1578,7 @@ fn spawn_runtime_health_loop(app: tauri::AppHandle) {
         .settings()
         .update_subscription_on_launch;
     let result = std::thread::Builder::new()
-        .name("flowproxy-runtime-health".to_owned())
+        .name("capybara-runtime-health".to_owned())
         .spawn(move || {
             let mut last_subscription_refresh = Instant::now() - AUTO_REFRESH_INITIAL_DELAY;
             let mut launch_refresh_pending = launch_refresh_pending;
@@ -1640,12 +1640,12 @@ const AUTO_REFRESH_MIN_SPACING: Duration = Duration::from_secs(60);
 ///
 /// The OS was restored to the operator's own settings on the previous exit, so
 /// the proxy is off at this point by design. This waits for the core to
-/// connect and then enables FlowProxy's proxy again, which is what "I turned it
+/// connect and then enables CapybaraProxy's proxy again, which is what "I turned it
 /// on last time" should mean. A core that never connects leaves the OS
 /// untouched.
 fn spawn_restore_system_proxy(app: tauri::AppHandle) {
     let result = std::thread::Builder::new()
-        .name("flowproxy-restore-system-proxy".to_owned())
+        .name("capybara-restore-system-proxy".to_owned())
         .spawn(move || {
             // The core starts on its own thread and can take a few seconds;
             // poll cheaply rather than sleeping for a fixed worst case.
@@ -1685,7 +1685,7 @@ fn spawn_restore_system_proxy(app: tauri::AppHandle) {
 /// through the Settings switch.
 fn spawn_auto_connect(app: tauri::AppHandle) {
     let result = std::thread::Builder::new()
-        .name("flowproxy-auto-connect".to_owned())
+        .name("capybara-auto-connect".to_owned())
         .spawn(move || {
             let state = app.state::<AppState>();
             match state.system_integration.start_runtime() {
@@ -1711,17 +1711,16 @@ fn spawn_auto_connect(app: tauri::AppHandle) {
 fn refresh_stored_subscription(app: &tauri::AppHandle, state: &AppState) -> Option<String> {
     let url = state.runtime.subscription_source_url()?;
     let user_agent = state.settings().subscription_user_agent;
-    let (document, usage) =
-        match flowproxy_mihomo_manager::subscription_fetch::fetch_with_user_agent(
-            &url,
-            user_agent.as_deref(),
-        ) {
-            Ok(result) => result,
-            Err(error) => {
-                log_native_error("downloading the stored subscription", error);
-                return None;
-            }
-        };
+    let (document, usage) = match capybara_mihomo_manager::subscription_fetch::fetch_with_user_agent(
+        &url,
+        user_agent.as_deref(),
+    ) {
+        Ok(result) => result,
+        Err(error) => {
+            log_native_error("downloading the stored subscription", error);
+            return None;
+        }
+    };
     if document.len() > MAX_SUBSCRIPTION_YAML_BYTES {
         log_native_error(
             "refreshing the stored subscription",
@@ -1853,14 +1852,13 @@ fn import_substore_subscription(
         return CommandResult::failure(error);
     }
     let user_agent = state.settings().subscription_user_agent;
-    let (document, usage) =
-        match flowproxy_mihomo_manager::subscription_fetch::fetch_with_user_agent(
-            &url,
-            user_agent.as_deref(),
-        ) {
-            Ok(result) => result,
-            Err(error) => return CommandResult::failure(error),
-        };
+    let (document, usage) = match capybara_mihomo_manager::subscription_fetch::fetch_with_user_agent(
+        &url,
+        user_agent.as_deref(),
+    ) {
+        Ok(result) => result,
+        Err(error) => return CommandResult::failure(error),
+    };
     if document.len() > MAX_SUBSCRIPTION_YAML_BYTES {
         return CommandResult::failure(RuntimeError::new(
             RuntimeErrorCode::SubscriptionInvalid,
@@ -1892,7 +1890,7 @@ fn import_substore_subscription(
 #[tauri::command]
 fn get_core_versions(
     state: State<'_, AppState>,
-) -> CommandResult<Vec<flowproxy_mihomo_manager::CoreVersion>> {
+) -> CommandResult<Vec<capybara_mihomo_manager::CoreVersion>> {
     let Some(store) = state.core_versions.as_ref() else {
         return CommandResult::failure(RuntimeError::new(
             RuntimeErrorCode::Internal,
@@ -1911,7 +1909,7 @@ fn get_core_versions(
 fn register_core_version(
     state: State<'_, AppState>,
     id: String,
-) -> CommandResult<Vec<flowproxy_mihomo_manager::CoreVersion>> {
+) -> CommandResult<Vec<capybara_mihomo_manager::CoreVersion>> {
     let Some(store) = state.core_versions.as_ref() else {
         return CommandResult::failure(RuntimeError::new(
             RuntimeErrorCode::Internal,
@@ -1933,7 +1931,7 @@ fn register_core_version(
 fn activate_core_version(
     state: State<'_, AppState>,
     id: Option<String>,
-) -> CommandResult<Vec<flowproxy_mihomo_manager::CoreVersion>> {
+) -> CommandResult<Vec<capybara_mihomo_manager::CoreVersion>> {
     let Some(store) = state.core_versions.as_ref() else {
         return CommandResult::failure(RuntimeError::new(
             RuntimeErrorCode::Internal,
@@ -2032,7 +2030,7 @@ fn open_log_directory(state: State<'_, AppState>) -> CommandResult<String> {
     }
 }
 
-/// Deletes every log file FlowProxy created and reports how many were removed.
+/// Deletes every log file CapybaraProxy created and reports how many were removed.
 #[tauri::command]
 fn clear_log_files(state: State<'_, AppState>) -> CommandResult<u32> {
     match logging::clear(&state.logs) {
@@ -2097,6 +2095,22 @@ pub fn run() {
         ])
         .setup(|app| {
             let config_directory = app.path().app_config_dir()?;
+            // The product was renamed, and the config directory moved with the
+            // identifier. Copy the previous tree once so an upgrade does not
+            // look like a fresh install.
+            match migration::migrate_config_directory(
+                migration::previous_config_directory().as_deref(),
+                &config_directory,
+            ) {
+                migration::MigrationOutcome::Copied { files } => {
+                    log_native_error("migrating the previous config directory", files);
+                }
+                migration::MigrationOutcome::Failed(error) => {
+                    log_native_error("migrating the previous config directory", error);
+                }
+                migration::MigrationOutcome::NotNeeded
+                | migration::MigrationOutcome::NoPreviousInstallation => {}
+            }
             let settings_store = SettingsStore::new(config_directory.clone());
             let loaded_settings = settings_store.load();
             if let Some(warning) = loaded_settings.warning {
@@ -2220,7 +2234,7 @@ pub fn run() {
             }
         })
         .run(tauri::generate_context!())
-        .expect("failed to run FlowProxy desktop application");
+        .expect("failed to run CapybaraProxy desktop application");
 }
 
 #[cfg(test)]
@@ -2231,9 +2245,9 @@ mod tests {
         MAX_IDENTIFIER_LENGTH,
     };
     use crate::settings::{CloseBehavior, DesktopSettings, SettingsStore, Theme, SETTINGS_VERSION};
-    use flowproxy_contracts::{CommandResult, RuntimeBackend, RuntimeErrorCode, RuntimeState};
-    use flowproxy_mihomo_manager::FakeMihomoAdapter;
-    use flowproxy_runtime::RuntimeManager;
+    use capybara_contracts::{CommandResult, RuntimeBackend, RuntimeErrorCode, RuntimeState};
+    use capybara_mihomo_manager::FakeMihomoAdapter;
+    use capybara_runtime::RuntimeManager;
     use serde_json::json;
     use std::path::Path;
     use std::sync::Arc;
@@ -2252,7 +2266,7 @@ mod tests {
         let system_integration = Arc::new(SystemIntegration::new(
             runtime.clone(),
             NativePlatform::new(directory),
-            directory.join("FlowProxy.exe"),
+            directory.join("CapybaraProxy.exe"),
         ));
         let logs = Arc::new(crate::logging::LogFileStore::new(directory.join("logs")));
         AppState::new(

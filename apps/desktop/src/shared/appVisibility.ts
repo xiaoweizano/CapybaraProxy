@@ -1,4 +1,4 @@
-export const APP_VISIBILITY_EVENT = "flowproxy:app-visibility";
+export const APP_VISIBILITY_EVENT = "capybara:app-visibility";
 
 export type AppVisibilityDetail = {
   hidden: boolean;

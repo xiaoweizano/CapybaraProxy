@@ -17,11 +17,11 @@ import {
 } from "./lib/tauri-cdp.mjs";
 
 const appExecutable = path.resolve(
-  process.env.FLOWPROXY_APP_EXECUTABLE ??
-    "F:/新建文件夹/FlowProxy/flowproxy-desktop.exe",
+  process.env.CAPYBARA_APP_EXECUTABLE ??
+    "F:/新建文件夹/CapybaraProxy/capybara-desktop.exe",
 );
 const outputDirectory = path.resolve(
-  process.env.FLOWPROXY_SCREENSHOT_DIR ?? "artifacts/screenshots/profiles-layout",
+  process.env.CAPYBARA_SCREENSHOT_DIR ?? "artifacts/screenshots/profiles-layout",
 );
 const browserPort = await findAvailablePort();
 
@@ -63,7 +63,7 @@ try {
   await page.evaluate(`
     (() => {
       document.documentElement.dataset.appVisibility = "visible";
-      window.dispatchEvent(new CustomEvent("flowproxy:app-visibility", {
+      window.dispatchEvent(new CustomEvent("capybara:app-visibility", {
         detail: { hidden: false },
       }));
     })()

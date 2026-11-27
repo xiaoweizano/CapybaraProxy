@@ -9,7 +9,7 @@
 //! core that is stopping: every read is best-effort and falls back to "no
 //! value" instead of propagating an error.
 
-use flowproxy_contracts::RuntimeState;
+use capybara_contracts::RuntimeState;
 
 use crate::speed_icon::format_speed;
 
@@ -56,7 +56,7 @@ impl TraySummary {
 #[cfg(test)]
 mod tests {
     use super::TraySummary;
-    use flowproxy_contracts::RuntimeState;
+    use capybara_contracts::RuntimeState;
 
     fn summary(state: RuntimeState, node: Option<&str>) -> TraySummary {
         TraySummary {

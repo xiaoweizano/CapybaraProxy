@@ -8,7 +8,7 @@ import {
   createPage,
   delay,
   findAvailablePort,
-  findFlowProxyPid,
+  findCapybaraProxyPid,
   runPowerShell,
   terminateProcessTree,
   waitForPageTarget,
@@ -16,19 +16,19 @@ import {
 } from "./lib/tauri-cdp.mjs";
 
 const appExecutable = path.resolve(
-  process.env.FLOWPROXY_APP_EXECUTABLE ??
-    "F:/codex-install/cargo-target/release/flowproxy-desktop.exe",
+  process.env.CAPYBARA_APP_EXECUTABLE ??
+    "F:/codex-install/cargo-target/release/capybara-desktop.exe",
 );
 const mihomoExecutable = path.resolve(
-  process.env.FLOWPROXY_MIHOMO_PATH ??
+  process.env.CAPYBARA_MIHOMO_PATH ??
     "F:/codex-install/mihomo/v1.19.33/win-amd64/mihomo-windows-amd64.exe",
 );
 const outputDirectory = path.resolve(
-  process.env.FLOWPROXY_SCREENSHOT_DIR ??
+  process.env.CAPYBARA_SCREENSHOT_DIR ??
     "artifacts/screenshots/stage6",
 );
 const evidencePath = path.resolve(
-  process.env.FLOWPROXY_STAGE6_CAPTURE_EVIDENCE ??
+  process.env.CAPYBARA_STAGE6_CAPTURE_EVIDENCE ??
     "artifacts/stage6-visual-evidence.json",
 );
 const pageUrlPrefix = "http://tauri.localhost/";
@@ -98,7 +98,7 @@ async function invokeOk(page, command, args, action) {
   const result = await page.invoke(command, args);
   assert(
     result?.ok,
-    `FlowProxy could not ${action}: ${JSON.stringify(result)}`,
+    `CapybaraProxy could not ${action}: ${JSON.stringify(result)}`,
   );
   return result.data;
 }
@@ -109,7 +109,7 @@ async function resizeNativeWindow(pid, width, height) {
     using System;
     using System.Runtime.InteropServices;
 
-    public static class FlowProxyStage6Window {
+    public static class CapybaraProxyStage6Window {
       [StructLayout(LayoutKind.Sequential)]
       public struct RECT {
         public int Left;
@@ -138,12 +138,12 @@ async function resizeNativeWindow(pid, width, height) {
     $process.Refresh();
     $handle = $process.MainWindowHandle;
     if ($handle -eq [IntPtr]::Zero) {
-      throw "FlowProxy has no visible main window handle."
+      throw "CapybaraProxy has no visible main window handle."
     }
 
     $flags = 0x0002 -bor 0x0004 -bor 0x0010;
     if (
-      -not [FlowProxyStage6Window]::SetWindowPos(
+      -not [CapybaraProxyStage6Window]::SetWindowPos(
         $handle,
         [IntPtr]::Zero,
         0,
@@ -153,12 +153,12 @@ async function resizeNativeWindow(pid, width, height) {
         $flags
       )
     ) {
-      throw "SetWindowPos failed for the FlowProxy main window."
+      throw "SetWindowPos failed for the CapybaraProxy main window."
     }
 
     Start-Sleep -Milliseconds 300;
-    $rect = New-Object FlowProxyStage6Window+RECT;
-    [void][FlowProxyStage6Window]::GetWindowRect($handle, [ref]$rect);
+    $rect = New-Object CapybaraProxyStage6Window+RECT;
+    [void][CapybaraProxyStage6Window]::GetWindowRect($handle, [ref]$rect);
     [ordered]@{
       handle = $handle.ToInt64()
       width = $rect.Right - $rect.Left
@@ -349,10 +349,10 @@ async function captureScreenshot(client, page, theme, viewport, view) {
   };
 }
 
-const existingPid = await findFlowProxyPid(appExecutable);
+const existingPid = await findCapybaraProxyPid(appExecutable);
 assert(
   existingPid === null,
-  `Stop FlowProxy process ${existingPid} before capturing Stage 6 screenshots.`,
+  `Stop CapybaraProxy process ${existingPid} before capturing Stage 6 screenshots.`,
 );
 
 await mkdir(outputDirectory, { recursive: true });
@@ -364,7 +364,7 @@ const child = spawn(appExecutable, [], {
   cwd: path.dirname(appExecutable),
   env: {
     ...process.env,
-    FLOWPROXY_MIHOMO_PATH: mihomoExecutable,
+    CAPYBARA_MIHOMO_PATH: mihomoExecutable,
     WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: [
       process.env.WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS,
       `--remote-debugging-port=${browserPort}`,
@@ -379,7 +379,7 @@ const appPid = child.pid;
 let client = null;
 let page = null;
 let runtimeStarted = false;
-let currentStep = "launching FlowProxy";
+let currentStep = "launching CapybaraProxy";
 const evidence = {
   timestamp: new Date().toISOString(),
   runtimeHost: "tauri-webview2",
@@ -397,7 +397,7 @@ const evidence = {
 try {
   assert(
     Number.isInteger(appPid) && appPid > 0,
-    "FlowProxy did not return a process identifier.",
+    "CapybaraProxy did not return a process identifier.",
   );
   const target = await waitForPageTarget(browserPort, {
     expectedUrlPrefix: pageUrlPrefix,
@@ -411,7 +411,7 @@ try {
     `document.readyState === "complete" &&
       document.querySelector(".app-frame") !== null &&
       typeof window.__TAURI_INTERNALS__?.invoke === "function"`,
-    "the FlowProxy application shell",
+    "the CapybaraProxy application shell",
     30_000,
   );
   evidence.startup = {
@@ -460,7 +460,7 @@ try {
       assert(
         windowSize.viewport.width === viewport.width &&
           windowSize.viewport.height === viewport.height,
-        `FlowProxy viewport did not reach ${viewport.width}x${viewport.height}: ${JSON.stringify(
+        `CapybaraProxy viewport did not reach ${viewport.width}x${viewport.height}: ${JSON.stringify(
           windowSize,
         )}`,
       );
@@ -516,6 +516,6 @@ try {
   if (!exited) {
     await terminateProcessTree(appPid).catch(() => undefined);
     child.kill();
-    throw new Error("FlowProxy did not exit after Stage 6 screenshot capture.");
+    throw new Error("CapybaraProxy did not exit after Stage 6 screenshot capture.");
   }
 }

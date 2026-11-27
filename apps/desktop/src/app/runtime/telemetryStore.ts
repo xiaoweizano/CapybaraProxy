@@ -148,7 +148,7 @@ export function createTelemetryStore(
         ...state,
         lastError: {
           code: "internal",
-          message: "FlowProxy could not read live telemetry.",
+          message: "CapybaraProxy could not read live telemetry.",
           retryable: true,
         },
       };

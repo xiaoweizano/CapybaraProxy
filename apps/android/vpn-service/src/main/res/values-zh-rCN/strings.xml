@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="notification_title">FlowProxy</string>
+    <string name="notification_title">CapybaraProxy</string>
     <string name="notification_preparing">正在准备 VPN 会话</string>
     <string name="notification_ready">VPN 接口就绪</string>
     <string name="notification_ready_no_core">VPN 接口就绪 · 代理核心不可用</string>
     <string name="notification_stop">停止</string>
-    <string name="vpn_session_name">FlowProxy - 代理核心不可用</string>
+    <string name="vpn_session_name">CapybaraProxy - 代理核心不可用</string>
     <string name="vpn_interface_rejected">Android 拒绝了 VPN 接口</string>
 </resources>

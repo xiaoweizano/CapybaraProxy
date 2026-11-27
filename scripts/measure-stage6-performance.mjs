@@ -10,7 +10,7 @@ import {
   createPage,
   delay,
   findAvailablePort,
-  findFlowProxyPid,
+  findCapybaraProxyPid,
   runPowerShell,
   terminateProcessTree,
   waitForPageTarget,
@@ -18,32 +18,32 @@ import {
 } from "./lib/tauri-cdp.mjs";
 
 const appExecutable = path.resolve(
-  process.env.FLOWPROXY_APP_EXECUTABLE ??
-    "F:/codex-install/cargo-target/release/flowproxy-desktop.exe",
+  process.env.CAPYBARA_APP_EXECUTABLE ??
+    "F:/codex-install/cargo-target/release/capybara-desktop.exe",
 );
 const mihomoExecutable = path.resolve(
-  process.env.FLOWPROXY_MIHOMO_PATH ??
+  process.env.CAPYBARA_MIHOMO_PATH ??
     "F:/codex-install/mihomo/v1.19.33/win-amd64/mihomo-windows-amd64.exe",
 );
 const configRoot =
-  process.env.FLOWPROXY_CONFIG_ROOT ??
+  process.env.CAPYBARA_CONFIG_ROOT ??
   path.join(
     process.env.APPDATA ??
       (() => {
         throw new Error("APPDATA is unavailable.");
       })(),
-    "com.flowproxy.desktop",
+    "com.capybara.proxy",
   );
 const outputPath = path.resolve(
-  process.env.FLOWPROXY_PERF_OUTPUT ??
+  process.env.CAPYBARA_PERF_OUTPUT ??
     "artifacts/stage6-performance-before.json",
 );
-const scale = Number(process.env.FLOWPROXY_PERF_SCALE ?? "1");
+const scale = Number(process.env.CAPYBARA_PERF_SCALE ?? "1");
 const fullSizeConnections = Number(
-  process.env.FLOWPROXY_PERF_LARGE_CONNECTIONS ?? "160",
+  process.env.CAPYBARA_PERF_LARGE_CONNECTIONS ?? "160",
 );
 const sampleIntervalMs = Number(
-  process.env.FLOWPROXY_PERF_SAMPLE_INTERVAL_MS ?? "5000",
+  process.env.CAPYBARA_PERF_SAMPLE_INTERVAL_MS ?? "5000",
 );
 const pageUrlPrefix = "http://tauri.localhost/";
 const scenarioDurations = {
@@ -59,11 +59,11 @@ const largeConnectionCount = Math.max(
 
 assert(
   Number.isFinite(scale) && scale > 0,
-  "FLOWPROXY_PERF_SCALE must be a positive number.",
+  "CAPYBARA_PERF_SCALE must be a positive number.",
 );
 assert(
   Number.isFinite(sampleIntervalMs) && sampleIntervalMs >= 500,
-  "FLOWPROXY_PERF_SAMPLE_INTERVAL_MS must be at least 500.",
+  "CAPYBARA_PERF_SAMPLE_INTERVAL_MS must be at least 500.",
 );
 
 function processCategory(processName) {
@@ -77,8 +77,8 @@ function processCategory(processName) {
     return "webview";
   }
 
-  if (normalized.startsWith("flowproxy")) {
-    return "flowproxy";
+  if (normalized.startsWith("capybara")) {
+    return "capybara";
   }
 
   return "other";
@@ -86,7 +86,7 @@ function processCategory(processName) {
 
 function summarizeProcesses(processes) {
   const byCategory = Object.fromEntries(
-    ["flowproxy", "webview", "mihomo", "other"].map((category) => [
+    ["capybara", "webview", "mihomo", "other"].map((category) => [
       category,
       {
         processCount: 0,
@@ -533,7 +533,7 @@ async function showHiddenWindow() {
     );
     $flowProxyName = New-Object System.Windows.Automation.PropertyCondition(
       [System.Windows.Automation.AutomationElement]::NameProperty,
-      "FlowProxy"
+      "CapybaraProxy"
     );
     $trayButtonCondition = New-Object System.Windows.Automation.AndCondition(
       $buttonType,
@@ -595,7 +595,7 @@ async function showHiddenWindow() {
     }
 
     if (-not $trayButton) {
-      throw "The FlowProxy tray icon was not found.";
+      throw "The CapybaraProxy tray icon was not found.";
     }
     $trayInvoke = $trayButton.GetCurrentPattern(
       [System.Windows.Automation.InvokePattern]::Pattern
@@ -605,10 +605,10 @@ async function showHiddenWindow() {
   return Date.now();
 }
 
-const existingPid = await findFlowProxyPid(appExecutable);
+const existingPid = await findCapybaraProxyPid(appExecutable);
 assert(
   existingPid === null,
-  `Stop FlowProxy process ${existingPid} before the Stage 6 performance run.`,
+  `Stop CapybaraProxy process ${existingPid} before the Stage 6 performance run.`,
 );
 
 const browserPort = await findAvailablePort();
@@ -617,7 +617,7 @@ const child = spawn(appExecutable, [], {
   cwd: path.dirname(appExecutable),
   env: {
     ...process.env,
-    FLOWPROXY_MIHOMO_PATH: mihomoExecutable,
+    CAPYBARA_MIHOMO_PATH: mihomoExecutable,
     WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: [
       process.env.WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS,
       `--remote-debugging-port=${browserPort}`,
@@ -635,7 +635,7 @@ let runtimeStarted = false;
 let trafficTarget = null;
 let traffic = null;
 let heldConnections = null;
-let currentStep = "launching FlowProxy";
+let currentStep = "launching CapybaraProxy";
 const evidence = {
   timestamp: new Date().toISOString(),
   status: "started",
@@ -662,7 +662,7 @@ const evidence = {
 try {
   assert(
     Number.isInteger(appPid) && appPid > 0,
-    "FlowProxy did not return a process identifier.",
+    "CapybaraProxy did not return a process identifier.",
   );
   const target = await waitForPageTarget(browserPort, {
     expectedUrlPrefix: pageUrlPrefix,
@@ -678,7 +678,7 @@ try {
       document.querySelector(".app-frame") !== null &&
       document.querySelector(".page-viewport") !== null &&
       typeof window.__TAURI_INTERNALS__?.invoke === "function"`,
-    "the interactive FlowProxy shell",
+    "the interactive CapybaraProxy shell",
     30_000,
   );
   await page.evaluate(

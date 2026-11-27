@@ -2,7 +2,7 @@
 
 ## 1. 设计基准
 
-本目录中的两张用户上传图片是 FlowProxy V1 的权威视觉参考：
+本目录中的两张用户上传图片是 CapybaraProxy V1 的权威视觉参考：
 
 - `assets/design-reference/A.png`
 - `assets/design-reference/C.png`

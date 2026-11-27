@@ -38,7 +38,7 @@ export async function readWindowsStage4Registry() {
     [ordered]@{
       proxyEnable = Read-Value '${INTERNET_SETTINGS_KEY}' 'ProxyEnable'
       proxyServer = Read-Value '${INTERNET_SETTINGS_KEY}' 'ProxyServer'
-      startup = Read-Value '${STARTUP_RUN_KEY}' 'FlowProxy'
+      startup = Read-Value '${STARTUP_RUN_KEY}' 'CapybaraProxy'
     } | ConvertTo-Json -Depth 6 -Compress
   `);
 
@@ -75,7 +75,7 @@ export async function applyWindowsStage4Registry(state) {
 
     Set-Value '${INTERNET_SETTINGS_KEY}' 'ProxyEnable' $state.proxyEnable;
     Set-Value '${INTERNET_SETTINGS_KEY}' 'ProxyServer' $state.proxyServer;
-    Set-Value '${STARTUP_RUN_KEY}' 'FlowProxy' $state.startup;
+    Set-Value '${STARTUP_RUN_KEY}' 'CapybaraProxy' $state.startup;
   `);
 }
 

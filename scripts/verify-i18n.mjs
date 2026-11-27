@@ -19,14 +19,14 @@ import {
 } from "./lib/tauri-cdp.mjs";
 
 const appExecutable = path.resolve(
-  process.env.FLOWPROXY_APP_EXECUTABLE ??
-    "F:/新建文件夹/FlowProxy/flowproxy-desktop.exe",
+  process.env.CAPYBARA_APP_EXECUTABLE ??
+    "F:/新建文件夹/CapybaraProxy/capybara-desktop.exe",
 );
 const artifactDirectory = path.resolve(
-  process.env.FLOWPROXY_ARTIFACTS ?? "artifacts/screenshots/packaged-acceptance",
+  process.env.CAPYBARA_ARTIFACTS ?? "artifacts/screenshots/packaged-acceptance",
 );
 const evidencePath = path.resolve(
-  process.env.FLOWPROXY_I18N_EVIDENCE ?? "artifacts/i18n-acceptance.json",
+  process.env.CAPYBARA_I18N_EVIDENCE ?? "artifacts/i18n-acceptance.json",
 );
 
 const evidence = { startedAt: new Date().toISOString(), steps: [], screenshots: [] };
@@ -74,7 +74,7 @@ async function main() {
     await page.evaluate(`
       (() => {
         document.documentElement.dataset.appVisibility = "visible";
-        window.dispatchEvent(new CustomEvent("flowproxy:app-visibility", {
+        window.dispatchEvent(new CustomEvent("capybara:app-visibility", {
           detail: { hidden: false },
         }));
       })()

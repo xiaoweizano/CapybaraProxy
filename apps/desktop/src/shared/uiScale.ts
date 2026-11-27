@@ -12,7 +12,7 @@ export const MAX_UI_SCALE = 140;
 /** Selectable values, in percent. */
 export const UI_SCALE_STEPS = [85, 92, 100, 110, 120, 130, 140] as const;
 
-export const UI_SCALE_STORAGE_KEY = "flowproxy.uiScale";
+export const UI_SCALE_STORAGE_KEY = "capybara.uiScale";
 
 /**
  * 16px at 100%, which keeps the familiar browser default as the baseline for

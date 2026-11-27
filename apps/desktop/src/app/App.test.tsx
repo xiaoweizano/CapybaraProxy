@@ -267,7 +267,7 @@ describe("App shell", () => {
 
     await waitFor(() => {
       expect(document.documentElement.dataset.theme).toBe("warm_flow");
-      expect(window.localStorage.getItem("flowproxy.theme")).toBe("warm_flow");
+      expect(window.localStorage.getItem("capybara.theme")).toBe("warm_flow");
     });
 
     firstRender.unmount();
@@ -278,7 +278,7 @@ describe("App shell", () => {
       expect(document.documentElement.dataset.theme).toBe("warm_flow");
     });
     expect(
-      screen.getByRole("img", { name: "FlowProxy mascot" }),
+      screen.getByRole("img", { name: "CapybaraProxy mascot" }),
     ).toBeInTheDocument();
   });
 });

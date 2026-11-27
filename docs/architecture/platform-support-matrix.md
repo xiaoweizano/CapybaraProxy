@@ -1,11 +1,11 @@
-# FlowProxy 平台支持矩阵
+# CapybaraProxy 平台支持矩阵
 
 更新日期：2026-11-24
 
 最近桌面运行验证：Windows 10 专业版 22H2，10.0.19045，x64
 
 最近 Android 运行验证：Android 8.0.0，API 26，x86_64 模拟器
-`FlowProxy_API_26`（2026-11-07；此后模拟器因缺少硬件加速驱动无法启动，
+`CapybaraProxy_API_26`（2026-11-07；此后模拟器因缺少硬件加速驱动无法启动，
 签名 release APK 未做安装验证）
 
 ## 状态定义
@@ -53,9 +53,9 @@
 - 启用系统代理要求 Runtime 已连接，并只使用 Mihomo adapter 返回的已验证
   `127.0.0.1:<port>` 回环端点。
 - 启用前写入有版本、大小受限且原子替换的 `system-proxy.json` Journal。
-- 用户或其他软件修改代理后，FlowProxy 释放所有权，不覆盖外部值。
+- 用户或其他软件修改代理后，CapybaraProxy 释放所有权，不覆盖外部值。
 - 应用和核心同时异常终止时，下一次应用启动会尝试恢复遗留 Journal。
-- 开机启动固定使用当前用户 `Run\FlowProxy`，命令仅为带引号的应用绝对路径。
+- 开机启动固定使用当前用户 `Run\CapybaraProxy`，命令仅为带引号的应用绝对路径。
 - 同名外部开机启动值会被保留并报告为 `conflict`。
 - 无后台 Windows 服务；异常终止到下次启动之间存在无法自动缩小的恢复窗口。
 - 托盘菜单代码已完成，但真实鼠标点击路径尚未人工验收。
@@ -116,7 +116,7 @@
 
 - 安装包（NSIS，`currentUser` 模式）自带 Mihomo `v1.19.33` 与 geodata，安装后无需手动放置核心。
 - 订阅导入端到端验证通过：粘贴 YAML → 校验 → 写入 → 启动后 Proxies 页面出现订阅节点。
-- 订阅原文存于 `%APPDATA%\com.flowproxy.desktop\mihomo\config.subscription.yaml`，明文，不加密。
+- 订阅原文存于 `%APPDATA%\com.capybara.proxy\mihomo\config.subscription.yaml`，明文，不加密。
 - 出站流量的公网可达性**未验证**：验收时本机 DNS 与 IP 直连均超时，混合端口返回 502，只证明代理链路在工作。
 - geodata 为快照，会随规则更新过时，无自动更新。
 - 安装包约 22 MiB（LZMA solid），解包后约 28.9 MB，其中 Mihomo 核心约 61 MB（未压缩）。

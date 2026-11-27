@@ -17,10 +17,10 @@ const projectRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname.
 const resourcesRoot = path.join(projectRoot, "apps", "desktop", "src-tauri", "resources");
 
 const MIHOMO_SOURCE =
-  process.env.FLOWPROXY_MIHOMO_SOURCE ??
+  process.env.CAPYBARA_MIHOMO_SOURCE ??
   "F:/codex-install/mihomo/v1.19.33/win-amd64/mihomo-windows-amd64.exe";
 const GEODATA_CACHE =
-  process.env.FLOWPROXY_GEODATA_CACHE ?? "F:/codex-install/geodata/meta-rules-dat";
+  process.env.CAPYBARA_GEODATA_CACHE ?? "F:/codex-install/geodata/meta-rules-dat";
 
 // SHA-256 of the pinned Mihomo release. Must match LOCKED_MIHOMO_SHA256 in
 // crates/mihomo-manager/src/binary.rs.

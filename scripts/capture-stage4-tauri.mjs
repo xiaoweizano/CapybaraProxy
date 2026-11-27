@@ -13,18 +13,18 @@ import {
   createPage,
   delay,
   findAvailablePort,
-  findFlowProxyPid,
+  findCapybaraProxyPid,
   terminateProcessTree,
   waitForPageTarget,
   waitForProcessExit,
 } from "./lib/tauri-cdp.mjs";
 
 const appExecutable = path.resolve(
-  process.env.FLOWPROXY_APP_EXECUTABLE ??
-    "F:/codex-install/cargo-target/release/flowproxy-desktop.exe",
+  process.env.CAPYBARA_APP_EXECUTABLE ??
+    "F:/codex-install/cargo-target/release/capybara-desktop.exe",
 );
 const mihomoExecutable = path.resolve(
-  process.env.FLOWPROXY_MIHOMO_PATH ??
+  process.env.CAPYBARA_MIHOMO_PATH ??
     "F:/codex-install/mihomo/v1.19.33/win-amd64/mihomo-windows-amd64.exe",
 );
 const configRoot = path.join(
@@ -32,7 +32,7 @@ const configRoot = path.join(
     (() => {
       throw new Error("APPDATA is unavailable.");
     })(),
-  "com.flowproxy.desktop",
+  "com.capybara.proxy",
 );
 const settingsPath = path.join(configRoot, "settings.json");
 const outputDirectory = path.resolve("artifacts/screenshots");
@@ -74,7 +74,7 @@ async function invokeOk(page, command, args, action) {
   const result = await page.invoke(command, args);
   assert(
     result?.ok,
-    `FlowProxy could not ${action}: ${JSON.stringify(result)}`,
+    `CapybaraProxy could not ${action}: ${JSON.stringify(result)}`,
   );
   return result.data;
 }
@@ -193,17 +193,17 @@ async function saveTheme(page, theme) {
   await page.waitFor(
     `document.readyState === "complete" &&
       typeof window.__TAURI_INTERNALS__?.invoke === "function"`,
-    "FlowProxy to reload",
+    "CapybaraProxy to reload",
     30_000,
   );
   await page.evaluate('location.hash = "/settings";');
   await waitForSettingsPage(page, theme);
 }
 
-const existingPid = await findFlowProxyPid(appExecutable);
+const existingPid = await findCapybaraProxyPid(appExecutable);
 assert(
   existingPid === null,
-  `Stop FlowProxy process ${existingPid} before capturing stage 4 screenshots.`,
+  `Stop CapybaraProxy process ${existingPid} before capturing stage 4 screenshots.`,
 );
 
 await mkdir(outputDirectory, { recursive: true });
@@ -215,7 +215,7 @@ const child = spawn(appExecutable, [], {
   cwd: path.dirname(appExecutable),
   env: {
     ...process.env,
-    FLOWPROXY_MIHOMO_PATH: mihomoExecutable,
+    CAPYBARA_MIHOMO_PATH: mihomoExecutable,
     WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: [
       process.env.WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS,
       `--remote-debugging-port=${browserPort}`,
@@ -241,7 +241,7 @@ let exited = false;
 try {
   assert(
     Number.isInteger(appPid) && appPid > 0,
-    "FlowProxy did not return a process identifier.",
+    "CapybaraProxy did not return a process identifier.",
   );
   const target = await waitForPageTarget(browserPort, {
     expectedUrlPrefix: pageUrlPrefix,
@@ -259,7 +259,7 @@ try {
     `document.readyState === "complete" &&
       document.querySelector(".app-frame") !== null &&
       typeof window.__TAURI_INTERNALS__?.invoke === "function"`,
-    "the FlowProxy application shell",
+    "the CapybaraProxy application shell",
   );
   await client.send("Page.bringToFront");
 
@@ -358,5 +358,5 @@ try {
 }
 
 if (!exited) {
-  throw new Error("FlowProxy did not exit after screenshot capture.");
+  throw new Error("CapybaraProxy did not exit after screenshot capture.");
 }

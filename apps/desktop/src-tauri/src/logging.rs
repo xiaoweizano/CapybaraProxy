@@ -10,8 +10,8 @@
 //! the core or the UI down, so all I/O errors are swallowed after the first
 //! report.
 
-use flowproxy_contracts::RuntimeLogLevel;
-use flowproxy_runtime::redact_sensitive_text;
+use capybara_contracts::RuntimeLogLevel;
+use capybara_runtime::redact_sensitive_text;
 use std::fs::{self, File, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -19,7 +19,7 @@ use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Prefix of every file this module creates; `prune` only touches these.
-const FILE_PREFIX: &str = "flowproxy-";
+const FILE_PREFIX: &str = "capybara-";
 const FILE_SUFFIX: &str = ".log";
 
 /// Owns the open file and the date it belongs to.
@@ -191,7 +191,7 @@ fn level_label(level: RuntimeLogLevel) -> &'static str {
     }
 }
 
-/// Extracts `YYYY-MM-DD` from `flowproxy-YYYY-MM-DD.log`.
+/// Extracts `YYYY-MM-DD` from `capybara-YYYY-MM-DD.log`.
 fn parse_log_file_day(name: &str) -> Option<String> {
     let rest = name.strip_prefix(FILE_PREFIX)?;
     let day = rest.strip_suffix(FILE_SUFFIX)?;
@@ -281,7 +281,7 @@ mod tests {
     use super::{
         clear, iso8601, parse_log_file_day, utc_day_string, LogFileStore, FILE_PREFIX, FILE_SUFFIX,
     };
-    use flowproxy_contracts::RuntimeLogLevel;
+    use capybara_contracts::RuntimeLogLevel;
     use std::fs;
 
     fn store(directory: &std::path::Path) -> LogFileStore {
@@ -376,11 +376,11 @@ mod tests {
     #[test]
     fn parses_only_this_modules_file_names() {
         assert_eq!(
-            parse_log_file_day("flowproxy-2026-11-26.log").as_deref(),
+            parse_log_file_day("capybara-2026-11-26.log").as_deref(),
             Some("2026-11-26")
         );
-        assert_eq!(parse_log_file_day("flowproxy-2026-11-26.txt"), None);
-        assert_eq!(parse_log_file_day("flowproxy-2026-1-26.log"), None);
+        assert_eq!(parse_log_file_day("capybara-2026-11-26.txt"), None);
+        assert_eq!(parse_log_file_day("capybara-2026-1-26.log"), None);
         assert_eq!(parse_log_file_day("other-2026-11-26.log"), None);
     }
 

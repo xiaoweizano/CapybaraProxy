@@ -254,7 +254,7 @@ export function RulesPage() {
  * Read-only by design: the provider's URL and refresh timer belong to the
  * profile author, and Mihomo fetches them on its own network stack. Showing
  * them here answers "where did these nodes and rules come from" without
- * pretending FlowProxy manages the fetch.
+ * pretending CapybaraProxy manages the fetch.
  */
 function ProvidersPanel({ connected }: { connected: boolean }) {
   const { t } = useTranslation();

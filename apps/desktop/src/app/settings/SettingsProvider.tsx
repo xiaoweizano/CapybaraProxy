@@ -206,8 +206,8 @@ function writePreferenceCache(settings: AppPreferences): void {
 function hasLegacyPreferences(): boolean {
   try {
     return (
-      window.localStorage.getItem("flowproxy.theme") !== null ||
-      window.localStorage.getItem("flowproxy.closeBehavior") !== null
+      window.localStorage.getItem("capybara.theme") !== null ||
+      window.localStorage.getItem("capybara.closeBehavior") !== null
     );
   } catch {
     return false;
@@ -318,7 +318,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       } catch {
         if (!disposed) {
           changeMode("native");
-          setError("FlowProxy settings could not be loaded.");
+          setError("CapybaraProxy settings could not be loaded.");
         }
       }
     };
@@ -356,7 +356,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         try {
           result = await saveSettings(toNativeSettings(nextSettings));
         } catch {
-          const message = "FlowProxy could not save desktop settings.";
+          const message = "CapybaraProxy could not save desktop settings.";
           setError(message);
           return { ok: false, message } as const;
         }
@@ -389,7 +389,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const updateTheme = useCallback(
     (theme: ThemeId): Promise<SettingsUpdateResult> => {
       if (!isTheme(theme)) {
-        const message = "Unknown FlowProxy theme.";
+        const message = "Unknown CapybaraProxy theme.";
         setError(message);
         return Promise.resolve({ ok: false, message });
       }
@@ -408,7 +408,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const updateLanguage = useCallback(
     (language: LanguageId): Promise<SettingsUpdateResult> => {
       if (!isLanguage(language)) {
-        const message = "Unknown FlowProxy language.";
+        const message = "Unknown CapybaraProxy language.";
         setError(message);
         return Promise.resolve({ ok: false, message });
       }

@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.flowproxy.mihomo.bridge"
+    namespace = "com.capybara.mihomo.bridge"
     compileSdk = 35
 
     defaultConfig {

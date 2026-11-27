@@ -1,5 +1,5 @@
 export const DEFAULT_THEME = "cyber_flow" as const;
-export const THEME_STORAGE_KEY = "flowproxy.theme";
+export const THEME_STORAGE_KEY = "capybara.theme";
 
 export type ThemeId = "cyber_flow" | "warm_flow";
 

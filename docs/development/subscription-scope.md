@@ -32,7 +32,7 @@
 
   转换结果补一个 `Proxy` 选择组与 `GEOIP,CN,DIRECT` / `MATCH,Proxy` 规则；
   节点名重复时按 `名称 2`、`名称 3` 去重。下载请求的 `User-Agent` 为
-  `clash.meta/<版本> (FlowProxy)`，机场据此下发 Clash YAML。
+  `clash.meta/<版本> (CapybaraProxy)`，机场据此下发 Clash YAML。
 - **系统代理**：下载订阅时若 Windows 已配置系统代理（Clash 等客户端常见），
   请求会走该代理；代理连接失败时自动用一次 15 秒超时的直连重试。旁路列表
   （`ProxyOverride`，含 `<local>` 与 `*` 通配）会被遵守，回环地址始终直连。
@@ -41,9 +41,9 @@
   不参与路由，也不会被当成运行中的真实状态（界面会明确标注「Mihomo 未运行」）。
 - 导入前执行 `mihomo -t -d <工作目录> -f <候选文件>` 校验；校验不通过不写入。
 - 写入采用原子替换：先写临时文件，校验通过后重命名，失败自动回滚。
-- 控制面隔离：订阅中以下顶层键会被移除并替换为 FlowProxy 控制值。
+- 控制面隔离：订阅中以下顶层键会被移除并替换为 CapybaraProxy 控制值。
 
-  | 被移除的键 | FlowProxy 写入的值 |
+  | 被移除的键 | CapybaraProxy 写入的值 |
   | --- | --- |
   | `mixed-port`、`port`、`socks-port`、`redir-port`、`tproxy-port` | `mixed-port: <Runtime 预留端口>` |
   | `external-controller`、`external-controller-tls`、`external-controller-unix`、`external-controller-pipe` | 命令行 `-ext-ctl 127.0.0.1:<预留端口>` |
@@ -54,7 +54,7 @@
   | `external-ui` | 移除 |
 
 - 订阅原文其余部分逐字节保留，包括注释、锚点、多行字符串与规则顺序。
-- 移除订阅后回到内置的 `FlowProxy Direct` 直连配置。
+- 移除订阅后回到内置的 `CapybaraProxy Direct` 直连配置。
 - **自动更新**：`Settings → Subscription` 可设置「启动时更新」与「每 N 小时更新」
   （0/6/12/24 预设，或 1–168 小时自定义）。刷新由桌面健康循环在后台完成，成功时发出
   `subscription-updated` 事件。打开「更新后重启」后，若核心正在运行，刷新成功会
@@ -70,7 +70,7 @@
   `total=0` 按「不限量」显示。粘贴导入与不发送该头的服务商不显示这一块。
   该信息是导入时的快照，只有在刷新订阅时才会更新。
 - **自定义 User-Agent**：`Settings → Subscription` 可填写下载订阅时发送的
-  User-Agent；留空使用内置的 `clash.meta/<版本> (FlowProxy)`。含控制字符或
+  User-Agent；留空使用内置的 `clash.meta/<版本> (CapybaraProxy)`。含控制字符或
   超过 512 字符的值会被原生层清除并回退到默认值。
 
 ## 安全约束
@@ -103,7 +103,7 @@ meta-rules-dat 使用 GPL-3.0，与本项目许可证一致。
 - **单节点或节点列表导入**：只接受完整配置文档。
 - **单份订阅的历史版本**：多订阅库是并列的多份配置，没有「同一订阅的上一版」
   回滚 UI。
-- **`proxy-providers` 的远程节点列表**：`proxy-providers` 段会原样保留，但其中的 `url` 由 Mihomo 在运行时自行拉取，FlowProxy 不代理、不校验、不缓存。
+- **`proxy-providers` 的远程节点列表**：`proxy-providers` 段会原样保留，但其中的 `url` 由 Mihomo 在运行时自行拉取，CapybaraProxy 不代理、不校验、不缓存。
 - **订阅内的 TUN 配置会被执行**：`tun:` 段在订阅里保留。当前阶段 TUN 能力本身未验证，实际是否生效取决于 Mihomo 与平台权限。
 
 ## 运维注意
@@ -111,4 +111,4 @@ meta-rules-dat 使用 GPL-3.0，与本项目许可证一致。
 - 导入、切换或修改覆写后，如果 Runtime 已在运行，需要停止再启动才会用上新配置；
   开启「更新后重启」时，自动更新会自己完成这一步。界面会给出提示。
 - 订阅原文保存在 `<配置目录>\mihomo\config.subscription.yaml`，元数据在同目录 `config.subscription.json`。两者都是明文，**不加密**。
-- 若订阅需要 `proxy-providers` 远程拉取，Mihomo 走的是它自己的网络栈，不受 FlowProxy 的 URL 校验约束。
+- 若订阅需要 `proxy-providers` 远程拉取，Mihomo 走的是它自己的网络栈，不受 CapybaraProxy 的 URL 校验约束。

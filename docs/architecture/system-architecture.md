@@ -1,4 +1,4 @@
-# FlowProxy 系统架构
+# CapybaraProxy 系统架构
 
 ## 1. 总体结构
 
@@ -74,12 +74,12 @@ Android：
 ## 6. 目录建议
 
 ```text
-FlowProxy/
+CapybaraProxy/
 ├── apps/
 │   ├── desktop/                 # React + Tauri
 │   └── android/                 # Kotlin + Compose
 ├── crates/
-│   ├── flowproxy-runtime/
+│   ├── capybara-runtime/
 │   ├── mihomo-manager/
 │   ├── system-proxy/
 │   ├── tun-manager/

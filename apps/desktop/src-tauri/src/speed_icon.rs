@@ -60,7 +60,7 @@ fn format_scaled(value: f64, unit: &str, max: f64) -> String {
 /// Renders a 32×32 RGBA icon with the upload row above the download row.
 ///
 /// `None` rows (a stopped core) render as an idle underline instead of text so
-/// the icon still reads as "FlowProxy is here, nothing is flowing".
+/// the icon still reads as "CapybaraProxy is here, nothing is flowing".
 pub(crate) fn render(upload: Option<u64>, download: Option<u64>) -> tauri::image::Image<'static> {
     let mut rgba = vec![0_u8; (ICON_SIZE * ICON_SIZE * 4) as usize];
 

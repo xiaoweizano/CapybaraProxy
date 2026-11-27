@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.flowproxy.core.data"
+    namespace = "com.capybara.core.data"
     compileSdk = 35
 
     defaultConfig {

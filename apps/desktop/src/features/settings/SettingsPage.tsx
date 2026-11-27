@@ -182,7 +182,7 @@ export function SettingsPage() {
   const tunCapability = integration.status?.capabilities.tun;
   const systemProxyEnabled =
     integration.status?.system_proxy.state === "enabled";
-  // The choice is remembered even while the OS value is off: FlowProxy restores
+  // The choice is remembered even while the OS value is off: CapybaraProxy restores
   // the journal on exit, so between launches the backend reports "disabled"
   // although the operator's intent is still "on". Say so instead of dropping
   // the switch back to off.
@@ -637,7 +637,7 @@ export function SettingsPage() {
 /**
  * Installed core builds.
  *
- * FlowProxy ships one locked core. An operator who wants a newer build drops
+ * CapybaraProxy ships one locked core. An operator who wants a newer build drops
  * the file into the cores folder, registers it (which records its digest), and
  * switches to it. Registration is the verification step: a build whose digest
  * cannot be read never appears in the list. A switch takes effect on the next
@@ -1134,7 +1134,7 @@ function AutoUpdateCustom({ controlsDisabled }: { controlsDisabled: boolean }) {
   );
 }
 
-/** The bypass list written to the system proxy while FlowProxy owns it. */
+/** The bypass list written to the system proxy while CapybaraProxy owns it. */
 function ProxyBypassField({ controlsDisabled }: { controlsDisabled: boolean }) {
   const { t } = useTranslation();
   const { settings, updateProxyBypass } = useAppSettings();

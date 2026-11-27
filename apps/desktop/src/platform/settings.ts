@@ -27,7 +27,7 @@ export type DesktopSettings = {
   subscription_update_hours?: number;
   /** Refresh the stored subscription once, right after launch. */
   update_subscription_on_launch?: boolean;
-  /** Connect the core as soon as FlowProxy launches. */
+  /** Connect the core as soon as CapybaraProxy launches. */
   auto_connect?: boolean;
   /** User-Agent for subscription downloads; `null`/absent keeps the default. */
   subscription_user_agent?: string | null;
@@ -35,7 +35,7 @@ export type DesktopSettings = {
   proxy_bypass?: string | null;
   /** Restart the core after an automatic subscription refresh. */
   restart_after_subscription_update?: boolean;
-  /** Whether FlowProxy owns the system proxy; restored on the next launch. */
+  /** Whether CapybaraProxy owns the system proxy; restored on the next launch. */
   system_proxy_enabled?: boolean;
   /** How many settings groups the Settings page shows. */
   settings_mode?: SettingsMode;
@@ -157,7 +157,7 @@ function invalidSettingsResponse<T>(): SettingsBridgeResult<T> {
     status: "error",
     error: {
       code: "internal",
-      message: "FlowProxy received an invalid settings response.",
+      message: "CapybaraProxy received an invalid settings response.",
       retryable: true,
     },
   };

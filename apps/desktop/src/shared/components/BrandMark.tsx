@@ -4,7 +4,7 @@ export function BrandMark({ className = "" }: { className?: string }) {
       className={className}
       viewBox="0 0 64 48"
       role="img"
-      aria-label="FlowProxy"
+      aria-label="CapybaraProxy"
     >
       <defs>
         <linearGradient id="brand-flow" x1="8" y1="12" x2="56" y2="38">

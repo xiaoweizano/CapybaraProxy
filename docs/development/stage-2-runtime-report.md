@@ -2,7 +2,7 @@
 
 日期：2026-11-05
 
-范围：FlowProxy 桌面 Runtime 骨架、Runtime Demo UI、原生设置持久化和受控退出；Windows 优先验证。
+范围：CapybaraProxy 桌面 Runtime 骨架、Runtime Demo UI、原生设置持久化和受控退出；Windows 优先验证。
 
 ## 1. 结论
 
@@ -19,9 +19,9 @@
 
 | 层级 | 位置 | 职责 |
 | --- | --- | --- |
-| 共享契约 | `crates/flowproxy-contracts` | Runtime 状态、错误码、命令结果、快照和日志类型 |
+| 共享契约 | `crates/capybara-contracts` | Runtime 状态、错误码、命令结果、快照和日志类型 |
 | Mihomo adapter | `crates/mihomo-manager` | `MihomoAdapter` 接口与无进程副作用的 Fake adapter |
-| Runtime | `crates/flowproxy-runtime` | 状态机、串行化变更、日志缓冲、脱敏和错误映射 |
+| Runtime | `crates/capybara-runtime` | 状态机、串行化变更、日志缓冲、脱敏和错误映射 |
 | Tauri 组合根 | `apps/desktop/src-tauri` | 命令/事件注册、原生设置、托盘和受控退出 |
 | 前端平台层 | `apps/desktop/src/platform` | 固定 typed bridge，不向业务组件暴露任意 invoke |
 | 前端功能层 | `apps/desktop/src/features/runtime` | Runtime Demo UI，只通过 bridge 访问 Runtime |
@@ -59,14 +59,14 @@ Runtime 修改由单个互斥锁串行化，快照序号单调递增。日志容
 
 Rust 测试分布：
 
-- `flowproxy-contracts`：5
-- `flowproxy-desktop`：12
-- `flowproxy-mihomo-manager`：3
-- `flowproxy-runtime`：18
+- `capybara-contracts`：5
+- `capybara-desktop`：12
+- `capybara-mihomo-manager`：3
+- `capybara-runtime`：18
 
 release 程序：
 
-- 路径：`F:\codex-install\cargo-target\release\flowproxy-desktop.exe`
+- 路径：`F:\codex-install\cargo-target\release\capybara-desktop.exe`
 - 大小：10,843,648 B
 - SHA-256：`680D61321981511C51BE0221652018E8B459C719EA94D37AF6B40163B21E5D70`
 

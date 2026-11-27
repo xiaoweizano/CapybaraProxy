@@ -2,9 +2,9 @@
 resolver = "2"
 members = [
   "apps/desktop/src-tauri",
-  "crates/flowproxy-contracts",
-  "crates/flowproxy-platform",
-  "crates/mihomo-manager",
-  "crates/flowproxy-runtime",
+  "crates/capybara-contracts",
+  "crates/capybara-platform",
+  "crates/capybara-mihomo-manager",
+  "crates/capybara-runtime",
 ]
 

@@ -6,7 +6,7 @@
 
 ## 背景
 
-FlowProxy 需要跨平台桌面 UI、低后台资源占用、原生窗口和托盘能力，并为后续 Rust Runtime Manager 与 Mihomo 子进程管理保留清晰边界。第一阶段禁止接入真实代理核心、系统代理和 TUN。
+CapybaraProxy 需要跨平台桌面 UI、低后台资源占用、原生窗口和托盘能力，并为后续 Rust Runtime Manager 与 Mihomo 子进程管理保留清晰边界。第一阶段禁止接入真实代理核心、系统代理和 TUN。
 
 ## 决策
 

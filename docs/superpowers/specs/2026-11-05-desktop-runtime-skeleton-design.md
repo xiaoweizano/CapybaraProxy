@@ -1,4 +1,4 @@
-# FlowProxy 桌面 Runtime 骨架设计
+# CapybaraProxy 桌面 Runtime 骨架设计
 
 日期：2026-11-05
 
@@ -31,9 +31,9 @@
 
 工程使用根级 Cargo workspace：
 
-- `crates/flowproxy-contracts`：共享 Runtime 类型、错误、日志和快照。
+- `crates/capybara-contracts`：共享 Runtime 类型、错误、日志和快照。
 - `crates/mihomo-manager`：`MihomoAdapter` trait 和 `FakeMihomoAdapter`。
-- `crates/flowproxy-runtime`：状态机、命令串行化、日志缓存和 adapter 编排。
+- `crates/capybara-runtime`：状态机、命令串行化、日志缓存和 adapter 编排。
 - `apps/desktop/src-tauri`：Tauri 组合根、设置存储、commands/events、窗口与托盘生命周期。
 - `apps/desktop/src`：Runtime Demo UI、typed bridge 和现有设置集成。
 

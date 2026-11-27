@@ -496,7 +496,7 @@ function isSubStoreList(value: unknown): value is SubStoreSubscription[] {
 function invalidRuntimeError(): RuntimeError {
   return {
     code: "internal",
-    message: "FlowProxy received an invalid Runtime response.",
+    message: "CapybaraProxy received an invalid Runtime response.",
     retryable: true,
   };
 }
@@ -944,7 +944,7 @@ export function exportDiagnostics(): Promise<RuntimeBridgeResult<string>> {
   return executeRuntimeCommand("export_diagnostics", isString);
 }
 
-/** Deletes every log file FlowProxy created. */
+/** Deletes every log file CapybaraProxy created. */
 export function clearLogFiles(): Promise<RuntimeBridgeResult<number>> {
   return executeRuntimeCommand(
     "clear_log_files",

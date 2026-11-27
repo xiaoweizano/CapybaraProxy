@@ -213,7 +213,7 @@ function invalidIntegrationResponse<T>(): SystemIntegrationBridgeResult<T> {
     status: "error",
     error: {
       code: "internal",
-      message: "FlowProxy received an invalid system integration response.",
+      message: "CapybaraProxy received an invalid system integration response.",
       retryable: true,
     },
   };

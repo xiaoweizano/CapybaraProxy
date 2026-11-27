@@ -64,7 +64,7 @@ describe("ThemeProvider", () => {
       expect(screen.getByText("warm_flow")).toBeInTheDocument();
     });
     expect(document.documentElement.dataset.theme).toBe("warm_flow");
-    expect(localStorage.getItem("flowproxy.theme")).toBe("warm_flow");
+    expect(localStorage.getItem("capybara.theme")).toBe("warm_flow");
   });
 });
 

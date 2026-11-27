@@ -228,7 +228,7 @@ describe("SettingsProvider", () => {
     await user.click(screen.getByRole("button", { name: "Use Warm Flow" }));
 
     expect(await screen.findByTestId("error")).toHaveTextContent(
-      "FlowProxy could not save desktop settings.",
+      "CapybaraProxy could not save desktop settings.",
     );
     expect(screen.getByTestId("theme")).toHaveTextContent("cyber_flow");
     expect(readStoredTheme(localStorage)).toBe("cyber_flow");

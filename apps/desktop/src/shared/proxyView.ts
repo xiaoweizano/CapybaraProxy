@@ -8,9 +8,9 @@
  */
 export type NodeSort = "default" | "delay" | "name";
 
-const SORT_STORAGE_KEY = "flowproxy.proxies.sort";
-const COLLAPSED_STORAGE_KEY = "flowproxy.proxies.collapsed";
-const FAVORITES_STORAGE_KEY = "flowproxy.proxies.favorites";
+const SORT_STORAGE_KEY = "capybara.proxies.sort";
+const COLLAPSED_STORAGE_KEY = "capybara.proxies.collapsed";
+const FAVORITES_STORAGE_KEY = "capybara.proxies.favorites";
 
 type Reader = { getItem(key: string): string | null };
 type Writer = { setItem(key: string, value: string): void };

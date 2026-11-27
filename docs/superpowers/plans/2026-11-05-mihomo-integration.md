@@ -1,4 +1,4 @@
-# FlowProxy Desktop Mihomo Integration Implementation Plan
+# CapybaraProxy Desktop Mihomo Integration Implementation Plan
 
 > **Goal:** Complete desktop phase 3 with a real, locally managed Mihomo core, real control API data, safe configuration activation, crash detection, and real-data desktop pages.
 
@@ -15,9 +15,9 @@
 
 ## Architecture
 
-- `flowproxy-contracts` owns serializable runtime, proxy, traffic, rule, connection, profile, and core information contracts.
-- `flowproxy-mihomo-manager` owns binary verification, safe configuration rendering, atomic profile activation, process lifecycle, log collection, and the loopback-only control API client.
-- `flowproxy-runtime` owns state transitions and exposes adapter data without holding the state lock across process or HTTP work.
+- `capybara-contracts` owns serializable runtime, proxy, traffic, rule, connection, profile, and core information contracts.
+- `capybara-mihomo-manager` owns binary verification, safe configuration rendering, atomic profile activation, process lifecycle, log collection, and the loopback-only control API client.
+- `capybara-runtime` owns state transitions and exposes adapter data without holding the state lock across process or HTTP work.
 - Tauri is the composition root. It exposes only fixed typed commands/events and never an arbitrary shell, path, URL, or HTTP API.
 - React reads real Runtime data. Mock Overview data is not rendered by the production application.
 

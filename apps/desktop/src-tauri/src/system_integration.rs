@@ -1,10 +1,10 @@
-use flowproxy_contracts::{RuntimeError, RuntimeErrorCode, RuntimeState};
-use flowproxy_mihomo_manager::MihomoAdapter;
-use flowproxy_platform::{
+use capybara_contracts::{RuntimeError, RuntimeErrorCode, RuntimeState};
+use capybara_mihomo_manager::MihomoAdapter;
+use capybara_platform::{
     PlatformCapabilities, PlatformError, PlatformErrorKind, ProxyRecovery, StartupActionOutcome,
     StartupState, SystemProxySnapshot,
 };
-use flowproxy_runtime::{RuntimeChange, RuntimeFailure, RuntimeManager};
+use capybara_runtime::{RuntimeChange, RuntimeFailure, RuntimeManager};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -471,9 +471,9 @@ where
     /// Re-applies an operator's saved "system proxy on" choice after a launch.
     ///
     /// The OS keeps whatever the operator's proxy client left behind, and
-    /// FlowProxy restores the journal on exit, so a fresh launch starts with
+    /// CapybaraProxy restores the journal on exit, so a fresh launch starts with
     /// the proxy pointing somewhere else. This re-enables it once the core is
-    /// connected, but never touches a proxy FlowProxy does not already own
+    /// connected, but never touches a proxy CapybaraProxy does not already own
     /// unless the operator asked for it in settings.
     pub fn restore_enabled_proxy(&self) -> HealthOutcome {
         let mut integration_error = None;
@@ -525,11 +525,11 @@ where
     }
 
     fn record_platform_error(&self, action: &str, error: &PlatformError) -> RuntimeError {
-        eprintln!("FlowProxy platform error while attempting to {action}: {error}");
+        eprintln!("CapybaraProxy platform error while attempting to {action}: {error}");
         let runtime_error = RuntimeError::new(
             RuntimeErrorCode::PlatformIntegration,
             format!(
-                "FlowProxy could not {action}. Review the current network settings before continuing."
+                "CapybaraProxy could not {action}. Review the current network settings before continuing."
             ),
             matches!(
                 error.kind,
@@ -647,7 +647,7 @@ mod windows_platform {
         PlatformControl, PlatformError, PlatformKind, ProxyRecovery, StartupActionOutcome,
         StartupState, SystemProxySnapshot,
     };
-    use flowproxy_platform::{
+    use capybara_platform::{
         capabilities_from_windows_probe, registry_proxy_backend, registry_startup_backend,
         PlatformCapabilities, RealRegistry, RealWinInetNotifier, StartupManager,
         SystemProxyManager, WindowsProxyBackend, WindowsStartupBackend,
@@ -728,7 +728,7 @@ mod unsupported_platform {
         PlatformControl, PlatformError, PlatformKind, ProxyRecovery, StartupActionOutcome,
         StartupState, SystemProxySnapshot,
     };
-    use flowproxy_platform::{
+    use capybara_platform::{
         unverified_capabilities, PlatformCapabilities, PlatformError, PlatformErrorKind,
     };
     use std::path::Path;
@@ -808,14 +808,14 @@ mod tests {
         IntegrationFailure, LaunchAtLoginState, PlatformControl, PlatformKind, RuntimeControl,
         StartupActionOutcome, StartupState, SystemIntegration,
     };
-    use flowproxy_contracts::{
+    use capybara_contracts::{
         RuntimeBackend, RuntimeError, RuntimeErrorCode, RuntimeSnapshot, RuntimeState,
     };
-    use flowproxy_platform::{
+    use capybara_platform::{
         CapabilityState, CapabilityStatus, PlatformCapabilities, PlatformError, PlatformErrorKind,
         ProxyRecovery, SystemProxySnapshot,
     };
-    use flowproxy_runtime::{RuntimeChange, RuntimeFailure};
+    use capybara_runtime::{RuntimeChange, RuntimeFailure};
     use std::path::{Path, PathBuf};
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::{Arc, Barrier, Mutex};
@@ -1005,7 +1005,7 @@ mod tests {
 
         fn capabilities(&mut self) -> PlatformCapabilities {
             if self.platform_kind != PlatformKind::Windows {
-                return flowproxy_platform::unverified_capabilities(
+                return capybara_platform::unverified_capabilities(
                     "System integration is verified on Windows only.",
                 );
             }
@@ -1086,7 +1086,7 @@ mod tests {
         ) -> Result<StartupActionOutcome, PlatformError> {
             self.startup = StartupState::Enabled;
             Ok(StartupActionOutcome::Changed(
-                flowproxy_platform::StartupStatus {
+                capybara_platform::StartupStatus {
                     state: self.startup.clone(),
                     command: None,
                     expected_command: String::new(),
@@ -1100,7 +1100,7 @@ mod tests {
         ) -> Result<StartupActionOutcome, PlatformError> {
             self.startup = StartupState::Disabled;
             Ok(StartupActionOutcome::Changed(
-                flowproxy_platform::StartupStatus {
+                capybara_platform::StartupStatus {
                     state: self.startup.clone(),
                     command: None,
                     expected_command: String::new(),
@@ -1121,7 +1121,7 @@ mod tests {
         let integration = Arc::new(SystemIntegration::new(
             runtime.clone(),
             platform,
-            PathBuf::from(r"C:\Program Files\FlowProxy\FlowProxy.exe"),
+            PathBuf::from(r"C:\Program Files\CapybaraProxy\CapybaraProxy.exe"),
         ));
         (integration, runtime, events)
     }
@@ -1221,7 +1221,7 @@ mod tests {
         let integration = SystemIntegration::new(
             runtime,
             platform,
-            PathBuf::from("/Applications/FlowProxy.app"),
+            PathBuf::from("/Applications/CapybaraProxy.app"),
         );
 
         let status = integration
@@ -1253,7 +1253,7 @@ mod tests {
         let integration = SystemIntegration::new(
             runtime,
             platform,
-            PathBuf::from("/usr/bin/flowproxy-desktop"),
+            PathBuf::from("/usr/bin/capybara-desktop"),
         );
 
         let status = integration
@@ -1277,7 +1277,7 @@ mod tests {
         let integration = SystemIntegration::new(
             runtime,
             platform,
-            PathBuf::from(r"C:\Program Files\FlowProxy\FlowProxy.exe"),
+            PathBuf::from(r"C:\Program Files\CapybaraProxy\CapybaraProxy.exe"),
         );
 
         let failure = integration
@@ -1305,7 +1305,7 @@ mod tests {
         let integration = SystemIntegration::new(
             runtime.clone(),
             platform,
-            PathBuf::from(r"C:\Program Files\FlowProxy\FlowProxy.exe"),
+            PathBuf::from(r"C:\Program Files\CapybaraProxy\CapybaraProxy.exe"),
         );
 
         integration.restart_runtime().expect("runtime restarts");
@@ -1350,7 +1350,7 @@ mod tests {
         let integration = SystemIntegration::new(
             runtime.clone(),
             platform,
-            PathBuf::from(r"C:\Program Files\FlowProxy\FlowProxy.exe"),
+            PathBuf::from(r"C:\Program Files\CapybaraProxy\CapybaraProxy.exe"),
         );
         runtime.set_health(change(RuntimeState::Error, 6));
 

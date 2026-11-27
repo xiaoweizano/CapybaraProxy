@@ -23,7 +23,7 @@ Android 视觉与性能见阶段 5 报告；本轮 Android 只补齐签名产物
 | 操作系统 | Windows 10 Pro，10.0.19045，x64 |
 | 逻辑处理器 | 8 |
 | 物理内存 | 34,233,077,760 字节（约 31.9 GiB） |
-| 被测程序 | `flowproxy-desktop.exe`（release，`--no-bundle` 构建） |
+| 被测程序 | `capybara-desktop.exe`（release，`--no-bundle` 构建） |
 | 窗口模式 | 标准窗口 1280×820 |
 | 主题 | A Cyber Flow |
 
@@ -83,7 +83,7 @@ Android 视觉与性能见阶段 5 报告；本轮 Android 只补齐签名产物
 
 | 项目 | 值 |
 | --- | --- |
-| 路径 | `F:\codex-install\cargo-target\release\bundle\nsis\FlowProxy_0.2.0_x64-setup.exe` |
+| 路径 | `F:\codex-install\cargo-target\release\bundle\nsis\CapybaraProxy_0.2.0_x64-setup.exe` |
 | 大小 | 23,064,741 字节（约 22 MiB，LZMA solid） |
 | 安装模式 | `currentUser`（不要求管理员权限） |
 | 解包后体积 | 约 28.9 MB（含 61 MB 未压缩的 Mihomo exe，压缩后显著变小） |
@@ -92,7 +92,7 @@ Android 视觉与性能见阶段 5 报告；本轮 Android 只补齐签名产物
 
 ```text
 <InstallDir>\
-  flowproxy-desktop.exe
+  capybara-desktop.exe
   resources\
     mihomo\mihomo.exe        (61,247,488 字节，SHA-256 与锁定版本一致)
     geodata\geosite.dat
@@ -105,7 +105,7 @@ Android 视觉与性能见阶段 5 报告；本轮 Android 只补齐签名产物
 
 首次安装（目标目录不存在时）用 `/S` 静默模式可以正常完成，实测安装到用户选择的目录并落位了全部资源。
 
-**已安装过的情况下再执行 `setup.exe /S` 会卡住**：安装器进程常驻不退出，也不更新目标目录，只能手动结束进程。表现见本轮复现（两个 `FlowProxy_0.2.0_x64-setup` 进程停留数分钟无进展）。常规的图形界面双击安装不受影响，但**用脚本重复部署同一个安装包时需要注意**。
+**已安装过的情况下再执行 `setup.exe /S` 会卡住**：安装器进程常驻不退出，也不更新目标目录，只能手动结束进程。表现见本轮复现（两个 `CapybaraProxy_0.2.0_x64-setup` 进程停留数分钟无进展）。常规的图形界面双击安装不受影响，但**用脚本重复部署同一个安装包时需要注意**。
 
 本轮最终二进制是直接复制到安装目录做验收的，目录结构与安装器产出的一致（`resources/mihomo/mihomo.exe`、`resources/geodata/*`）。安装器本身的覆盖安装行为列为 P2 待查。
 
@@ -115,7 +115,7 @@ Android 视觉与性能见阶段 5 报告；本轮 Android 只补齐签名产物
 
 | 步骤 | 结果 |
 | --- | --- |
-| 未设置 `FLOWPROXY_MIHOMO_PATH` 时能找到捆绑核心 | 通过 |
+| 未设置 `CAPYBARA_MIHOMO_PATH` 时能找到捆绑核心 | 通过 |
 | 在 Profiles 页面粘贴 YAML 导入订阅 | 通过，提示 "Subscription imported" |
 | 点击 Overview 的 Connect 启动 Runtime | 通过，状态变为 `Connected` |
 | 导入的节点出现在 Proxies 页面 | 通过（`Proxy → Local Test`） |
@@ -134,13 +134,13 @@ Android 视觉与性能见阶段 5 报告；本轮 Android 只补齐签名产物
 | SHA-256 | `c69c7c4170e3ab711f8ec43cc4b2f280f0c01044a29749d3c42c1e37faa8c705` |
 | versionName / versionCode | `0.2.0-stage6` / `2` |
 | 签名 | APK Signature Scheme v2 有效，单签名者 |
-| 证书 DN | `CN=FlowProxy, OU=Development, O=FlowProxy, L=Local, ST=Local, C=CN` |
+| 证书 DN | `CN=CapybaraProxy, OU=Development, O=CapybaraProxy, L=Local, ST=Local, C=CN` |
 | 证书 SHA-256 | `1e81a340b493e80de1490dea41c9e2bf99e5974f0aeec698d21277822f337696` |
 | zipalign | 4 字节对齐通过 |
 
 **未完成**：安装到设备验证。本机模拟器无法启动（`x86_64 emulation currently requires hardware acceleration`，未安装 Android Emulator Hypervisor Driver），与阶段 5 记录的环境限制一致。APK 的安装与运行行为仍以阶段 5 的 Debug 构建结果为准。
 
-**证书保管**：keystore 位于 `F:\codex-install\flowproxy-keystore\flowproxy-release.jks`，密码在同目录 `.password`，两者都不入库。**后续所有版本必须使用同一证书签名**，否则无法覆盖安装。
+**证书保管**：keystore 位于 `F:\codex-install\capybara-keystore\capybara-release.jks`，密码在同目录 `.password`，两者都不入库。**后续所有版本必须使用同一证书签名**，否则无法覆盖安装。
 
 ## 6. 本轮发现并修复的问题
 

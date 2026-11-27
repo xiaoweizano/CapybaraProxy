@@ -81,7 +81,7 @@ describe("runtime bridge", () => {
       ok: false,
       error: {
         code: "already_running",
-        message: "FlowProxy Runtime is already running.",
+        message: "CapybaraProxy Runtime is already running.",
         retryable: false,
       },
     });
@@ -92,7 +92,7 @@ describe("runtime bridge", () => {
       status: "error",
       error: {
         code: "already_running",
-        message: "FlowProxy Runtime is already running.",
+        message: "CapybaraProxy Runtime is already running.",
         retryable: false,
       },
     });
@@ -111,7 +111,7 @@ describe("runtime bridge", () => {
     if (result.status === "error") {
       expect(result.error.code).toBe("internal");
       expect(result.error.message).toBe(
-        "FlowProxy received an invalid Runtime response.",
+        "CapybaraProxy received an invalid Runtime response.",
       );
     }
   });
@@ -317,7 +317,7 @@ describe("runtime bridge", () => {
             index: 0,
             rule_type: "MATCH",
             payload: "",
-            proxy: "FlowProxy Direct",
+            proxy: "CapybaraProxy Direct",
           },
         ],
       })
@@ -325,8 +325,8 @@ describe("runtime bridge", () => {
         ok: true,
         data: [
           {
-            id: "flowproxy-direct",
-            name: "FlowProxy Direct",
+            id: "capybara-direct",
+            name: "CapybaraProxy Direct",
             active: true,
             updated_at_ms: null,
           },

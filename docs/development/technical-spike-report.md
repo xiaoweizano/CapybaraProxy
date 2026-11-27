@@ -2,7 +2,7 @@
 
 日期：2026-11-05
 
-范围：FlowProxy 桌面 UI 原型，Windows 优先验证
+范围：CapybaraProxy 桌面 UI 原型，Windows 优先验证
 
 > 本报告只记录第一阶段结果，不包含第二阶段 Runtime 骨架。当前构建、测试、依赖审计和 Runtime Demo 验收以 `docs/development/stage-2-runtime-report.md` 为准；本报告中的审计数据是第一阶段当次证据，不能替代第二阶段复验。
 
@@ -55,7 +55,7 @@ RustSec warning：
 
 release 程序路径：
 
-`F:\codex-install\cargo-target\release\flowproxy-desktop.exe`
+`F:\codex-install\cargo-target\release\capybara-desktop.exe`
 
 release 可执行文件大小：9,179,136 B。
 
@@ -66,7 +66,7 @@ release SHA-256：`55BAC6DE0CFC0FC3AD0C832800D27753E82C8EE3FBB80AD1C06B813CA0786
 - Windows release 程序成功启动，原生无边框窗口和 WebView UI 正常渲染。
 - 使用 WebView2 CDP 实际点击并验证 Overview、Proxies、Rules、Connections、Profiles、Logs、Settings 七个导航入口。
 - A Cyber Flow 为默认主题，C Warm Flow 可通过主题控件切换。
-- A/C 主题在页面重载后均保持选择，主题键为 `flowproxy.theme`。
+- A/C 主题在页面重载后均保持选择，主题键为 `capybara.theme`。
 - A 主题首页显示 Network Orb，C 主题首页显示原创蓝白吉祥物 SVG。
 - 生产资源指纹与本次构建产物一致；本地字体加载成功，没有横向溢出。
 - 未发现运行时异常、控制台错误或生产 CSP 资源阻断。
@@ -114,7 +114,7 @@ release SHA-256：`55BAC6DE0CFC0FC3AD0C832800D27753E82C8EE3FBB80AD1C06B813CA0786
 1. 高延迟和未测量延迟使用了成功视觉状态，可能误导用户。现已分别映射为警告/不可用状态，并增加回归测试。
 2. 未测量延迟的环形仪表仍会绘制终点光点。现仅在存在有效有限数值时绘制该端点，并增加回归测试。
 3. Rust 测试代码存在 rustfmt 格式问题。现已修复并通过 `cargo fmt -- --check`。
-4. 截图脚本固定调试端口，重复运行时可能与现有进程冲突。现支持通过 `FLOWPROXY_CDP_PORT` 指定端口。
+4. 截图脚本固定调试端口，重复运行时可能与现有进程冲突。现支持通过 `CAPYBARA_CDP_PORT` 指定端口。
 5. Proxy Group 切换此前只更新本地显示，节点列表不联动。现已按代理组过滤节点、自动选择组内首节点，并同步更新延迟和地图。
 6. 生产图表模块此前可能在空数据时合成默认曲线。现已移除合成流量，空数据保持不绘制；Mock 流量只在明确隔离的预览数据层提供。
 7. Mock 流量、会话和连接数据此前标注不够明确。现已分别显示 `Mock traffic`、`Mock sessions` 等提示，避免被误认为真实运行状态。
@@ -138,7 +138,7 @@ release SHA-256：`55BAC6DE0CFC0FC3AD0C832800D27753E82C8EE3FBB80AD1C06B813CA0786
 
 Tauri 已创建托盘菜单和隐藏的 `tray_icon_app` 原生消息窗口，代码包含 Show、Exit、托盘左键恢复与关闭行为切换。默认关闭隐藏已经通过标准窗口关闭消息自动验证。
 
-当前自动化桌面会话无法公开定位 Windows 通知区中收起的 FlowProxy 图标，因此“点击托盘 Show 恢复窗口”和“点击托盘 Exit 退出”仍要求人工鼠标验收，不能记录为已自动验证。
+当前自动化桌面会话无法公开定位 Windows 通知区中收起的 CapybaraProxy 图标，因此“点击托盘 Show 恢复窗口”和“点击托盘 Exit 退出”仍要求人工鼠标验收，不能记录为已自动验证。
 
 ## 8. 后续入口条件
 

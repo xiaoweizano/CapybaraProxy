@@ -14,9 +14,9 @@ import {
   waitForPageTarget,
 } from "./lib/tauri-cdp.mjs";
 
-const exe = "F:/新建文件夹/FlowProxy/flowproxy-desktop.exe";
+const exe = "F:/新建文件夹/CapybaraProxy/capybara-desktop.exe";
 const fixture = await readFile(
-  process.env.FLOWPROXY_SUBSCRIPTION ?? "F:/codex-install/subscriptions/test-sub.yaml",
+  process.env.CAPYBARA_SUBSCRIPTION ?? "F:/codex-install/subscriptions/test-sub.yaml",
   "utf8",
 );
 const port = await findAvailablePort();
@@ -45,7 +45,7 @@ try {
   await page.evaluate(`
     (() => {
       document.documentElement.dataset.appVisibility = "visible";
-      window.dispatchEvent(new CustomEvent("flowproxy:app-visibility", {
+      window.dispatchEvent(new CustomEvent("capybara:app-visibility", {
         detail: { hidden: false },
       }));
     })()

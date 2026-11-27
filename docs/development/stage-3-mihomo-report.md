@@ -21,9 +21,9 @@
 
 | 层级 | 位置 | 职责 |
 | --- | --- | --- |
-| 共享契约 | `crates/flowproxy-contracts` | Runtime、核心信息、代理、延迟、流量、连接、规则、Profile 和错误码 |
+| 共享契约 | `crates/capybara-contracts` | Runtime、核心信息、代理、延迟、流量、连接、规则、Profile 和错误码 |
 | Mihomo 管理 | `crates/mihomo-manager` | 二进制校验、配置生成、原子写入、进程管理、日志采集和 loopback API client |
-| Runtime | `crates/flowproxy-runtime` | 状态机、并发控制、健康轮询、崩溃检测、日志脱敏和有界缓存 |
+| Runtime | `crates/capybara-runtime` | 状态机、并发控制、健康轮询、崩溃检测、日志脱敏和有界缓存 |
 | Tauri 组合根 | `apps/desktop/src-tauri` | 固定 typed commands/events、设置、托盘和受控退出 |
 | 前端平台层 | `apps/desktop/src/platform` | 固定 bridge，不向业务组件暴露任意 shell、路径、URL 或 HTTP 调用 |
 | 前端功能层 | `apps/desktop/src/features` | Overview、Proxies、Rules、Connections、Profiles、Logs 和 Settings |
@@ -62,14 +62,14 @@
 
 Rust 测试分布：
 
-- `flowproxy-contracts`：8
-- `flowproxy-desktop`：15
-- `flowproxy-mihomo-manager`：29
-- `flowproxy-runtime`：28
+- `capybara-contracts`：8
+- `capybara-desktop`：15
+- `capybara-mihomo-manager`：29
+- `capybara-runtime`：28
 
 最新 release：
 
-- 路径：`F:\codex-install\cargo-target\release\flowproxy-desktop.exe`
+- 路径：`F:\codex-install\cargo-target\release\capybara-desktop.exe`
 - 大小：11,130,368 B
 - SHA-256：`77015DC1D05AFCF7D3BD553B490963FEE0894CDFD7F47ABB674B8A9E5089BE62`
 - 构建时间：2026-11-06 10:42:03

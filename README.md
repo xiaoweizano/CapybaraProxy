@@ -1,10 +1,10 @@
-# FlowProxy
+# CapybaraProxy
 
 > **Your Network. Your Flow.** / 让网络自由流动。
 >
 > English: [README.en.md](README.en.md)
 
-FlowProxy 是一个跨平台的网络代理客户端。它自带并托管 Mihomo 核心，用统一的界面管理订阅、代理组、规则、连接与系统代理，而不是让用户直接编辑 YAML 或操作命令行。
+CapybaraProxy 是一个跨平台的网络代理客户端。它自带并托管 Mihomo 核心，用统一的界面管理订阅、代理组、规则、连接与系统代理，而不是让用户直接编辑 YAML 或操作命令行。
 
 当前代码库包含可运行的 Windows 桌面端，以及 Android 端的界面与服务骨架。
 
@@ -34,7 +34,7 @@ FlowProxy 是一个跨平台的网络代理客户端。它自带并托管 Mihomo
 - **多订阅库**：保存多份订阅并随时切换生效项，每份独立存储、可单独删除。
 - **多种导入方式**：订阅链接、Clash / Mihomo YAML，或 `ss://` `vmess://` `vless://` `trojan://` `hysteria2://` `tuic://` 分享链接（自动转换）。
 - **流量与到期**：解析服务商的 `subscription-userinfo` 响应头，显示已用流量、总量进度与到期时间。
-- **覆写**：每份订阅可单独保存自定义规则与覆写 YAML，刷新订阅不会丢失；控制项（端口、密钥、`allow-lan` 等）始终由 FlowProxy 接管，覆写无法覆盖。
+- **覆写**：每份订阅可单独保存自定义规则与覆写 YAML，刷新订阅不会丢失；控制项（端口、密钥、`allow-lan` 等）始终由 CapybaraProxy 接管，覆写无法覆盖。
 - **自动更新**：启动时更新与定时更新（预设间隔或 1–168 小时自定义），可配置更新后自动重启核心。
 - **Sub-Store 对接**：填写后端地址与 `x-api-token`，列出并一键导入。
 
@@ -46,7 +46,7 @@ FlowProxy 是一个跨平台的网络代理客户端。它自带并托管 Mihomo
 
 ### 观测
 
-- 概览页显示实时上下行速率、流量曲线、会话时长，以及由 FlowProxy 自己记账的**今日**与**近 7 天**累计流量（核心重启不清零）。
+- 概览页显示实时上下行速率、流量曲线、会话时长，以及由 CapybaraProxy 自己记账的**今日**与**近 7 天**累计流量（核心重启不清零）。
 - 连接页可展开单条连接的完整详情（域名、目标地址、命中规则、链路、上传量、建立时间），支持搜索与一键全部关闭。
 - 规则页显示每条规则当前命中的连接数，并列出配置里的规则集与代理集来源。
 - **规则调试器**：输入域名或 IP，按顺序评估规则表，告诉你哪条规则会决定路由；无法评估的规则类型（GEO、规则集、进程名等）会明确列出而不是假装判断。
@@ -71,7 +71,18 @@ FlowProxy 是一个跨平台的网络代理客户端。它自带并托管 Mihomo
 
 ### 安装
 
-运行安装包 `FlowProxy_<version>_x64-setup.exe`，按当前用户安装，不需要管理员权限。安装包已捆绑校验过的 Mihomo 核心与 geodata，无需手动放置文件。
+运行安装包 `CapybaraProxy_<version>_x64-setup.exe`，按当前用户安装，不需要管理员权限。安装包已捆绑校验过的 Mihomo 核心与 geodata，无需手动放置文件。
+
+### 从旧版本升级
+
+产品由 FlowProxy 更名为 CapybaraProxy，应用标识符也随之变更，配置目录从
+`%APPDATA%com.flowproxy.desktop` 变为 `%APPDATA%com.capybara.proxy`。
+
+新版本首次启动时会**自动复制**旧目录到新位置（设置、订阅、流量记账、日志等），
+旧目录保持原样，确认无误后可手动删除。复制只在目标目录尚无 `settings.json`
+时发生，因此不会覆盖已经用过新版的数据。
+
+开机启动项、系统代理等系统状态会在下次启动时按新路径重新写入。
 
 ### 第一次使用
 
@@ -148,7 +159,7 @@ FlowProxy 是一个跨平台的网络代理客户端。它自带并托管 Mihomo
 | 内核版本索引与构建 | `<配置目录>/cores/` |
 | 日志 | 系统应用日志目录下的按天文件 |
 
-Windows 上应用配置目录通常为 `%APPDATA%\com.flowproxy.desktop`。以上文件均为明文，**不做加密**；订阅文件里含服务商凭据，按文件权限保护。
+Windows 上应用配置目录通常为 `%APPDATA%\com.capybara.proxy`。以上文件均为明文，**不做加密**；订阅文件里含服务商凭据，按文件权限保护。
 
 ---
 
@@ -156,9 +167,9 @@ Windows 上应用配置目录通常为 `%APPDATA%\com.flowproxy.desktop`。以�
 
 ### 托管什么
 
-Mihomo 的控制端口、API 密钥、代理监听端口、`allow-lan` 与绑定地址**不由订阅决定**。导入订阅时这些顶层键会被移除，替换为 FlowProxy 在启动时生成的值：
+Mihomo 的控制端口、API 密钥、代理监听端口、`allow-lan` 与绑定地址**不由订阅决定**。导入订阅时这些顶层键会被移除，替换为 CapybaraProxy 在启动时生成的值：
 
-| 被移除的键 | FlowProxy 写入的值 |
+| 被移除的键 | CapybaraProxy 写入的值 |
 | --- | --- |
 | `mixed-port`、`port`、`socks-port`、`redir-port`、`tproxy-port` | 预留的回环端口 |
 | `external-controller` 及其变体 | 命令行 `-ext-ctl 127.0.0.1:<端口>` |
@@ -209,15 +220,15 @@ $env:NO_PROXY = 'localhost,127.0.0.1'
 如果开发构建里没有捆绑核心，可以指向一个已校验的可执行文件：
 
 ```powershell
-$env:FLOWPROXY_MIHOMO_PATH = 'F:\path\to\mihomo.exe'
+$env:CAPYBARA_MIHOMO_PATH = 'F:\path\to\mihomo.exe'
 ```
 
 ### 核心查找顺序
 
 启动时按以下顺序查找，命中后校验 SHA-256 与版本：
 
-1. `FLOWPROXY_MIHOMO_PATH` 指向的文件
-2. `flowproxy-desktop.exe` 同目录的 `mihomo.exe`
+1. `CAPYBARA_MIHOMO_PATH` 指向的文件
+2. `capybara-desktop.exe` 同目录的 `mihomo.exe`
 3. 同目录 `resources\mihomo.exe`
 4. 同目录 `resources\mihomo\mihomo.exe`（安装包默认布局）
 5. 同目录 `mihomo\mihomo.exe`
@@ -250,7 +261,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 ```
 
-当前状态：前端 131 项测试、Rust 223 项测试全部通过；`clippy -D warnings` 无告警；中英语言包 525 个键一致。
+当前状态：前端 131 项测试、Rust 228 项测试全部通过；`clippy -D warnings` 无告警；中英语言包 525 个键一致。
 
 仓库内配置了 GitHub Actions（`.github/workflows/verify.yml`），在推送与 PR 时运行上述检查；依赖审计只报告不阻断。详见 `docs/development/ci.md`。
 
@@ -265,10 +276,10 @@ apps/
   desktop/          Tauri 桌面端（React + TypeScript + Rust）
   android/          Android 端（Kotlin + Jetpack Compose）
 crates/
-  flowproxy-contracts   跨端共享的数据契约
-  flowproxy-runtime     运行时状态机与日志
-  mihomo-manager        Mihomo 子进程、控制 API、订阅与配置
-  flowproxy-platform    平台能力（系统代理、开机启动、TUN 探测）
+  capybara-contracts   跨端共享的数据契约
+  capybara-runtime     运行时状态机与日志
+  capybara-mihomo-manager   Mihomo 子进程、控制 API、订阅与配置
+  capybara-platform    平台能力（系统代理、开机启动、TUN 探测）
 packages/
   design-tokens     桌面与 Android 共享的设计令牌
 docs/              产品、界面、架构与各阶段报告
@@ -289,9 +300,9 @@ scripts/           资源准备、验收与校验脚本
 
 ## 已确认的产品决策
 
-1. 产品名：FlowProxy。
+1. 产品名：CapybaraProxy。
 2. 目标平台：Windows、macOS、Linux、Android。
-3. 代理核心：Mihomo，由 FlowProxy 自行分发、启动、监控与管理。
+3. 代理核心：Mihomo，由 CapybaraProxy 自行分发、启动、监控与管理。
 4. 桌面技术栈：React + TypeScript + Tauri + Rust。
 5. Android：Kotlin + Jetpack Compose，使用 Android `VpnService`。
 6. 主题：默认 Cyber Flow，可切换 Warm Flow。

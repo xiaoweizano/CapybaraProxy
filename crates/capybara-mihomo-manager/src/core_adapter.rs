@@ -1,0 +1,1593 @@
+use crate::binary::{
+    random_hex, resolve_verified_binary, sha256_file, verify_binary_version, VerifiedMihomoBinary,
+};
+use crate::config::ConfigStore;
+use crate::control_api::{
+    close_all_connections, close_connection, parse_connections, parse_proxy_groups, parse_rules,
+    read_core_preferences, select_proxy, test_delay, test_group_delay, update_core_preferences,
+    LoopbackApiClient,
+};
+use crate::core_versions::CoreVersionStore;
+use crate::subscription_store::{StoredSubscription, SubscriptionInput, SubscriptionStore};
+use crate::MihomoAdapter;
+use capybara_contracts::{
+    ConnectionPage, CoreInfo, CorePreferences, DelayProbeSettings, GroupDelayResult, LogLevel,
+    ProfileInfo, ProviderInfo, ProxyGroup, RoutingMode, RuleItem, RuntimeBackend, RuntimeError,
+    RuntimeErrorCode, RuntimeState, StartupPreferences, SubscriptionSnapshot, SubscriptionUsage,
+    TelemetrySnapshot,
+};
+use std::collections::VecDeque;
+use std::io::{BufRead, BufReader, Read};
+use std::net::TcpListener;
+use std::path::{Path, PathBuf};
+use std::process::{Child, Command, Output, Stdio};
+use std::sync::mpsc::{self, Receiver, SyncSender, TrySendError};
+use std::thread::{self, JoinHandle};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+
+const MAX_CAPTURED_LOGS: usize = 500;
+const MAX_PROFILE_VALIDATOR_OUTPUT_BYTES: usize = 64 * 1024;
+const API_START_TIMEOUT: Duration = Duration::from_secs(5);
+const PROFILE_VALIDATION_TIMEOUT: Duration = Duration::from_secs(10);
+
+pub struct MihomoCoreAdapter {
+    binary: VerifiedMihomoBinary,
+    config_store: ConfigStore,
+    subscriptions: SubscriptionStore,
+    child: Option<Child>,
+    log_pump: Option<LogPump>,
+    client: Option<LoopbackApiClient>,
+    proxy_port: Option<u16>,
+    telemetry_sample: Option<TelemetrySample>,
+    pending_logs: VecDeque<String>,
+    /// Values written into the next generated profile.
+    startup_preferences: StartupPreferences,
+    /// Target used by latency probes.
+    delay_probe: DelayProbeSettings,
+    /// URL of the subscription being imported. Taken once by the next
+    /// successful import so the document can be refreshed later.
+    pending_subscription_url: Option<String>,
+    /// Usage numbers from the provider, captured while downloading the
+    /// document that is being imported.
+    pending_subscription_usage: Option<SubscriptionUsage>,
+    /// Subscription an import should replace instead of creating a new entry.
+    pending_subscription_target: Option<String>,
+}
+
+struct TelemetrySample {
+    sampled_at: Instant,
+    upload_bytes: u64,
+    download_bytes: u64,
+}
+
+struct LogPump {
+    receiver: Receiver<String>,
+    workers: Vec<JoinHandle<()>>,
+}
+
+impl MihomoCoreAdapter {
+    pub fn discover(config_directory: PathBuf) -> Result<Self, RuntimeError> {
+        // An operator-supplied build, when registered and activated, wins over
+        // the bundled core. Its digest was recorded at registration and is
+        // re-checked on every activation, so it is verified either way.
+        let store = CoreVersionStore::new(config_directory.join("cores"));
+        let binary = match store.active_binary() {
+            Ok(Some(path)) if path.is_file() => {
+                let digest = sha256_file(&path)?;
+                verify_binary_version(&path)?;
+                VerifiedMihomoBinary::from_verified(path, digest)
+            }
+            // No registered build, or it disappeared since activation: fall
+            // back to the bundled core rather than failing to start.
+            _ => resolve_verified_binary(default_binary_candidates(&config_directory))?,
+        };
+        Ok(Self::new(
+            binary,
+            ConfigStore::new(config_directory.join("config.yaml")),
+        ))
+    }
+
+    pub fn new(binary: VerifiedMihomoBinary, config_store: ConfigStore) -> Self {
+        let subscriptions =
+            SubscriptionStore::new(working_directory_of(&config_store).unwrap_or_default());
+        Self {
+            binary,
+            config_store,
+            subscriptions,
+            child: None,
+            log_pump: None,
+            client: None,
+            proxy_port: None,
+            telemetry_sample: None,
+            pending_logs: VecDeque::new(),
+            startup_preferences: StartupPreferences::default(),
+            delay_probe: DelayProbeSettings::default(),
+            pending_subscription_url: None,
+            pending_subscription_usage: None,
+            pending_subscription_target: None,
+        }
+    }
+
+    /// Makes the subscription library match the pre-library layout.
+    ///
+    /// Upgrading installations kept `config.subscription.yaml` and its JSON
+    /// next to the config; the library adopts the document once and removes
+    /// the legacy pair so a downgrade cannot resurrect it.
+    fn adopt_legacy_subscription(&mut self) -> Result<(), RuntimeError> {
+        let Some(legacy_document) = self.config_store.read_subscription()? else {
+            return Ok(());
+        };
+        let metadata = read_subscription_metadata(&self.config_store);
+        let adopted = self.subscriptions.adopt_legacy(SubscriptionInput {
+            name: metadata
+                .as_ref()
+                .map(|metadata| metadata.name.as_str())
+                .unwrap_or("Imported subscription"),
+            document: &legacy_document,
+            source_url: metadata
+                .as_ref()
+                .and_then(|metadata| metadata.source_url.clone()),
+            usage: metadata
+                .as_ref()
+                .and_then(|metadata| metadata.usage.clone()),
+            proxy_count: metadata
+                .as_ref()
+                .map(|metadata| metadata.proxy_count as u32),
+            updated_at_ms: metadata
+                .as_ref()
+                .map(|metadata| metadata.imported_at_ms)
+                .unwrap_or_else(now_ms),
+        })?;
+        if adopted {
+            let _ = self.config_store.remove_subscription();
+            let _ = remove_subscription_metadata(&self.config_store);
+        }
+        Ok(())
+    }
+
+    /// The subscription the core launches with, after ensuring legacy files
+    /// have been adopted.
+    fn active_subscription(&mut self) -> Result<Option<StoredSubscription>, RuntimeError> {
+        self.adopt_legacy_subscription()?;
+        self.subscriptions.active()
+    }
+
+    fn subscription_profiles(&mut self) -> Result<Vec<ProfileInfo>, RuntimeError> {
+        self.adopt_legacy_subscription()?;
+        let updated_at_ms = self
+            .config_store
+            .path()
+            .metadata()
+            .ok()
+            .and_then(|metadata| metadata.modified().ok())
+            .and_then(system_time_ms);
+        let active_id = self.subscriptions.active_id();
+
+        let mut profiles = self
+            .subscriptions
+            .list()?
+            .into_iter()
+            .map(|subscription| ProfileInfo {
+                id: subscription.id.clone(),
+                name: subscription.name,
+                active: active_id.as_deref() == Some(subscription.id.as_str()),
+                updated_at_ms: (subscription.updated_at_ms > 0)
+                    .then_some(subscription.updated_at_ms)
+                    .or(updated_at_ms),
+                source: Some("subscription".to_owned()),
+                proxy_count: subscription.proxy_count,
+            })
+            .collect::<Vec<_>>();
+
+        if profiles.is_empty() {
+            profiles.push(ProfileInfo {
+                id: "capybara-direct".to_owned(),
+                name: "CapybaraProxy Direct".to_owned(),
+                active: true,
+                updated_at_ms,
+                source: None,
+                proxy_count: Some(0),
+            });
+        }
+        Ok(profiles)
+    }
+
+    pub fn binary_digest(&self) -> &str {
+        self.binary.digest()
+    }
+
+    fn client(&self) -> Result<&LoopbackApiClient, RuntimeError> {
+        self.client
+            .as_ref()
+            .ok_or_else(|| api_error("The local Mihomo control API is not connected."))
+    }
+
+    fn start_core(&mut self) -> Result<(), RuntimeError> {
+        if self.child.is_some() || self.is_running() {
+            return Err(RuntimeError::new(
+                RuntimeErrorCode::AlreadyRunning,
+                "The Mihomo core is already running.",
+                false,
+            ));
+        }
+
+        let previous_profile = self.config_store.snapshot()?;
+        match self.start_core_with_profile() {
+            Ok(()) => Ok(()),
+            Err(error) => {
+                if let Err(restore_error) = self.config_store.restore(previous_profile.as_deref()) {
+                    return Err(RuntimeError::new(
+                        error.code,
+                        format!(
+                            "{} The previous Mihomo profile could not be restored: {}",
+                            error.message, restore_error.message
+                        ),
+                        false,
+                    ));
+                }
+                Err(error)
+            }
+        }
+    }
+
+    fn start_core_with_profile(&mut self) -> Result<(), RuntimeError> {
+        let preferred_proxy_port = match self.startup_preferences.proxy_port {
+            0 => None,
+            port => Some(port),
+        };
+        let (api_port, proxy_port) = reserve_loopback_ports(preferred_proxy_port)?;
+        let secret = random_hex(32)?;
+        let binary_path = self.binary.path().to_path_buf();
+        let working_directory = working_directory_of(&self.config_store)?;
+        deploy_bundled_geodata(&working_directory);
+
+        let profile = match self.active_subscription()? {
+            Some(subscription) => {
+                crate::subscription::prepare_profile_full(
+                    &subscription.document,
+                    proxy_port,
+                    self.startup_preferences,
+                    &subscription.override_rules,
+                    subscription.override_yaml.as_deref(),
+                )?
+                .profile
+            }
+            None => crate::config::render_direct_profile_with(
+                api_port,
+                proxy_port,
+                &secret,
+                self.startup_preferences,
+            )?,
+        };
+
+        self.config_store.activate(&profile, |candidate| {
+            validate_profile(&binary_path, &working_directory, candidate, &secret)
+        })?;
+
+        let config_path = self.config_store.path().to_path_buf();
+
+        let mut command = Command::new(self.binary.path());
+        command
+            .arg("-d")
+            .arg(&working_directory)
+            .arg("-f")
+            .arg(&config_path)
+            .arg("-ext-ctl")
+            .arg(format!("127.0.0.1:{api_port}"))
+            .arg("-secret")
+            .arg(&secret)
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        hide_console_window(&mut command);
+
+        let mut child = command.spawn().map_err(|error| {
+            RuntimeError::new(
+                RuntimeErrorCode::CoreUnavailable,
+                format!("The Mihomo core could not be started: {error}"),
+                true,
+            )
+        })?;
+        let log_pump = match LogPump::capture(&mut child) {
+            Ok(log_pump) => log_pump,
+            Err(error) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(error);
+            }
+        };
+        self.child = Some(child);
+        self.log_pump = Some(log_pump);
+        self.client = Some(LoopbackApiClient::new(
+            &format!("http://127.0.0.1:{api_port}"),
+            &secret,
+        )?);
+        self.proxy_port = Some(proxy_port);
+        self.telemetry_sample = None;
+
+        let deadline = Instant::now() + API_START_TIMEOUT;
+        loop {
+            self.drain_core_logs();
+            if !self.process_is_alive() {
+                self.cleanup_failed_start();
+                return Err(RuntimeError::new(
+                    RuntimeErrorCode::CoreUnavailable,
+                    "The Mihomo core exited before its control API became ready.",
+                    true,
+                ));
+            }
+
+            if self.client()?.get_json("/version").is_ok() {
+                return Ok(());
+            }
+            if Instant::now() >= deadline {
+                self.cleanup_failed_start();
+                return Err(RuntimeError::new(
+                    RuntimeErrorCode::ApiUnavailable,
+                    "The Mihomo control API did not become ready in time.",
+                    true,
+                ));
+            }
+            thread::sleep(Duration::from_millis(50));
+        }
+    }
+
+    fn stop_core(&mut self) -> Result<(), RuntimeError> {
+        let Some(mut child) = self.child.take() else {
+            self.client = None;
+            self.proxy_port = None;
+            return Err(RuntimeError::new(
+                RuntimeErrorCode::NotRunning,
+                "The Mihomo core is not running.",
+                false,
+            ));
+        };
+
+        match child.try_wait() {
+            Ok(Some(_)) => {}
+            Ok(None) => {
+                if let Err(error) = child.kill() {
+                    self.child = Some(child);
+                    return Err(RuntimeError::new(
+                        RuntimeErrorCode::CoreUnavailable,
+                        format!("The Mihomo core could not be stopped: {error}"),
+                        true,
+                    ));
+                }
+            }
+            Err(error) => {
+                self.child = Some(child);
+                return Err(RuntimeError::new(
+                    RuntimeErrorCode::CoreUnavailable,
+                    format!("The Mihomo core process state could not be read: {error}"),
+                    true,
+                ));
+            }
+        }
+        if let Err(error) = child.wait() {
+            self.child = Some(child);
+            return Err(RuntimeError::new(
+                RuntimeErrorCode::CoreUnavailable,
+                format!("The Mihomo core process could not be reaped: {error}"),
+                true,
+            ));
+        }
+
+        self.client = None;
+        self.proxy_port = None;
+        self.telemetry_sample = None;
+        self.clear_finished_core_session();
+        Ok(())
+    }
+
+    fn cleanup_failed_start(&mut self) {
+        if let Some(mut child) = self.child.take() {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+        self.client = None;
+        self.proxy_port = None;
+        self.telemetry_sample = None;
+        self.clear_finished_core_session();
+    }
+
+    fn process_is_alive(&mut self) -> bool {
+        let Some(child) = self.child.as_mut() else {
+            return false;
+        };
+        match child.try_wait() {
+            Ok(None) => true,
+            Ok(Some(_)) => {
+                self.child = None;
+                self.client = None;
+                self.proxy_port = None;
+                self.telemetry_sample = None;
+                self.clear_finished_core_session();
+                false
+            }
+            Err(_) => false,
+        }
+    }
+
+    fn clear_finished_core_session(&mut self) {
+        if let Some(log_pump) = self.log_pump.as_mut() {
+            for worker in log_pump.workers.drain(..) {
+                let _ = worker.join();
+            }
+        }
+        self.drain_core_logs();
+        self.log_pump = None;
+    }
+
+    fn drain_core_logs(&mut self) {
+        let Some(log_pump) = self.log_pump.as_ref() else {
+            return;
+        };
+        for line in log_pump.receiver.try_iter() {
+            if self.pending_logs.len() == MAX_CAPTURED_LOGS {
+                self.pending_logs.pop_front();
+            }
+            self.pending_logs.push_back(line);
+        }
+    }
+
+    fn ensure_healthy(&mut self) -> Result<(), RuntimeError> {
+        if !self.process_is_alive() {
+            return Err(RuntimeError::new(
+                RuntimeErrorCode::CoreUnavailable,
+                "The Mihomo core process exited unexpectedly.",
+                true,
+            ));
+        }
+        self.client()?;
+        Ok(())
+    }
+
+    fn fetch_connections(&mut self) -> Result<ConnectionPage, RuntimeError> {
+        self.ensure_healthy()?;
+        let payload = self.client()?.get_json("/connections")?;
+        parse_connections(&payload)
+    }
+}
+
+impl MihomoAdapter for MihomoCoreAdapter {
+    fn start(&mut self) -> Result<(), RuntimeError> {
+        self.start_core()
+    }
+
+    fn stop(&mut self) -> Result<(), RuntimeError> {
+        self.stop_core()
+    }
+
+    fn simulate_crash(&mut self) -> Result<(), RuntimeError> {
+        Err(RuntimeError::new(
+            RuntimeErrorCode::InvalidState,
+            "Crash simulation is unavailable for a real Mihomo core.",
+            false,
+        ))
+    }
+
+    fn is_running(&mut self) -> bool {
+        self.process_is_alive()
+    }
+
+    fn health(&mut self) -> Result<(), RuntimeError> {
+        self.ensure_healthy()?;
+        self.client()?.get_json("/version")?;
+        Ok(())
+    }
+
+    fn controlled_proxy_endpoint(&mut self) -> Option<String> {
+        if !self.process_is_alive() {
+            return None;
+        }
+        self.proxy_port
+            .filter(|port| *port > 0)
+            .map(|port| format!("127.0.0.1:{port}"))
+    }
+
+    fn core_info(&mut self) -> Result<CoreInfo, RuntimeError> {
+        self.ensure_healthy()?;
+        let payload = self.client()?.get_json("/version")?;
+        Ok(CoreInfo {
+            backend: RuntimeBackend::Mihomo,
+            version: payload
+                .get("version")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or(crate::LOCKED_MIHOMO_VERSION)
+                .to_owned(),
+            pid: self.child.as_ref().map(Child::id),
+        })
+    }
+
+    fn telemetry(&mut self) -> Result<TelemetrySnapshot, RuntimeError> {
+        let page = self.fetch_connections()?;
+        let sampled_at = Instant::now();
+        let (upload_bps, download_bps) = self
+            .telemetry_sample
+            .as_ref()
+            .map(|previous| {
+                let elapsed_seconds = sampled_at
+                    .saturating_duration_since(previous.sampled_at)
+                    .as_secs_f64()
+                    .max(0.001);
+                (
+                    rate_per_second(
+                        page.upload_total_bytes,
+                        previous.upload_bytes,
+                        elapsed_seconds,
+                    ),
+                    rate_per_second(
+                        page.download_total_bytes,
+                        previous.download_bytes,
+                        elapsed_seconds,
+                    ),
+                )
+            })
+            .unwrap_or((0, 0));
+        self.telemetry_sample = Some(TelemetrySample {
+            sampled_at,
+            upload_bytes: page.upload_total_bytes,
+            download_bytes: page.download_total_bytes,
+        });
+
+        Ok(TelemetrySnapshot {
+            state: RuntimeState::Connected,
+            timestamp_ms: now_ms(),
+            upload_bps,
+            download_bps,
+            total_upload_bytes: page.upload_total_bytes,
+            total_download_bytes: page.download_total_bytes,
+            memory_bytes: page.memory_bytes,
+            active_connections: page.connections.len(),
+        })
+    }
+
+    fn proxy_groups(&mut self) -> Result<Vec<ProxyGroup>, RuntimeError> {
+        self.ensure_healthy()?;
+        let payload = self.client()?.get_json("/proxies")?;
+        parse_proxy_groups(&payload)
+    }
+
+    fn set_startup_preferences(&mut self, preferences: StartupPreferences) {
+        self.startup_preferences = preferences;
+    }
+
+    fn set_delay_probe(&mut self, probe: DelayProbeSettings) {
+        self.delay_probe = probe.normalized();
+    }
+
+    fn set_pending_subscription_url(&mut self, url: Option<String>) {
+        self.pending_subscription_url = url;
+    }
+
+    fn set_pending_subscription_usage(&mut self, usage: Option<SubscriptionUsage>) {
+        self.pending_subscription_usage = usage;
+    }
+
+    fn set_pending_subscription_target(&mut self, id: Option<String>) {
+        self.pending_subscription_target = id;
+    }
+
+    fn select_proxy(&mut self, group: &str, proxy: &str) -> Result<(), RuntimeError> {
+        self.ensure_healthy()?;
+        select_proxy(self.client()?, group, proxy)
+    }
+
+    fn test_proxy_delay(&mut self, proxy: &str, timeout_ms: u32) -> Result<u32, RuntimeError> {
+        self.ensure_healthy()?;
+        test_delay(self.client()?, proxy, timeout_ms, &self.delay_probe)
+    }
+
+    fn test_group_delay(
+        &mut self,
+        group: &str,
+        timeout_ms: u32,
+    ) -> Result<GroupDelayResult, RuntimeError> {
+        self.ensure_healthy()?;
+        test_group_delay(self.client()?, group, timeout_ms, &self.delay_probe)
+    }
+
+    fn core_preferences(&mut self) -> Result<CorePreferences, RuntimeError> {
+        self.ensure_healthy()?;
+        read_core_preferences(self.client()?)
+    }
+
+    fn update_core_preferences(
+        &mut self,
+        mode: Option<RoutingMode>,
+        log_level: Option<LogLevel>,
+    ) -> Result<CorePreferences, RuntimeError> {
+        self.ensure_healthy()?;
+        update_core_preferences(self.client()?, mode, log_level)
+    }
+
+    fn connections(&mut self) -> Result<ConnectionPage, RuntimeError> {
+        self.fetch_connections()
+    }
+
+    fn close_connection(&mut self, connection_id: &str) -> Result<(), RuntimeError> {
+        self.ensure_healthy()?;
+        close_connection(self.client()?, connection_id)
+    }
+
+    fn close_all_connections(&mut self) -> Result<(), RuntimeError> {
+        self.ensure_healthy()?;
+        close_all_connections(self.client()?)
+    }
+
+    fn rules(&mut self) -> Result<Vec<RuleItem>, RuntimeError> {
+        self.ensure_healthy()?;
+        let payload = self.client()?.get_json("/rules")?;
+        parse_rules(&payload)
+    }
+
+    fn providers(&mut self) -> Result<Vec<ProviderInfo>, RuntimeError> {
+        self.ensure_healthy()?;
+        crate::control_api::read_providers(self.client()?)
+    }
+
+    fn profiles(&mut self) -> Result<Vec<ProfileInfo>, RuntimeError> {
+        self.subscription_profiles()
+    }
+
+    fn import_subscription(&mut self, name: &str, yaml: &str) -> Result<(), RuntimeError> {
+        self.adopt_legacy_subscription()?;
+        let prepared = crate::subscription::prepare_profile(yaml, 1)?;
+        let binary_path = self.binary.path().to_path_buf();
+        let working_directory = working_directory_of(&self.config_store)?;
+        deploy_bundled_geodata(&working_directory);
+
+        // Validate the document exactly as it will be launched, then persist
+        // the operator's original text. Start applies the control block again
+        // for the port it reserves, so storing the prepared copy would nest the
+        // header on every restart.
+        validate_prepared_subscription(&binary_path, &working_directory, &prepared.profile)?;
+
+        // A pasted document has no header to read, so an older import's
+        // numbers must not survive it.
+        let usage = self.pending_subscription_usage.take();
+        let source_url = self.pending_subscription_url.take();
+        let target = self.pending_subscription_target.take();
+        let input = SubscriptionInput {
+            name,
+            document: yaml,
+            source_url,
+            usage,
+            proxy_count: Some(prepared.proxy_count as u32),
+            updated_at_ms: now_ms(),
+        };
+
+        // Refreshing an existing subscription keeps its id and its override
+        // rules and YAML; the name comes from the caller.
+        if let Some(id) = target.filter(|id| self.subscriptions.read(id).ok().flatten().is_some()) {
+            return self.subscriptions.update(&id, input);
+        }
+        self.subscriptions.create(input).map(|_| ())
+    }
+
+    fn clear_subscription(&mut self) -> Result<(), RuntimeError> {
+        self.adopt_legacy_subscription()?;
+        match self.subscriptions.active_id() {
+            Some(id) => self.subscriptions.remove(&id),
+            None => Ok(()),
+        }
+    }
+
+    fn remove_subscription(&mut self, id: &str) -> Result<(), RuntimeError> {
+        self.subscriptions.remove(id)
+    }
+
+    fn activate_subscription(&mut self, id: &str) -> Result<(), RuntimeError> {
+        self.subscriptions.set_active(id)
+    }
+
+    fn set_subscription_rules(&mut self, id: &str, rules: &[String]) -> Result<(), RuntimeError> {
+        self.subscriptions.set_rules(id, rules)
+    }
+
+    fn set_subscription_override_yaml(
+        &mut self,
+        id: &str,
+        yaml: Option<&str>,
+    ) -> Result<(), RuntimeError> {
+        self.subscriptions.set_override_yaml(id, yaml)
+    }
+
+    fn subscription_snapshot(&mut self) -> Result<SubscriptionSnapshot, RuntimeError> {
+        let active = self.active_subscription()?;
+        let Some(subscription) = active else {
+            return Ok(SubscriptionSnapshot::default());
+        };
+
+        let parsed = crate::subscription_preview::preview(&subscription.document);
+        Ok(SubscriptionSnapshot {
+            groups: parsed.groups,
+            rules: parsed.rules,
+            has_subscription: true,
+            source_url: subscription.source_url,
+            updated_at_ms: (subscription.updated_at_ms > 0).then_some(subscription.updated_at_ms),
+            name: Some(subscription.name),
+            usage: subscription.usage,
+            id: Some(subscription.id),
+            active: true,
+            override_rules: subscription.override_rules,
+            override_yaml: subscription.override_yaml,
+        })
+    }
+
+    fn take_logs(&mut self) -> Vec<String> {
+        self.drain_core_logs();
+        self.pending_logs.drain(..).collect()
+    }
+
+    fn subscription_source_url(&mut self) -> Option<String> {
+        self.subscriptions
+            .active()
+            .ok()
+            .flatten()
+            .and_then(|subscription| subscription.source_url)
+    }
+}
+
+impl Drop for MihomoCoreAdapter {
+    fn drop(&mut self) {
+        let _ = self.stop_core();
+    }
+}
+
+impl LogPump {
+    fn capture(child: &mut Child) -> Result<Self, RuntimeError> {
+        let stdout = child.stdout.take().ok_or_else(|| {
+            RuntimeError::new(
+                RuntimeErrorCode::CoreUnavailable,
+                "The Mihomo stdout pipe is unavailable.",
+                true,
+            )
+        })?;
+        let stderr = child.stderr.take().ok_or_else(|| {
+            RuntimeError::new(
+                RuntimeErrorCode::CoreUnavailable,
+                "The Mihomo stderr pipe is unavailable.",
+                true,
+            )
+        })?;
+        let (sender, receiver) = mpsc::sync_channel(MAX_CAPTURED_LOGS);
+        let stdout_sender = sender.clone();
+        let stderr_sender = sender;
+        let stdout_worker = thread::Builder::new()
+            .name("capybara-mihomo-stdout".to_owned())
+            .spawn(move || read_lines(stdout, stdout_sender))
+            .map_err(|error| {
+                RuntimeError::new(
+                    RuntimeErrorCode::CoreUnavailable,
+                    format!("The Mihomo stdout reader could not start: {error}"),
+                    true,
+                )
+            })?;
+        let stderr_worker = match thread::Builder::new()
+            .name("capybara-mihomo-stderr".to_owned())
+            .spawn(move || read_lines(stderr, stderr_sender))
+        {
+            Ok(worker) => worker,
+            Err(error) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                let _ = stdout_worker.join();
+                return Err(RuntimeError::new(
+                    RuntimeErrorCode::CoreUnavailable,
+                    format!("The Mihomo stderr reader could not start: {error}"),
+                    true,
+                ));
+            }
+        };
+
+        Ok(Self {
+            receiver,
+            workers: vec![stdout_worker, stderr_worker],
+        })
+    }
+}
+
+fn read_lines(reader: impl Read, sender: SyncSender<String>) {
+    let mut reader = BufReader::new(reader);
+    let mut line = String::new();
+    loop {
+        line.clear();
+        match reader.read_line(&mut line) {
+            Ok(0) => break,
+            Ok(_) => {
+                let trimmed = line.trim_end_matches(['\r', '\n']);
+                if !trimmed.is_empty() {
+                    let bounded = trimmed.chars().take(1_024).collect::<String>();
+                    match sender.try_send(bounded) {
+                        Ok(()) | Err(TrySendError::Full(_)) => {}
+                        Err(TrySendError::Disconnected(_)) => break,
+                    }
+                }
+            }
+            Err(_) => break,
+        }
+    }
+}
+
+/// Validates a prepared document without touching the active configuration.
+fn validate_prepared_subscription(
+    binary: &Path,
+    working_directory: &Path,
+    profile: &str,
+) -> Result<(), RuntimeError> {
+    // Import can be the first thing a fresh install does, before any core start
+    // has created the runtime directory, so it is created here as well.
+    std::fs::create_dir_all(working_directory).map_err(|error| {
+        RuntimeError::new(
+            RuntimeErrorCode::ConfigInvalid,
+            format!("The Mihomo runtime directory could not be created: {error}"),
+            true,
+        )
+    })?;
+
+    let candidate = working_directory.join(format!(
+        ".capybara-subscription-check.{}.yaml",
+        std::process::id()
+    ));
+    let guard = TempCandidateGuard::new(candidate.clone());
+    std::fs::write(&candidate, profile).map_err(|error| {
+        RuntimeError::new(
+            RuntimeErrorCode::ConfigInvalid,
+            format!("The subscription could not be staged for validation: {error}"),
+            true,
+        )
+    })?;
+
+    let result = validate_profile(binary, working_directory, &candidate, "");
+    drop(guard);
+    result
+}
+
+struct TempCandidateGuard {
+    path: PathBuf,
+}
+
+impl TempCandidateGuard {
+    fn new(path: PathBuf) -> Self {
+        Self { path }
+    }
+}
+
+impl Drop for TempCandidateGuard {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.path);
+    }
+}
+
+fn validate_profile(
+    binary: &Path,
+    working_directory: &Path,
+    candidate: &Path,
+    secret: &str,
+) -> Result<(), RuntimeError> {
+    let mut command = Command::new(binary);
+    command
+        .arg("-t")
+        .arg("-d")
+        .arg(working_directory)
+        .arg("-f")
+        .arg(candidate)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    hide_console_window(&mut command);
+    let output = run_profile_validator(&mut command, PROFILE_VALIDATION_TIMEOUT)?;
+    if output.status.success() {
+        return Ok(());
+    }
+    let message = profile_validation_detail(&output.stdout, &output.stderr, secret)
+        .map(|detail| format!("Mihomo rejected the generated profile: {detail}"))
+        .unwrap_or_else(|| "Mihomo rejected the generated profile.".to_owned());
+    Err(RuntimeError::new(
+        RuntimeErrorCode::ConfigInvalid,
+        message,
+        false,
+    ))
+}
+
+fn profile_validation_detail(stdout: &[u8], stderr: &[u8], secret: &str) -> Option<String> {
+    let stdout = String::from_utf8_lossy(stdout);
+    let stderr = String::from_utf8_lossy(stderr);
+    let mut detail = [stdout.trim(), stderr.trim()]
+        .into_iter()
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n");
+    if detail.is_empty() {
+        return None;
+    }
+    if !secret.is_empty() {
+        detail = detail.replace(secret, "[REDACTED]");
+    }
+    Some(detail.chars().take(512).collect())
+}
+
+fn run_profile_validator(command: &mut Command, timeout: Duration) -> Result<Output, RuntimeError> {
+    let mut child = command.spawn().map_err(|error| {
+        RuntimeError::new(
+            RuntimeErrorCode::CoreUnavailable,
+            format!("The Mihomo profile validator could not start: {error}"),
+            true,
+        )
+    })?;
+
+    let stdout_reader = child.stdout.take().map(spawn_output_reader);
+    let stderr_reader = child.stderr.take().map(spawn_output_reader);
+    let started = Instant::now();
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) if started.elapsed() < timeout => {
+                thread::sleep(Duration::from_millis(20));
+            }
+            Ok(None) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                let _ = join_output_reader(stdout_reader);
+                let _ = join_output_reader(stderr_reader);
+                return Err(RuntimeError::new(
+                    RuntimeErrorCode::CoreUnavailable,
+                    format!(
+                        "The Mihomo profile validator timed out after {} ms.",
+                        timeout.as_millis()
+                    ),
+                    true,
+                ));
+            }
+            Err(error) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                let _ = join_output_reader(stdout_reader);
+                let _ = join_output_reader(stderr_reader);
+                return Err(RuntimeError::new(
+                    RuntimeErrorCode::CoreUnavailable,
+                    format!("The Mihomo profile validator could not be monitored: {error}"),
+                    true,
+                ));
+            }
+        }
+    };
+
+    Ok(Output {
+        status,
+        stdout: join_output_reader(stdout_reader)?,
+        stderr: join_output_reader(stderr_reader)?,
+    })
+}
+
+fn spawn_output_reader(
+    mut pipe: impl Read + Send + 'static,
+) -> JoinHandle<std::io::Result<Vec<u8>>> {
+    thread::spawn(move || {
+        let mut output = Vec::new();
+        let mut exceeded_limit = false;
+        let mut buffer = [0_u8; 8192];
+        loop {
+            let read = pipe.read(&mut buffer)?;
+            if read == 0 {
+                break;
+            }
+            let remaining = MAX_PROFILE_VALIDATOR_OUTPUT_BYTES.saturating_sub(output.len());
+            let retained = read.min(remaining);
+            output.extend_from_slice(&buffer[..retained]);
+            exceeded_limit |= retained < read;
+        }
+        if exceeded_limit {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "The Mihomo profile validator output exceeded the 64 KiB limit.",
+            ));
+        }
+        Ok(output)
+    })
+}
+
+fn join_output_reader(
+    reader: Option<JoinHandle<std::io::Result<Vec<u8>>>>,
+) -> Result<Vec<u8>, RuntimeError> {
+    let Some(reader) = reader else {
+        return Ok(Vec::new());
+    };
+    reader
+        .join()
+        .map_err(|_| {
+            RuntimeError::new(
+                RuntimeErrorCode::CoreUnavailable,
+                "The Mihomo profile validator output reader stopped unexpectedly.",
+                true,
+            )
+        })?
+        .map_err(|error| {
+            RuntimeError::new(
+                RuntimeErrorCode::CoreUnavailable,
+                format!("The Mihomo profile validator output could not be read: {error}"),
+                true,
+            )
+        })
+}
+
+/// Reserves the API and proxy loopback ports.
+///
+/// When the operator pinned a mixed-port the proxy port is bound exactly;
+/// a port that is already taken is an error rather than a silent fallback,
+/// because the system proxy keeps pointing at the configured number.
+fn reserve_loopback_ports(preferred_proxy_port: Option<u16>) -> Result<(u16, u16), RuntimeError> {
+    let first = TcpListener::bind(("127.0.0.1", 0)).map_err(|error| {
+        RuntimeError::new(
+            RuntimeErrorCode::ApiUnavailable,
+            format!("A loopback port could not be reserved: {error}"),
+            true,
+        )
+    })?;
+    let first_port = first
+        .local_addr()
+        .map_err(|error| {
+            RuntimeError::new(
+                RuntimeErrorCode::ApiUnavailable,
+                format!("The reserved loopback port could not be read: {error}"),
+                true,
+            )
+        })?
+        .port();
+    let second =
+        TcpListener::bind(("127.0.0.1", preferred_proxy_port.unwrap_or(0))).map_err(|error| {
+            match preferred_proxy_port {
+                Some(port) => RuntimeError::new(
+                    RuntimeErrorCode::ApiUnavailable,
+                    format!("The configured mixed-port {port} is not available: {error}"),
+                    true,
+                ),
+                None => RuntimeError::new(
+                    RuntimeErrorCode::ApiUnavailable,
+                    format!("A second loopback port could not be reserved: {error}"),
+                    true,
+                ),
+            }
+        })?;
+    let second_port = second
+        .local_addr()
+        .map_err(|error| {
+            RuntimeError::new(
+                RuntimeErrorCode::ApiUnavailable,
+                format!("The second loopback port could not be read: {error}"),
+                true,
+            )
+        })?
+        .port();
+    drop(second);
+    drop(first);
+    if first_port == second_port {
+        return Err(RuntimeError::new(
+            RuntimeErrorCode::ApiUnavailable,
+            "The API and mixed-port loopback ports must differ.",
+            true,
+        ));
+    }
+    Ok((first_port, second_port))
+}
+
+fn default_binary_candidates(config_directory: &Path) -> Vec<PathBuf> {
+    let explicit = std::env::var_os("CAPYBARA_MIHOMO_PATH").map(PathBuf::from);
+    let executable = std::env::current_exe().ok();
+    build_binary_candidates(explicit, executable.as_deref(), config_directory)
+}
+
+fn build_binary_candidates(
+    explicit: Option<PathBuf>,
+    executable: Option<&Path>,
+    config_directory: &Path,
+) -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+    if let Some(explicit) = explicit {
+        candidates.push(explicit);
+    }
+    if let Some(executable) = executable {
+        if let Some(directory) = executable.parent() {
+            candidates.push(directory.join("mihomo.exe"));
+            candidates.push(directory.join("resources").join("mihomo.exe"));
+            // Tauri keeps the configured relative path under `resources/`, so
+            // `resources/mihomo/mihomo.exe` arrives as below.
+            candidates.push(
+                directory
+                    .join("resources")
+                    .join("mihomo")
+                    .join("mihomo.exe"),
+            );
+            candidates.push(
+                directory
+                    .join("resources")
+                    .join("resources")
+                    .join("mihomo")
+                    .join("mihomo.exe"),
+            );
+            candidates.push(directory.join("mihomo").join("mihomo.exe"));
+        }
+    }
+    candidates.push(config_directory.join("mihomo.exe"));
+    candidates
+}
+
+/// Copies the bundled geodata snapshots into Mihomo's working directory.
+///
+/// `mihomo -t` and the running core both resolve `geosite.dat` and
+/// `geoip.metadb` from `-d`. Without them, any `GEOIP`/`GEOSITE` rule makes the
+/// core try to download the data, which blocks validation for 90 seconds and
+/// then fails on an offline machine.
+///
+/// Failures are ignored on purpose: a subscription that needs no geodata keeps
+/// working, and a subscription that does need it will fail validation with a
+/// clear Mihomo error.
+fn deploy_bundled_geodata(working_directory: &Path) {
+    // The runtime directory may not exist yet on a fresh install, and every
+    // copy below would then fail silently.
+    if std::fs::create_dir_all(working_directory).is_err() {
+        return;
+    }
+    let executable = std::env::current_exe().ok();
+    for candidate in bundled_geodata_candidates(executable.as_deref()) {
+        if !candidate.is_dir() {
+            continue;
+        }
+        for file in ["geosite.dat", "geoip.metadb"] {
+            let source = candidate.join(file);
+            let target = working_directory.join(file);
+            if !source.is_file() || target.is_file() {
+                continue;
+            }
+            let _ = std::fs::copy(&source, &target);
+        }
+    }
+}
+fn bundled_geodata_candidates(executable: Option<&Path>) -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+    if let Some(executable) = executable {
+        if let Some(directory) = executable.parent() {
+            candidates.push(directory.join("resources").join("geodata"));
+            candidates.push(
+                directory
+                    .join("resources")
+                    .join("resources")
+                    .join("geodata"),
+            );
+            candidates.push(directory.join("geodata"));
+        }
+    }
+    candidates
+}
+
+fn rate_per_second(current: u64, previous: u64, elapsed_seconds: f64) -> u64 {
+    let delta = current.saturating_sub(previous);
+    ((delta as f64) / elapsed_seconds).round() as u64
+}
+
+fn system_time_ms(value: SystemTime) -> Option<i64> {
+    value
+        .duration_since(UNIX_EPOCH)
+        .ok()
+        .and_then(|duration| i64::try_from(duration.as_millis()).ok())
+}
+
+fn now_ms() -> i64 {
+    system_time_ms(SystemTime::now()).unwrap_or(0)
+}
+
+fn working_directory_of(config_store: &ConfigStore) -> Result<PathBuf, RuntimeError> {
+    config_store
+        .path()
+        .parent()
+        .map(Path::to_path_buf)
+        .ok_or_else(|| {
+            RuntimeError::new(
+                RuntimeErrorCode::ConfigInvalid,
+                "The Mihomo configuration path has no parent directory.",
+                false,
+            )
+        })
+}
+
+/// Metadata of the legacy single-subscription layout.
+///
+/// Only read once, so an upgrading installation keeps its name, source URL and
+/// usage numbers when the document is adopted into the subscription library.
+#[derive(serde::Serialize, serde::Deserialize)]
+struct SubscriptionMetadata {
+    name: String,
+    imported_at_ms: i64,
+    proxy_count: usize,
+    /// URL the document was downloaded from. Absent when it was pasted, which
+    /// also means the subscription cannot be refreshed automatically.
+    #[serde(default)]
+    source_url: Option<String>,
+    /// Automatic refresh interval in minutes. `None` disables it.
+    #[serde(default)]
+    update_interval_minutes: Option<u32>,
+    /// Provider-reported usage captured with the download. Absent for a pasted
+    /// document and for older metadata files.
+    #[serde(default)]
+    usage: Option<SubscriptionUsage>,
+}
+
+const SUBSCRIPTION_METADATA_SUFFIX: &str = ".subscription.json";
+
+fn subscription_metadata_path(config_store: &ConfigStore) -> Option<PathBuf> {
+    let subscription_path = config_store.subscription_path()?;
+    let file_name = subscription_path.file_name()?.to_str()?;
+    let stem = file_name.strip_suffix(".yaml")?;
+    Some(subscription_path.with_file_name(format!("{stem}{SUBSCRIPTION_METADATA_SUFFIX}")))
+}
+
+fn remove_subscription_metadata(config_store: &ConfigStore) -> std::io::Result<()> {
+    let Some(path) = subscription_metadata_path(config_store) else {
+        return Ok(());
+    };
+    match std::fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error),
+    }
+}
+
+fn read_subscription_metadata(config_store: &ConfigStore) -> Option<SubscriptionMetadata> {
+    let path = subscription_metadata_path(config_store)?;
+    let raw = std::fs::read_to_string(path).ok()?;
+    serde_json::from_str(&raw).ok()
+}
+
+fn api_error(message: impl Into<String>) -> RuntimeError {
+    RuntimeError::new(RuntimeErrorCode::ApiUnavailable, message, true)
+}
+
+#[cfg(windows)]
+fn hide_console_window(command: &mut Command) {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    command.creation_flags(CREATE_NO_WINDOW);
+}
+
+#[cfg(not(windows))]
+fn hide_console_window(_command: &mut Command) {}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        build_binary_candidates, deploy_bundled_geodata, profile_validation_detail,
+        rate_per_second, read_lines, reserve_loopback_ports, run_profile_validator,
+        validate_prepared_subscription, LogPump, MihomoCoreAdapter,
+    };
+    use crate::binary::VerifiedMihomoBinary;
+    use crate::config::ConfigStore;
+    use crate::control_api::LoopbackApiClient;
+    use crate::MihomoAdapter;
+    use capybara_contracts::RuntimeErrorCode;
+    use std::io::Cursor;
+    use std::net::TcpListener;
+    use std::path::PathBuf;
+    use std::process::{Command, Stdio};
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::{mpsc, Arc};
+    use std::thread;
+    use std::time::{Duration, Instant};
+
+    /// Spawns a child and returns it *after it has already exited*.
+    ///
+    /// `cmd.exe /C exit 0` proved unreliable: depending on the shell it stays
+    /// resident, and these tests then burned their deadline waiting for an exit
+    /// that never came. Spawning a long-running process and terminating it here
+    /// gives the same precondition — a `Child` in the exited state — without
+    /// depending on how a helper binary handles `/C`.
+    /// Spawns a child and returns it *after it has already exited*.
+    ///
+    /// `cmd.exe /C exit 0` proved unreliable here: depending on the shell it
+    /// stays resident, and the tests then burned their deadline waiting for an
+    /// exit that never came. `cmd /C rem` exits promptly, and the state is
+    /// observed below so the returned `Child` is guaranteed to be reaped.
+    fn spawn_exited_child() -> std::process::Child {
+        let mut child = Command::new("cmd.exe")
+            .args(["/C", "rem"])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("spawn short-lived child");
+
+        let deadline = Instant::now() + Duration::from_secs(10);
+        loop {
+            match child.try_wait() {
+                Ok(Some(_)) => return child,
+                Ok(None) if Instant::now() < deadline => {
+                    thread::sleep(Duration::from_millis(10));
+                }
+                Ok(None) => {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    panic!("short-lived child did not exit");
+                }
+                Err(error) => panic!("could not read child state: {error}"),
+            }
+        }
+    }
+
+    #[test]
+    fn telemetry_rates_use_elapsed_time_and_ignore_counter_resets() {
+        assert_eq!(rate_per_second(1_500, 500, 2.0), 500);
+        assert_eq!(rate_per_second(100, 500, 1.0), 0);
+    }
+
+    #[test]
+    fn reserved_loopback_ports_are_distinct_and_non_zero() {
+        let (api, proxy) = reserve_loopback_ports(None).expect("reserve loopback ports");
+        assert!(api > 0);
+        assert!(proxy > 0);
+        assert_ne!(api, proxy);
+    }
+
+    #[test]
+    fn a_pinned_proxy_port_is_used_verbatim_and_a_busy_port_is_reported() {
+        let probe = TcpListener::bind(("127.0.0.1", 0)).expect("bind a probe port");
+        let pinned = probe.local_addr().expect("probe address").port();
+        drop(probe);
+
+        let (api, proxy) =
+            reserve_loopback_ports(Some(pinned)).expect("reserving a free pinned port");
+        assert_eq!(proxy, pinned);
+        assert_ne!(api, proxy);
+
+        let held = TcpListener::bind(("127.0.0.1", 0)).expect("hold a port");
+        let busy = held.local_addr().expect("held address").port();
+        let error = reserve_loopback_ports(Some(busy)).expect_err("a busy port must fail");
+        assert!(error.message.contains(&busy.to_string()));
+    }
+
+    #[test]
+    fn controlled_proxy_endpoint_requires_a_live_owned_core() {
+        let directory = tempfile::tempdir().expect("temporary config directory");
+        let child = Command::new("powershell.exe")
+            .args([
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                "Start-Sleep -Seconds 5",
+            ])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("spawn live child");
+        let mut adapter = MihomoCoreAdapter::new(
+            VerifiedMihomoBinary::test_fixture(),
+            ConfigStore::new(directory.path().join("config.yaml")),
+        );
+        adapter.child = Some(child);
+        adapter.proxy_port = Some(49_153);
+
+        assert_eq!(
+            adapter.controlled_proxy_endpoint().as_deref(),
+            Some("127.0.0.1:49153")
+        );
+    }
+
+    #[test]
+    fn controlled_proxy_endpoint_is_cleared_after_the_core_exits() {
+        let directory = tempfile::tempdir().expect("temporary config directory");
+        let child = spawn_exited_child();
+        let mut adapter = MihomoCoreAdapter::new(
+            VerifiedMihomoBinary::test_fixture(),
+            ConfigStore::new(directory.path().join("config.yaml")),
+        );
+        adapter.child = Some(child);
+        adapter.proxy_port = Some(49_153);
+
+        assert_eq!(adapter.controlled_proxy_endpoint(), None);
+        assert!(adapter.proxy_port.is_none());
+        assert!(adapter.child.is_none());
+    }
+
+    #[test]
+    fn exited_core_session_joins_log_workers_and_clears_connection_state() {
+        let directory = tempfile::tempdir().expect("temporary config directory");
+        let child = spawn_exited_child();
+
+        let first_finished = Arc::new(AtomicBool::new(false));
+        let second_finished = Arc::new(AtomicBool::new(false));
+        let first_flag = Arc::clone(&first_finished);
+        let second_flag = Arc::clone(&second_finished);
+        let (_sender, receiver) = mpsc::channel();
+        let workers = vec![
+            thread::spawn(move || {
+                thread::sleep(Duration::from_millis(100));
+                first_flag.store(true, Ordering::Release);
+            }),
+            thread::spawn(move || {
+                thread::sleep(Duration::from_millis(100));
+                second_flag.store(true, Ordering::Release);
+            }),
+        ];
+
+        let mut adapter = MihomoCoreAdapter::new(
+            VerifiedMihomoBinary::test_fixture(),
+            ConfigStore::new(directory.path().join("config.yaml")),
+        );
+        adapter.child = Some(child);
+        adapter.log_pump = Some(LogPump { receiver, workers });
+        adapter.client = Some(
+            LoopbackApiClient::new("http://127.0.0.1:49152", "0123456789abcdef")
+                .expect("fixture API client"),
+        );
+        adapter.proxy_port = Some(49153);
+
+        assert!(!adapter.process_is_alive());
+
+        assert!(adapter.child.is_none());
+        assert!(adapter.log_pump.is_none());
+        assert!(adapter.client.is_none());
+        assert!(adapter.proxy_port.is_none());
+        assert!(first_finished.load(Ordering::Acquire));
+        assert!(second_finished.load(Ordering::Acquire));
+    }
+
+    #[test]
+    fn log_reader_drops_excess_lines_without_blocking() {
+        let source = b"one\ntwo\nthree\nfour\n".as_slice();
+        let (sender, receiver) = mpsc::sync_channel(2);
+
+        read_lines(source, sender);
+
+        let lines = receiver.try_iter().collect::<Vec<_>>();
+        assert_eq!(lines, vec!["one".to_owned(), "two".to_owned()]);
+    }
+
+    #[test]
+    fn profile_validator_timeout_kills_a_hung_process() {
+        let mut command = Command::new("powershell.exe");
+        command
+            .args([
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                "Start-Sleep -Seconds 5",
+            ])
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        let started = Instant::now();
+
+        let error = run_profile_validator(&mut command, Duration::from_millis(150))
+            .expect_err("hung validator must time out");
+
+        assert_eq!(error.code, RuntimeErrorCode::CoreUnavailable);
+        assert!(error.message.contains("timed out"));
+        assert!(started.elapsed() < Duration::from_secs(3));
+    }
+
+    #[test]
+    fn profile_validator_output_reader_rejects_excess_output() {
+        let reader = super::spawn_output_reader(Cursor::new(vec![b'x'; 64 * 1024 + 1]));
+
+        let error = super::join_output_reader(Some(reader))
+            .expect_err("validator output above the limit must be rejected");
+
+        assert_eq!(error.code, RuntimeErrorCode::CoreUnavailable);
+        assert!(error.message.contains("exceeded"));
+    }
+
+    #[test]
+    fn profile_validation_detail_includes_stdout_stderr_and_is_bounded() {
+        let secret = "debug0123456789abcdef";
+        let stdout = format!("stdout:{secret}:{}\n", "a".repeat(280));
+        let stderr = format!("stderr:{secret}:{}\n", "b".repeat(280));
+
+        let detail = profile_validation_detail(stdout.as_bytes(), stderr.as_bytes(), secret)
+            .expect("validator output should produce an error detail");
+
+        assert!(detail.contains("stdout:"));
+        assert!(detail.contains("stderr:"));
+        assert!(!detail.contains(secret));
+        assert!(detail.contains("[REDACTED]"));
+        assert_eq!(detail.chars().count(), 512);
+    }
+
+    #[test]
+    fn stop_core_terminates_a_running_child_without_an_idle_grace_period() {
+        let directory = tempfile::tempdir().expect("temporary config directory");
+        let child = Command::new("powershell.exe")
+            .args([
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                "Start-Sleep -Seconds 5",
+            ])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("spawn long-lived child");
+        let mut adapter = MihomoCoreAdapter::new(
+            VerifiedMihomoBinary::test_fixture(),
+            ConfigStore::new(directory.path().join("config.yaml")),
+        );
+        adapter.child = Some(child);
+
+        let started = Instant::now();
+        adapter.stop_core().expect("force-stop fixture child");
+
+        assert!(started.elapsed() < Duration::from_secs(2));
+        assert!(adapter.child.is_none());
+    }
+
+    #[test]
+    fn staging_creates_the_runtime_directory_on_a_fresh_install() {
+        // First import on a new install runs before any core start has created
+        // the directory; staging used to fail with `os error 3`.
+        let directory = tempfile::tempdir().expect("temporary config directory");
+        let runtime_directory = directory.path().join("mihomo");
+        assert!(!runtime_directory.exists());
+
+        // The fixture binary does not exist, so validation itself fails — what
+        // matters here is that staging got far enough to write the candidate.
+        let error = validate_prepared_subscription(
+            &PathBuf::from("mihomo-test.exe"),
+            &runtime_directory,
+            "proxies: []\n",
+        )
+        .expect_err("the fixture binary cannot run");
+        assert!(
+            error.message.contains("validator could not start"),
+            "{}",
+            error.message
+        );
+        assert!(runtime_directory.is_dir());
+    }
+
+    #[test]
+    fn geodata_deployment_creates_the_runtime_directory() {
+        let directory = tempfile::tempdir().expect("temporary config directory");
+        let runtime_directory = directory.path().join("mihomo");
+
+        deploy_bundled_geodata(&runtime_directory);
+
+        assert!(runtime_directory.is_dir());
+    }
+
+    #[test]
+    fn binary_candidates_do_not_embed_developer_install_paths() {
+        let executable = PathBuf::from(r"C:\Program Files\CapybaraProxy\capybara.exe");
+        let config_directory = PathBuf::from(r"C:\Users\person\AppData\Roaming\CapybaraProxy");
+        let candidates = build_binary_candidates(None, Some(&executable), &config_directory);
+
+        assert_eq!(
+            candidates,
+            vec![
+                PathBuf::from(r"C:\Program Files\CapybaraProxy\mihomo.exe"),
+                PathBuf::from(r"C:\Program Files\CapybaraProxy\resources\mihomo.exe"),
+                PathBuf::from(r"C:\Program Files\CapybaraProxy\resources\mihomo\mihomo.exe"),
+                PathBuf::from(
+                    r"C:\Program Files\CapybaraProxy\resources\resources\mihomo\mihomo.exe"
+                ),
+                PathBuf::from(r"C:\Program Files\CapybaraProxy\mihomo\mihomo.exe"),
+                PathBuf::from(r"C:\Users\person\AppData\Roaming\CapybaraProxy\mihomo.exe"),
+            ]
+        );
+    }
+
+    #[test]
+    fn bundled_geodata_is_looked_up_next_to_the_executable() {
+        let executable = PathBuf::from(r"C:\Program Files\CapybaraProxy\capybara.exe");
+        let candidates = super::bundled_geodata_candidates(Some(&executable));
+
+        assert_eq!(
+            candidates,
+            vec![
+                PathBuf::from(r"C:\Program Files\CapybaraProxy\resources\geodata"),
+                PathBuf::from(r"C:\Program Files\CapybaraProxy\resources\resources\geodata"),
+                PathBuf::from(r"C:\Program Files\CapybaraProxy\geodata"),
+            ]
+        );
+    }
+}

@@ -260,7 +260,7 @@ describe("SettingsPage system integration", () => {
     const integration = createIntegrationValue({
       error: {
         code: "platform_integration",
-        message: "FlowProxy could not restore the system proxy.",
+        message: "CapybaraProxy could not restore the system proxy.",
         retryable: true,
       },
     });
@@ -270,7 +270,7 @@ describe("SettingsPage system integration", () => {
       await screen.findByRole("switch", { name: "System proxy" }),
     ).toHaveAttribute("aria-checked", "false");
     expect(
-      screen.getByText("FlowProxy could not restore the system proxy."),
+      screen.getByText("CapybaraProxy could not restore the system proxy."),
     ).toBeInTheDocument();
   });
 

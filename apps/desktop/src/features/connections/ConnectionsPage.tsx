@@ -135,7 +135,7 @@ export function ConnectionsPage() {
       });
       setActionError({
         code: "internal",
-        message: "FlowProxy could not close the selected connection.",
+        message: "CapybaraProxy could not close the selected connection.",
         retryable: true,
       });
     } finally {
@@ -170,7 +170,7 @@ export function ConnectionsPage() {
     } catch {
       setActionError({
         code: "internal",
-        message: "FlowProxy could not close the connections.",
+        message: "CapybaraProxy could not close the connections.",
         retryable: true,
       });
     } finally {

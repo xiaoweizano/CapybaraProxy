@@ -1,4 +1,4 @@
-# FlowProxy Phase 4 System Integration Design
+# CapybaraProxy Phase 4 System Integration Design
 
 ## Scope
 
@@ -14,7 +14,7 @@ established UI, Runtime, Mihomo, or Android boundaries.
 
 ## Module Boundary
 
-`flowproxy-platform` owns operating-system policy and adapters. The Tauri crate
+`capybara-platform` owns operating-system policy and adapters. The Tauri crate
 coordinates this crate with Runtime lifecycle state. React only calls typed
 commands and renders returned state; it never receives shell, registry, or
 arbitrary path inputs.
@@ -31,22 +31,22 @@ Registry scope is the current user:
 
 The managed endpoint is always `127.0.0.1:<Mihomo mixed-port>`.
 
-Before enabling, FlowProxy captures `ProxyEnable` and `ProxyServer` presence and
+Before enabling, CapybaraProxy captures `ProxyEnable` and `ProxyServer` presence and
 values. A versioned journal is atomically persisted before either registry
 value is changed. The journal records the original value and the exact managed
 endpoint.
 
-If any write or WinINet refresh fails, FlowProxy immediately restores the
+If any write or WinINet refresh fails, CapybaraProxy immediately restores the
 captured values. The journal remains only when restoration fails, allowing the
 next launch to retry recovery.
 
 Disable and crash recovery modify the system proxy only when current values
 still equal the journal's managed values. If the user changed the values,
-FlowProxy releases journal ownership without overwriting the user's settings.
+CapybaraProxy releases journal ownership without overwriting the user's settings.
 A missing journal never authorizes disabling a user-owned proxy.
 
 The unavoidable recovery window is between an abrupt process termination and
-the next FlowProxy launch. No background service exists in this phase.
+the next CapybaraProxy launch. No background service exists in this phase.
 
 ## Runtime Lifecycle
 
@@ -64,11 +64,11 @@ the next FlowProxy launch. No background service exists in this phase.
 
 ## Launch at Login
 
-The Windows adapter owns the current-user Run value named `FlowProxy`. The
+The Windows adapter owns the current-user Run value named `CapybaraProxy`. The
 stored command is exactly one quoted absolute executable path and is never
 passed through a shell.
 
-Disabling removes the value only when it matches FlowProxy's expected command.
+Disabling removes the value only when it matches CapybaraProxy's expected command.
 A foreign value with the same fixed name is preserved and reported as a
 structured conflict.
 

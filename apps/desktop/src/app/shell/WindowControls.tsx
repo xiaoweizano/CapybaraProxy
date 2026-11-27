@@ -10,7 +10,7 @@ function runWindowAction(action: () => Promise<void>): void {
   void Promise.resolve()
     .then(action)
     .catch((error: unknown) => {
-      console.error("FlowProxy window action failed", error);
+      console.error("CapybaraProxy window action failed", error);
     });
 }
 

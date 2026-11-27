@@ -1,4 +1,4 @@
-export const CLOSE_BEHAVIOR_STORAGE_KEY = "flowproxy.closeBehavior";
+export const CLOSE_BEHAVIOR_STORAGE_KEY = "capybara.closeBehavior";
 
 export type CloseBehavior = "hide_to_tray" | "exit_application";
 

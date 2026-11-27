@@ -38,7 +38,7 @@ export function useDocumentVisibility(): void {
         }
       })
       .catch((error: unknown) => {
-        console.error("FlowProxy native visibility subscription failed", error);
+        console.error("CapybaraProxy native visibility subscription failed", error);
       });
 
     return () => {

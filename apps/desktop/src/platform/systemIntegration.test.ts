@@ -110,7 +110,7 @@ describe("system integration bridge", () => {
       ok: false,
       error: {
         code: "platform_integration",
-        message: "FlowProxy could not update the system proxy.",
+        message: "CapybaraProxy could not update the system proxy.",
         retryable: true,
       },
     });
@@ -119,7 +119,7 @@ describe("system integration bridge", () => {
       status: "error",
       error: {
         code: "platform_integration",
-        message: "FlowProxy could not update the system proxy.",
+        message: "CapybaraProxy could not update the system proxy.",
         retryable: true,
       },
     });
@@ -161,7 +161,7 @@ describe("system integration bridge", () => {
     eventHandler?.({
       payload: {
         kind: "status",
-        status: { ...status, executable_path: "C:\\secret\\FlowProxy.exe" },
+        status: { ...status, executable_path: "C:\\secret\\CapybaraProxy.exe" },
       },
     });
     eventHandler?.({
@@ -169,7 +169,7 @@ describe("system integration bridge", () => {
         kind: "error",
         error: {
           code: "platform_integration",
-          message: "FlowProxy could not restore the system proxy.",
+          message: "CapybaraProxy could not restore the system proxy.",
           retryable: true,
         },
       },
@@ -192,7 +192,7 @@ describe("system integration bridge", () => {
       kind: "error",
       error: {
         code: "platform_integration",
-        message: "FlowProxy could not restore the system proxy.",
+        message: "CapybaraProxy could not restore the system proxy.",
         retryable: true,
       },
     });

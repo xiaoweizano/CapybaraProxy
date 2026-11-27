@@ -13,7 +13,7 @@ import {
   createPage,
   delay,
   findAvailablePort,
-  findFlowProxyPid,
+  findCapybaraProxyPid,
   processIdsStillAlive,
   terminateProcessTree,
   waitForPageTarget,
@@ -26,11 +26,11 @@ import {
 } from "./lib/windows-registry.mjs";
 
 const appExecutable = path.resolve(
-  process.env.FLOWPROXY_APP_EXECUTABLE ??
-    "F:/codex-install/cargo-target/release/flowproxy-desktop.exe",
+  process.env.CAPYBARA_APP_EXECUTABLE ??
+    "F:/codex-install/cargo-target/release/capybara-desktop.exe",
 );
 const mihomoExecutable = path.resolve(
-  process.env.FLOWPROXY_MIHOMO_PATH ??
+  process.env.CAPYBARA_MIHOMO_PATH ??
     "F:/codex-install/mihomo/v1.19.33/win-amd64/mihomo-windows-amd64.exe",
 );
 const configRoot = path.join(
@@ -38,7 +38,7 @@ const configRoot = path.join(
     (() => {
       throw new Error("APPDATA is unavailable.");
     })(),
-  "com.flowproxy.desktop",
+  "com.capybara.proxy",
 );
 const journalPath = path.join(configRoot, "system-proxy.json");
 const resultPath = path.resolve("artifacts/stage4-windows-acceptance.json");
@@ -117,7 +117,7 @@ async function invokeOk(page, command, args, action) {
   const result = await page.invoke(command, args);
   assert(
     result?.ok,
-    `FlowProxy could not ${action}: ${JSON.stringify(result)}`,
+    `CapybaraProxy could not ${action}: ${JSON.stringify(result)}`,
   );
   return result.data;
 }
@@ -147,7 +147,7 @@ async function connectToApplication(port) {
     `document.readyState === "complete" &&
       document.querySelector(".app-frame") !== null &&
       typeof window.__TAURI_INTERNALS__?.invoke === "function"`,
-    "the FlowProxy application shell",
+    "the CapybaraProxy application shell",
   );
 
   assert(
@@ -164,7 +164,7 @@ async function startApplication() {
     cwd: path.dirname(appExecutable),
     env: {
       ...process.env,
-      FLOWPROXY_MIHOMO_PATH: mihomoExecutable,
+      CAPYBARA_MIHOMO_PATH: mihomoExecutable,
       WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: [
         process.env.WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS,
         `--remote-debugging-port=${browserPort}`,
@@ -178,7 +178,7 @@ async function startApplication() {
 
   assert(
     Number.isInteger(child.pid) && child.pid > 0,
-    "FlowProxy did not return a process identifier.",
+    "CapybaraProxy did not return a process identifier.",
   );
 
   try {
@@ -220,14 +220,14 @@ await mkdir(configRoot, { recursive: true });
 
 const initialRegistry = await readWindowsStage4Registry();
 const initialJournal = await readOptionalFile(journalPath);
-const initialAppPid = await findFlowProxyPid(appExecutable);
+const initialAppPid = await findCapybaraProxyPid(appExecutable);
 assert(
   initialAppPid === null,
-  `Stop FlowProxy process ${initialAppPid} before running stage 4 acceptance.`,
+  `Stop CapybaraProxy process ${initialAppPid} before running stage 4 acceptance.`,
 );
 assert(
   !initialJournal.exists,
-  `FlowProxy already has a system proxy journal at ${journalPath}; recovery must be inspected before acceptance.`,
+  `CapybaraProxy already has a system proxy journal at ${journalPath}; recovery must be inspected before acceptance.`,
 );
 
 const audit = {
@@ -326,7 +326,7 @@ try {
     (registry) =>
       registry.proxyServer.value === enabledJournal.managed_server &&
       registry.proxyEnable.value === 1,
-    "FlowProxy to own the system proxy",
+    "CapybaraProxy to own the system proxy",
   );
   await verifyProxyRegistry(
     enabledRegistry,
@@ -395,7 +395,7 @@ try {
   assert(
     protectedRegistry.proxyEnable.value === 1 &&
       protectedRegistry.proxyServer.value === "10.0.0.2:8080",
-    `FlowProxy overwrote an external proxy change: ${JSON.stringify(
+    `CapybaraProxy overwrote an external proxy change: ${JSON.stringify(
       protectedRegistry,
     )}`,
   );
@@ -585,7 +585,7 @@ try {
   assert(
     startupConflict.launch_at_login.state === "conflict" &&
       conflictRegistry.startup.value === foreignStartup.startup.value,
-    `FlowProxy did not preserve the foreign startup value: ${JSON.stringify(
+    `CapybaraProxy did not preserve the foreign startup value: ${JSON.stringify(
       conflictRegistry.startup,
     )}`,
   );
@@ -632,7 +632,7 @@ try {
   applicationPid = null;
   assert(
     await waitForProcessExit(staleApplicationPid, 15_000),
-    "FlowProxy did not terminate for the stale journal test.",
+    "CapybaraProxy did not terminate for the stale journal test.",
   );
   await waitForProcessExit(staleCoreInfo.pid, 15_000);
   await waitForJournal(
@@ -703,7 +703,7 @@ try {
   }
   assert(
     await waitForProcessExit(exitApplicationPid, 20_000),
-    "FlowProxy did not exit after the controlled exit request.",
+    "CapybaraProxy did not exit after the controlled exit request.",
   );
   completedControlledExit = true;
   application = null;

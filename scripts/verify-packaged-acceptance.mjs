@@ -6,10 +6,10 @@
 // read the resulting state off the DOM.
 //
 // Environment:
-//   FLOWPROXY_APP_EXECUTABLE  installed flowproxy-desktop.exe
-//   FLOWPROXY_SUBSCRIPTION    path to a subscription YAML fixture
-//   FLOWPROXY_EVIDENCE        output JSON path
-//   FLOWPROXY_ARTIFACTS       directory for screenshots
+//   CAPYBARA_APP_EXECUTABLE  installed capybara-desktop.exe
+//   CAPYBARA_SUBSCRIPTION    path to a subscription YAML fixture
+//   CAPYBARA_EVIDENCE        output JSON path
+//   CAPYBARA_ARTIFACTS       directory for screenshots
 
 import { spawn, execFile } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -29,18 +29,18 @@ import {
 const execFileAsync = promisify(execFile);
 
 const appExecutable = path.resolve(
-  process.env.FLOWPROXY_APP_EXECUTABLE ??
-    "F:/新建文件夹/FlowProxy/flowproxy-desktop.exe",
+  process.env.CAPYBARA_APP_EXECUTABLE ??
+    "F:/新建文件夹/CapybaraProxy/capybara-desktop.exe",
 );
 const subscriptionPath = path.resolve(
-  process.env.FLOWPROXY_SUBSCRIPTION ??
+  process.env.CAPYBARA_SUBSCRIPTION ??
     "F:/codex-install/subscriptions/test-sub.yaml",
 );
 const evidencePath = path.resolve(
-  process.env.FLOWPROXY_EVIDENCE ?? "artifacts/stage6-packaged-acceptance.json",
+  process.env.CAPYBARA_EVIDENCE ?? "artifacts/stage6-packaged-acceptance.json",
 );
 const artifactDirectory = path.resolve(
-  process.env.FLOWPROXY_ARTIFACTS ?? "artifacts/screenshots/packaged-acceptance",
+  process.env.CAPYBARA_ARTIFACTS ?? "artifacts/screenshots/packaged-acceptance",
 );
 const pageUrlPrefix = "http://tauri.localhost/";
 
@@ -64,13 +64,13 @@ async function main() {
   await mkdir(artifactDirectory, { recursive: true });
 
   const browserPort = await findAvailablePort();
-  // FLOWPROXY_MIHOMO_PATH is deliberately cleared: the bundle must locate the
+  // CAPYBARA_MIHOMO_PATH is deliberately cleared: the bundle must locate the
   // core it ships.
   const child = spawn(appExecutable, [], {
     cwd: path.dirname(appExecutable),
     env: {
       ...process.env,
-      FLOWPROXY_MIHOMO_PATH: "",
+      CAPYBARA_MIHOMO_PATH: "",
       WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: [
         process.env.WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS,
         `--remote-debugging-port=${browserPort}`,
@@ -114,7 +114,7 @@ async function main() {
       await page.evaluate(`
         (() => {
           document.documentElement.dataset.appVisibility = "visible";
-          window.dispatchEvent(new CustomEvent("flowproxy:app-visibility", {
+          window.dispatchEvent(new CustomEvent("capybara:app-visibility", {
             detail: { hidden: false },
           }));
         })()
@@ -339,7 +339,7 @@ async function main() {
 async function readMixedPort() {
   const configPath = path.join(
     process.env.APPDATA ?? "",
-    "com.flowproxy.desktop",
+    "com.capybara.proxy",
     "mihomo",
     "config.yaml",
   );
@@ -414,10 +414,10 @@ async function screenshot(page, name, client) {
 async function showMainWindow() {
   const script = `
     $signature = '[DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);';
-    Add-Type -MemberDefinition $signature -Name Win32 -Namespace FlowProxy;
-    Get-Process flowproxy-desktop -ErrorAction SilentlyContinue | ForEach-Object {
+    Add-Type -MemberDefinition $signature -Name Win32 -Namespace CapybaraProxy;
+    Get-Process capybara-desktop -ErrorAction SilentlyContinue | ForEach-Object {
       if ($_.MainWindowHandle -ne 0) {
-        [FlowProxy.Win32]::ShowWindow($_.MainWindowHandle, 5) | Out-Null
+        [CapybaraProxy.Win32]::ShowWindow($_.MainWindowHandle, 5) | Out-Null
       }
     }`;
   await execFileAsync("powershell", ["-NoProfile", "-NonInteractive", "-Command", script]);

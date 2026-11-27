@@ -169,6 +169,6 @@ Android：
 
 ## 9. Codex 首轮提示词
 
-请先阅读仓库中的 README.md 和 docs/ 下所有产品、UI、架构、性能及开发规范，并查看 assets/design-reference/ 中的两张 FlowProxy 参考图。
+请先阅读仓库中的 README.md 和 docs/ 下所有产品、UI、架构、性能及开发规范，并查看 assets/design-reference/ 中的两张 CapybaraProxy 参考图。
 
 当前任务只执行阶段 0 和阶段 1 的桌面工程骨架准备。先检查仓库和开发环境，不要覆盖已有文件。采用 React + TypeScript + Tauri + Rust。建立可运行的桌面工程、导航、Overview 静态 UI、A/C 双主题和主题持久化。A 为默认主题，严格以参考图为视觉基准。暂不集成 Mihomo，不实现真实系统代理/TUN，不要用假数据冒充真实状态。完成后运行构建和测试，提供运行方法、截图、测试结果、已知差异和下一步建议。Android 只建立独立工程方案，不要在本任务中同时展开完整实现。

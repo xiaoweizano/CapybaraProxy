@@ -128,14 +128,14 @@ pub(crate) struct DesktopSettings {
     /// Refresh the stored subscription once, right after launch.
     #[serde(default)]
     pub update_subscription_on_launch: bool,
-    /// Start the core as soon as FlowProxy launches.
+    /// Start the core as soon as CapybaraProxy launches.
     #[serde(default)]
     pub auto_connect: bool,
     /// User-Agent sent when downloading subscriptions. Empty keeps the
     /// built-in Clash identifier, which is what providers expect.
     #[serde(default)]
     pub subscription_user_agent: Option<String>,
-    /// Bypass list written to the system proxy while FlowProxy owns it.
+    /// Bypass list written to the system proxy while CapybaraProxy owns it.
     /// Empty keeps the list Windows already has.
     #[serde(default)]
     pub proxy_bypass: Option<String>,
@@ -143,7 +143,7 @@ pub(crate) struct DesktopSettings {
     /// so the new nodes take effect without a manual restart.
     #[serde(default)]
     pub restart_after_subscription_update: bool,
-    /// Whether FlowProxy should own the system proxy. Persisted so a restart
+    /// Whether CapybaraProxy should own the system proxy. Persisted so a restart
     /// re-applies it instead of silently leaving the OS on the old value.
     #[serde(default)]
     pub system_proxy_enabled: bool,
@@ -412,7 +412,7 @@ impl SettingsStore {
                 return LoadedSettings {
                     settings: DesktopSettings::default(),
                     warning: Some(format!(
-                        "FlowProxy settings could not be read; defaults were restored: {error}"
+                        "CapybaraProxy settings could not be read; defaults were restored: {error}"
                     )),
                 };
             }
@@ -424,7 +424,7 @@ impl SettingsStore {
                 return LoadedSettings {
                     settings: DesktopSettings::default(),
                     warning: Some(format!(
-                        "FlowProxy settings version {} is unsupported; defaults were restored.",
+                        "CapybaraProxy settings version {} is unsupported; defaults were restored.",
                         settings.version
                     )),
                 };
@@ -433,7 +433,7 @@ impl SettingsStore {
                 return LoadedSettings {
                     settings: DesktopSettings::default(),
                     warning: Some(format!(
-                        "FlowProxy settings could not be read; defaults were restored: {error}"
+                        "CapybaraProxy settings could not be read; defaults were restored: {error}"
                     )),
                 };
             }
@@ -448,18 +448,18 @@ impl SettingsStore {
     pub(crate) fn save(&self, settings: &DesktopSettings) -> Result<(), SettingsStoreError> {
         if settings.version != SETTINGS_VERSION {
             return Err(SettingsStoreError::new(format!(
-                "Cannot save unsupported FlowProxy settings version {}.",
+                "Cannot save unsupported CapybaraProxy settings version {}.",
                 settings.version
             )));
         }
         let settings = &settings.clone().normalized();
 
         let parent = self.path.parent().ok_or_else(|| {
-            SettingsStoreError::new("FlowProxy settings path has no parent directory.")
+            SettingsStoreError::new("CapybaraProxy settings path has no parent directory.")
         })?;
         fs::create_dir_all(parent).map_err(|error| {
             SettingsStoreError::new(format!(
-                "Could not create the FlowProxy settings directory: {error}"
+                "Could not create the CapybaraProxy settings directory: {error}"
             ))
         })?;
 
@@ -467,16 +467,18 @@ impl SettingsStore {
         let guard = TemporaryFileGuard::new(temporary_path);
 
         serde_json::to_writer_pretty(&mut temporary_file, settings).map_err(|error| {
-            SettingsStoreError::new(format!("Could not serialize FlowProxy settings: {error}"))
+            SettingsStoreError::new(format!(
+                "Could not serialize CapybaraProxy settings: {error}"
+            ))
         })?;
         temporary_file.sync_all().map_err(|error| {
-            SettingsStoreError::new(format!("Could not flush FlowProxy settings: {error}"))
+            SettingsStoreError::new(format!("Could not flush CapybaraProxy settings: {error}"))
         })?;
         drop(temporary_file);
 
         fs::rename(guard.path(), &self.path).map_err(|error| {
             SettingsStoreError::new(format!(
-                "Could not replace FlowProxy settings atomically: {error}"
+                "Could not replace CapybaraProxy settings atomically: {error}"
             ))
         })?;
         guard.commit();
@@ -496,7 +498,7 @@ impl SettingsStore {
             .open(&path)
             .map_err(|error| {
                 SettingsStoreError::new(format!(
-                    "Could not create a temporary FlowProxy settings file: {error}"
+                    "Could not create a temporary CapybaraProxy settings file: {error}"
                 ))
             })?;
         Ok((path, file))

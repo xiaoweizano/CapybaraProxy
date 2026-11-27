@@ -9,8 +9,8 @@
 - 基于 `i18next` + `react-i18next`，资源在 `apps/desktop/src/i18n/locales/`。
 - 支持 English、简体中文两种语言。
 - 切换入口：**Settings → Appearance → Language**。
-- 持久化：写入 `%APPDATA%\com.flowproxy.desktop\settings.json` 的 `language` 字段，
-  同时缓存到 `localStorage`（`flowproxy.language`）用于首帧渲染。
+- 持久化：写入 `%APPDATA%\com.capybara.proxy\settings.json` 的 `language` 字段，
+  同时缓存到 `localStorage`（`capybara.language`）用于首帧渲染。
 - `settings.json` 若没有 `language` 字段（旧版本写入），按系统语言初始化，
   不会把中文系统上的升级用户强制切回英文。
 - 切换时同步更新 `<html lang>`，`Intl` 日期/时间格式跟随语言。
@@ -18,7 +18,7 @@
 
 ### Android（Compose）
 
-- 采用与前缀无关的字典实现（`app/src/main/kotlin/com/flowproxy/android/i18n/`），
+- 采用与前缀无关的字典实现（`app/src/main/kotlin/com/capybara/android/i18n/`），
   不依赖 `values-xx` 资源或 AppCompat，因此 API 26–35 行为一致。
 - 支持 English、简体中文两种语言。
 - 切换入口：**Settings → Language**。
@@ -31,7 +31,7 @@
   `MihomoCapabilityReport.detail` 等技术诊断信息保持英文。这些文本含动态上下文，
   逐条翻译容易产生误导；界面上以「错误码 + 原文」的形式展示，便于检索。
 - **Mihomo 自身的日志与规则类型**：来自核心，不做改写。
-- **品牌与专有名词**：`FlowProxy`、`Cyber Flow`、`Warm Flow`、`Mihomo`、`TUN`、`ABI`。
+- **品牌与专有名词**：`CapybaraProxy`、`Cyber Flow`、`Warm Flow`、`Mihomo`、`TUN`、`ABI`。
 - **订阅内容**（节点名、代理组名、规则 payload）：属于用户数据。
 
 ## 明确未实现

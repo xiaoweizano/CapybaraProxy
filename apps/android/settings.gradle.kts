@@ -14,7 +14,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "FlowProxyAndroid"
+rootProject.name = "CapybaraProxyAndroid"
 include(":core-model")
 include(":core-theme")
 include(":core-data")

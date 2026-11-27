@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.flowproxy.core.theme"
+    namespace = "com.capybara.core.theme"
     compileSdk = 35
 
     defaultConfig {

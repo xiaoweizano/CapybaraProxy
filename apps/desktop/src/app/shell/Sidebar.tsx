@@ -11,7 +11,7 @@ export function Sidebar() {
       <div className="sidebar-brand" aria-label={t("nav.home")}>
         <BrandMark className="sidebar-brand-mark" />
         <div className="sidebar-brand-copy">
-          <strong>FlowProxy</strong>
+          <strong>CapybaraProxy</strong>
           <span>{t("app.tagline")}</span>
         </div>
       </div>

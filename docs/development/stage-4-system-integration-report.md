@@ -63,7 +63,7 @@ TUN 仅探测，未激活，也未修改路由或系统代理以外的网络配�
 
 最终无安装包 release：
 
-- 路径：`F:\codex-install\cargo-target\release\flowproxy-desktop.exe`
+- 路径：`F:\codex-install\cargo-target\release\capybara-desktop.exe`
 - 构建时间：`2026-11-06T13:59:55+08:00`
 - 大小：`11,256,832` 字节
 - SHA-256：
@@ -91,16 +91,16 @@ RustSec 允许级警告：
   （当前进程未提权）。
 - 初始代理 `192.168.1.2:7890` 被完整记录；启用后切换为
   `127.0.0.1:<random-loopback-port>`，停用后恢复原值。
-- 模拟外部软件将代理改为 `10.0.0.2:8080` 后，FlowProxy 释放 Journal 所有权，
+- 模拟外部软件将代理改为 `10.0.0.2:8080` 后，CapybaraProxy 释放 Journal 所有权，
   保留外部值，不覆盖用户修改。
 - 强制终止 Mihomo 后 Runtime 进入 `error`，系统代理恢复原值且 Journal 清除。
 - Runtime 重启先报告 `running_disconnected`，替换核心连接后切换到
   `connected`，并使用新的回环端口重新启用系统代理。
-- 开机启动写入当前用户 `Run\FlowProxy`，命令为带引号的 release 绝对路径；
+- 开机启动写入当前用户 `Run\CapybaraProxy`，命令为带引号的 release 绝对路径；
   停用后删除自身值。
-- 外部同名 `Run\FlowProxy` 值被报告为 `conflict`，启用和停用均不覆盖。
+- 外部同名 `Run\CapybaraProxy` 值被报告为 `conflict`，启用和停用均不覆盖。
 - 应用和核心同时强杀后保留脏 Journal；下一次启动恢复原代理并删除 Journal。
-- 受控退出恢复系统代理、结束 FlowProxy 和 Mihomo 进程。
+- 受控退出恢复系统代理、结束 CapybaraProxy 和 Mihomo 进程。
 - `finally` 路径把测试前代理注册表、开机启动值和 Journal 恢复；本轮实测原
   代理仍为 `192.168.1.2:7890`。
 
@@ -164,7 +164,7 @@ RustSec 允许级警告：
 ### P2
 
 1. 托盘四项交互只完成代码与构建检查，真实鼠标操作待人工验证。
-2. 异常强杀后的代理恢复依赖下一次 FlowProxy 启动；本阶段没有后台服务缩短
+2. 异常强杀后的代理恢复依赖下一次 CapybaraProxy 启动；本阶段没有后台服务缩短
    该恢复窗口。
 3. RustSec 有 2 条上游允许级警告，需要随 Tauri/GTK 依赖升级复核。
 4. macOS/Linux 未运行验证，系统修改能力保持 `unverified`。

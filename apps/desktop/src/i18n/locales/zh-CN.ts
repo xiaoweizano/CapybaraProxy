@@ -37,7 +37,7 @@ export const zhCN: ResourceShape = {
     logs: "日志",
     settings: "设置",
     primary: "主导航",
-    home: "FlowProxy 首页",
+    home: "CapybaraProxy 首页",
   },
   runtime: {
     state: {
@@ -199,7 +199,7 @@ export const zhCN: ResourceShape = {
     providersHeading: "规则与代理集",
     providersCount: "{{count}} 个来源",
     providersHint:
-      "这些 provider 由 Mihomo 用自己的网络栈拉取。FlowProxy 只做展示，不代理、不缓存、也不校验其中的地址。",
+      "这些 provider 由 Mihomo 用自己的网络栈拉取。CapybaraProxy 只做展示，不代理、不缓存、也不校验其中的地址。",
     providerName: "来源",
     providerKind: "类型",
     providerKindProxy: "代理集",
@@ -254,7 +254,7 @@ export const zhCN: ResourceShape = {
     subscriptionKicker: "订阅",
     subscriptionHeading: "导入订阅",
     subscriptionHint:
-      "控制端口、API 密钥与代理端口由 FlowProxy 统一接管，订阅里的其余内容原样使用。订阅地址可借助系统代理下载。",
+      "控制端口、API 密钥与代理端口由 CapybaraProxy 统一接管，订阅里的其余内容原样使用。订阅地址可借助系统代理下载。",
     replacesCurrent: "导入新订阅会替换当前订阅。",
     addsAnother: "导入会新增一份订阅并设为生效，其余的仍可在上方切换。",
     tabUrl: "通过链接导入",
@@ -362,7 +362,7 @@ export const zhCN: ResourceShape = {
     windowKicker: "窗口与启动",
     closeButton: "关闭按钮行为",
     hideToTray: "隐藏到托盘",
-    hideToTrayCaption: "保持 FlowProxy 继续运行",
+    hideToTrayCaption: "保持 CapybaraProxy 继续运行",
     exitApplication: "退出程序",
     exitApplicationCaption: "结束桌面进程",
     startup: "启动",
@@ -370,17 +370,17 @@ export const zhCN: ResourceShape = {
     silentStart: "静默启动",
     silentStartCaption: "启动后直接进入托盘，不显示主窗口",
     autoConnect: "启动后自动连接",
-    autoConnectCaption: "FlowProxy 启动后立即拉起 Mihomo 核心",
+    autoConnectCaption: "CapybaraProxy 启动后立即拉起 Mihomo 核心",
     network: "网络",
     integration: "系统集成",
     systemProxy: "系统代理",
     systemProxyRemembered:
-      "已记录为开启。核心连接后 FlowProxy 会重新应用系统代理。",
+      "已记录为开启。核心连接后 CapybaraProxy 会重新应用系统代理。",
     launchAtLogin: "开机启动",
     tunInterface: "TUN 接口",
     detectionOnly: "仅探测",
     tunAvailableHint: "所有连接都通过 TUN 转发",
-    tunNeedsElevation: "以管理员身份运行 FlowProxy 才能启用 TUN。",
+    tunNeedsElevation: "以管理员身份运行 CapybaraProxy 才能启用 TUN。",
     checkingCapability: "正在检查桌面端能力",
     integrationUnavailable: "桌面端集成不可用",
     checkingElevation: "正在检查提权与驱动可用性",
@@ -423,7 +423,7 @@ export const zhCN: ResourceShape = {
     subscriptionUserAgentCaption: "下载订阅时发送的客户端标识",
     subscriptionUserAgentHint:
       "留空则使用内置的 Clash 标识，多数服务商靠它决定返回什么格式的订阅。",
-    subscriptionUserAgentPlaceholder: "clash.meta/… (FlowProxy)",
+    subscriptionUserAgentPlaceholder: "clash.meta/… (CapybaraProxy)",
     library: "多订阅",
     logs: "日志",
     logsKicker: "留存",
@@ -518,7 +518,7 @@ export const zhCN: ResourceShape = {
     substore: "Sub-Store",
     substoreKicker: "外部服务",
     substoreHint:
-      "连接外部 Sub-Store 服务，即可在 FlowProxy 内列出其中的订阅并直接导入。",
+      "连接外部 Sub-Store 服务，即可在 CapybaraProxy 内列出其中的订阅并直接导入。",
     substoreUrl: "服务地址",
     substoreToken: "API Token",
     substoreNote: "Token 仅保存在本地，不会写入日志。",
@@ -578,6 +578,6 @@ export const zhCN: ResourceShape = {
   },
   diagram: {
     networkOrb: "网络光球",
-    mascot: "FlowProxy 吉祥物",
+    mascot: "CapybaraProxy 吉祥物",
   },
 };

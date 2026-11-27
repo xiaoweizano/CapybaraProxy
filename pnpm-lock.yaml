@@ -13,7 +13,7 @@ importers:
 
   apps/desktop:
     dependencies:
-      '@flowproxy/design-tokens':
+      '@capybara/design-tokens':
         specifier: workspace:*
         version: link:../../packages/design-tokens
       '@fontsource-variable/manrope':

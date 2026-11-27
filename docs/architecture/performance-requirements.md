@@ -49,7 +49,7 @@
 8. Mihomo 重启和异常退出恢复。
 
 记录：
-- FlowProxy UI/Rust 进程 CPU、内存。
+- CapybaraProxy UI/Rust 进程 CPU、内存。
 - Mihomo CPU、内存。
 - 整体应用 CPU、内存。
 - 空闲后台唤醒/轮询频率。

@@ -93,7 +93,7 @@ export async function waitForPageTarget(
     await delay(250);
   }
 
-  throw new Error("FlowProxy WebView2 CDP endpoint did not become available.");
+  throw new Error("CapybaraProxy WebView2 CDP endpoint did not become available.");
 }
 
 export function createCdpClient(webSocketUrl) {
@@ -120,7 +120,7 @@ export function createCdpClient(webSocketUrl) {
   const ready = new Promise((resolve, reject) => {
     socket.onopen = resolve;
     socket.onerror = () =>
-      reject(new Error("Could not connect to the FlowProxy WebView."));
+      reject(new Error("Could not connect to the CapybaraProxy WebView."));
   });
 
   return {
@@ -208,11 +208,11 @@ export async function waitForProcessExit(pid, timeoutMs = 20_000) {
   return false;
 }
 
-export async function findFlowProxyPid(executable) {
+export async function findCapybaraProxyPid(executable) {
   const normalizedExecutable = executable.toLowerCase().replaceAll("'", "''");
   const output = await runPowerShell(`
     $target = '${normalizedExecutable}';
-    Get-CimInstance Win32_Process -Filter "Name = 'flowproxy-desktop.exe'" |
+    Get-CimInstance Win32_Process -Filter "Name = 'capybara-desktop.exe'" |
       Where-Object {
         $_.ExecutablePath -and
         $_.ExecutablePath.ToLowerInvariant() -eq $target

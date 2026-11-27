@@ -4,16 +4,16 @@ import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 
-const browserPort = process.env.FLOWPROXY_CDP_PORT ?? "9222";
+const browserPort = process.env.CAPYBARA_CDP_PORT ?? "9222";
 const browserUrl = `http://127.0.0.1:${browserPort}`;
 const configRoot =
-  process.env.FLOWPROXY_CONFIG_ROOT ??
+  process.env.CAPYBARA_CONFIG_ROOT ??
   path.join(
     process.env.APPDATA ??
       (() => {
         throw new Error("APPDATA is unavailable.");
       })(),
-    "com.flowproxy.desktop",
+    "com.capybara.proxy",
   );
 const actionTimeoutMs = 15_000;
 
@@ -68,7 +68,7 @@ async function findPageTarget() {
     await delay(250);
   }
 
-  throw new Error("FlowProxy WebView2 CDP endpoint did not become available.");
+  throw new Error("CapybaraProxy WebView2 CDP endpoint did not become available.");
 }
 
 function createCdpClient(webSocketUrl) {
@@ -95,7 +95,7 @@ function createCdpClient(webSocketUrl) {
   const ready = new Promise((resolve, reject) => {
     socket.onopen = resolve;
     socket.onerror = () =>
-      reject(new Error("Could not connect to the FlowProxy WebView."));
+      reject(new Error("Could not connect to the CapybaraProxy WebView."));
   });
 
   return {
@@ -235,7 +235,7 @@ function startHoldingTarget() {
     holder.server = createServer((request, response) => {
       holder.release = () => {
         response.writeHead(200, { "content-type": "text/plain" });
-        response.end("FlowProxy stage 3 active connection");
+        response.end("CapybaraProxy stage 3 active connection");
       };
       if (request.url === "/hold") {
         return;
@@ -301,7 +301,7 @@ try {
     `document.readyState === "complete" &&
       document.querySelector(".app-frame") !== null &&
       typeof window.__TAURI_INTERNALS__?.invoke === "function"`,
-    "the FlowProxy application shell",
+    "the CapybaraProxy application shell",
   );
 
   assert(
@@ -452,9 +452,9 @@ try {
   assert(profiles.ok, `Profiles failed: ${JSON.stringify(profiles)}`);
   assert(
     profiles.data.some(
-      (profile) => profile.name === "FlowProxy Direct" && profile.active,
+      (profile) => profile.name === "CapybaraProxy Direct" && profile.active,
     ),
-    "The active FlowProxy Direct profile is missing.",
+    "The active CapybaraProxy Direct profile is missing.",
   );
   evidence.profiles = profiles.data.length;
 

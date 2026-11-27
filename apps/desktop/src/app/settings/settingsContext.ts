@@ -9,7 +9,7 @@ import type {
   TraySpeedDisplay,
 } from "../../platform/settings";
 
-export const SETTINGS_MIGRATION_KEY = "flowproxy.settings.migrated.v1";
+export const SETTINGS_MIGRATION_KEY = "capybara.settings.migrated.v1";
 
 export type AppPreferences = {
   theme: ThemeId;
@@ -29,7 +29,7 @@ export type AppPreferences = {
   subscriptionUpdateHours: number;
   /** Refresh the stored subscription once, right after launch. */
   updateSubscriptionOnLaunch: boolean;
-  /** Connect the core as soon as FlowProxy launches. */
+  /** Connect the core as soon as CapybaraProxy launches. */
   autoConnect: boolean;
   /** User-Agent used when downloading subscriptions; `null` keeps the
    * Clash identifier providers expect. */
@@ -38,7 +38,7 @@ export type AppPreferences = {
   proxyBypass: string;
   /** Restart the core after an automatic subscription refresh. */
   restartAfterSubscriptionUpdate: boolean;
-  /** Whether the operator wants FlowProxy to own the system proxy. */
+  /** Whether the operator wants CapybaraProxy to own the system proxy. */
   systemProxyEnabled: boolean;
   /** How many settings groups the Settings page shows. */
   settingsMode: SettingsMode;

@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="notification_title">FlowProxy</string>
+    <string name="notification_title">CapybaraProxy</string>
     <string name="notification_preparing">Preparing VPN session</string>
     <string name="notification_ready">VPN interface ready</string>
     <string name="notification_ready_no_core">VPN interface ready · proxy core unavailable</string>
     <string name="notification_stop">Stop</string>
-    <string name="vpn_session_name">FlowProxy - proxy core unavailable</string>
+    <string name="vpn_session_name">CapybaraProxy - proxy core unavailable</string>
     <string name="vpn_interface_rejected">Android rejected the VPN interface</string>
 </resources>

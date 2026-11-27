@@ -48,7 +48,7 @@ describe("WindowControls", () => {
       expect(consoleError).toHaveBeenCalledTimes(3);
     });
     expect(consoleError).toHaveBeenCalledWith(
-      "FlowProxy window action failed",
+      "CapybaraProxy window action failed",
       expect.any(Error),
     );
   });

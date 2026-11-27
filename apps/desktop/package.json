@@ -1,5 +1,5 @@
 {
-  "name": "@flowproxy/desktop",
+  "name": "@capybara/desktop",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -14,7 +14,7 @@
     "tauri": "tauri"
   },
   "dependencies": {
-    "@flowproxy/design-tokens": "workspace:*",
+    "@capybara/design-tokens": "workspace:*",
     "@fontsource-variable/manrope": "^5.3.0",
     "@fontsource-variable/sora": "^5.3.0",
     "@tauri-apps/api": "^2.12.4",

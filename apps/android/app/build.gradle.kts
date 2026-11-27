@@ -19,11 +19,11 @@ val hasReleaseSigning = keystorePropertiesFile.isFile &&
     keystoreProperties.getProperty("storeFile") != null
 
 android {
-    namespace = "com.flowproxy.android"
+    namespace = "com.capybara.android"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.flowproxy.android"
+        applicationId = "com.capybara.android"
         minSdk = 26
         targetSdk = 35
         versionCode = 2

@@ -1,5 +1,5 @@
 {
-  "name": "flowproxy",
+  "name": "capybara",
   "version": "0.1.0",
   "private": true,
   "packageManager": "pnpm@10.12.1",
@@ -9,14 +9,14 @@
     }
   },
   "scripts": {
-    "dev": "pnpm --filter @flowproxy/desktop dev",
-    "build": "pnpm --filter @flowproxy/desktop build",
-    "test": "pnpm --filter @flowproxy/desktop test",
-    "lint": "pnpm --filter @flowproxy/desktop lint",
-    "typecheck": "pnpm --filter @flowproxy/desktop typecheck",
-    "tauri": "pnpm --filter @flowproxy/desktop tauri",
-    "tauri:dev": "pnpm --filter @flowproxy/desktop tauri dev",
-    "tauri:build": "pnpm --filter @flowproxy/desktop tauri build"
+    "dev": "pnpm --filter @capybara/desktop dev",
+    "build": "pnpm --filter @capybara/desktop build",
+    "test": "pnpm --filter @capybara/desktop test",
+    "lint": "pnpm --filter @capybara/desktop lint",
+    "typecheck": "pnpm --filter @capybara/desktop typecheck",
+    "tauri": "pnpm --filter @capybara/desktop tauri",
+    "tauri:dev": "pnpm --filter @capybara/desktop tauri dev",
+    "tauri:build": "pnpm --filter @capybara/desktop tauri build"
   }
 }
 

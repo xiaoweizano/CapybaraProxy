@@ -6,15 +6,15 @@ import process from "node:process";
 const edgePath =
   process.env.EDGE_PATH ??
   "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe";
-const browserPort = process.env.FLOWPROXY_CDP_PORT ?? "9222";
+const browserPort = process.env.CAPYBARA_CDP_PORT ?? "9222";
 const browserUrl = `http://127.0.0.1:${browserPort}`;
-const pageUrl = process.env.FLOWPROXY_URL ?? "http://127.0.0.1:4173/";
-const attachToExistingPage = process.env.FLOWPROXY_ATTACH_CDP === "1";
-const screenshotPrefix = process.env.FLOWPROXY_SCREENSHOT_PREFIX ?? "";
+const pageUrl = process.env.CAPYBARA_URL ?? "http://127.0.0.1:4173/";
+const attachToExistingPage = process.env.CAPYBARA_ATTACH_CDP === "1";
+const screenshotPrefix = process.env.CAPYBARA_SCREENSHOT_PREFIX ?? "";
 const outputDirectory = path.resolve("artifacts/screenshots");
 const profileDirectory = path.resolve(
-  process.env.FLOWPROXY_EDGE_PROFILE ??
-    "F:/codex-install/flowproxy-edge-profile",
+  process.env.CAPYBARA_EDGE_PROFILE ??
+    "F:/codex-install/capybara-edge-profile",
 );
 
 const screenshots = [
@@ -229,7 +229,7 @@ async function captureScreenshot(client, screenshot) {
           );
         }
       } else {
-        localStorage.setItem("flowproxy.theme", theme);
+        localStorage.setItem("capybara.theme", theme);
       }
 
       location.reload();
@@ -316,7 +316,7 @@ async function captureScreenshot(client, screenshot) {
     );
   }
 
-  if (process.env.FLOWPROXY_LAYOUT_DEBUG === "1") {
+  if (process.env.CAPYBARA_LAYOUT_DEBUG === "1") {
     process.stdout.write(`${JSON.stringify(layout)}\n`);
   }
 

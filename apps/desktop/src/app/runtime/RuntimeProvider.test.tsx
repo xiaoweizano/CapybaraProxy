@@ -134,7 +134,7 @@ describe("RuntimeProvider", () => {
       status: "ok",
       data: [
         {
-          name: "FlowProxy Direct",
+          name: "CapybaraProxy Direct",
           group_type: "Selector",
           selected: "DIRECT",
           nodes: [

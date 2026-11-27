@@ -1,23 +1,23 @@
 [package]
-name = "flowproxy-desktop"
+name = "capybara-desktop"
 version = "0.1.0"
-description = "FlowProxy desktop client"
-authors = ["FlowProxy"]
+description = "CapybaraProxy desktop client"
+authors = ["CapybaraProxy"]
 edition = "2021"
 rust-version = "1.77.2"
 
 [lib]
-name = "flowproxy_lib"
+name = "capybara_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2.7.4", features = [] }
 
 [dependencies]
-flowproxy-contracts = { path = "../../../crates/flowproxy-contracts" }
-flowproxy-mihomo-manager = { path = "../../../crates/mihomo-manager" }
-flowproxy-platform = { path = "../../../crates/flowproxy-platform" }
-flowproxy-runtime = { path = "../../../crates/flowproxy-runtime" }
+capybara-contracts = { path = "../../../crates/capybara-contracts" }
+capybara-mihomo-manager = { path = "../../../crates/capybara-mihomo-manager" }
+capybara-platform = { path = "../../../crates/capybara-platform" }
+capybara-runtime = { path = "../../../crates/capybara-runtime" }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.145"
 tauri = { version = "2.12.5", features = ["tray-icon"] }

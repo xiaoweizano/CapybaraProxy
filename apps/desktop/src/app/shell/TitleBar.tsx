@@ -12,7 +12,7 @@ export function TitleBar() {
   return (
     <header className="titlebar">
       <div className="titlebar-drag" data-tauri-drag-region>
-        <span className="titlebar-kicker">FlowProxy</span>
+        <span className="titlebar-kicker">CapybaraProxy</span>
         <span className="titlebar-divider" aria-hidden="true">
           /
         </span>

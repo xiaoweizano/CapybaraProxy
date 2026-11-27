@@ -10,7 +10,7 @@
 //! it carries the provider's credentials in every proxy entry.
 
 use crate::settings::DesktopSettings;
-use flowproxy_contracts::{CoreInfo, RuntimeSnapshot, SubscriptionSnapshot};
+use capybara_contracts::{CoreInfo, RuntimeSnapshot, SubscriptionSnapshot};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -38,12 +38,12 @@ pub fn write_bundle(
 ) -> std::io::Result<PathBuf> {
     fs::create_dir_all(target_directory)?;
     let path = target_directory.join(format!(
-        "FlowProxy-diagnostics-{}.txt",
-        flowproxy_runtime::redact_sensitive_text(&timestamp_slug())
+        "CapybaraProxy-diagnostics-{}.txt",
+        capybara_runtime::redact_sensitive_text(&timestamp_slug())
     ));
 
     let mut body = String::with_capacity(16 * 1024);
-    body.push_str("# FlowProxy diagnostics\n");
+    body.push_str("# CapybaraProxy diagnostics\n");
     body.push_str("# Subscription URLs, tokens and the core secret are removed.\n\n");
 
     body.push_str("## Environment\n");
@@ -213,7 +213,7 @@ pub fn write_bundle(
 fn push_line(body: &mut String, key: &str, value: &str) {
     body.push_str(key);
     body.push_str(": ");
-    body.push_str(&flowproxy_runtime::redact_sensitive_text(value));
+    body.push_str(&capybara_runtime::redact_sensitive_text(value));
     body.push('\n');
 }
 
@@ -256,7 +256,7 @@ fn append_logs(body: &mut String, directory: &Path) {
             body.push_str("(unreadable)\n");
             continue;
         };
-        body.push_str(&flowproxy_runtime::redact_sensitive_text(&contents));
+        body.push_str(&capybara_runtime::redact_sensitive_text(&contents));
         if !contents.ends_with('\n') {
             body.push('\n');
         }
@@ -322,9 +322,7 @@ pub fn open_folder(directory: &Path) -> std::io::Result<()> {
 mod tests {
     use super::{civil_from_days, truncate, write_bundle, DiagnosticInput};
     use crate::settings::DesktopSettings;
-    use flowproxy_contracts::{
-        RuntimeBackend, RuntimeSnapshot, RuntimeState, SubscriptionSnapshot,
-    };
+    use capybara_contracts::{RuntimeBackend, RuntimeSnapshot, RuntimeState, SubscriptionSnapshot};
     use std::fs;
 
     fn input<'a>(

@@ -1,5 +1,5 @@
 /**
- * Interface languages FlowProxy ships.
+ * Interface languages CapybaraProxy ships.
  *
  * The identifier matches the `Language` enum on the Rust side so the value can
  * round-trip through `settings.json` unchanged.
@@ -8,7 +8,7 @@ export type LanguageId = "english" | "simplified_chinese";
 
 export const DEFAULT_LANGUAGE: LanguageId = "english";
 
-const STORAGE_KEY = "flowproxy.language";
+const STORAGE_KEY = "capybara.language";
 
 /** BCP-47 tags handed to i18next and to `Intl`. */
 export const LANGUAGE_TAGS: Record<LanguageId, string> = {

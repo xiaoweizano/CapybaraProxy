@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.flowproxy.vpn.service"
+    namespace = "com.capybara.vpn.service"
     compileSdk = 35
 
     defaultConfig {

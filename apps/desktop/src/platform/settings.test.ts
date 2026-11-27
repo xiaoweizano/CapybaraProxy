@@ -92,7 +92,7 @@ describe("settings bridge", () => {
       status: "error",
       error: {
         code: "internal",
-        message: "FlowProxy could not contact the desktop Runtime.",
+        message: "CapybaraProxy could not contact the desktop Runtime.",
         retryable: true,
       },
     });

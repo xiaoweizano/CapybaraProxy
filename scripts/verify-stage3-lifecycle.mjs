@@ -4,11 +4,11 @@ import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 
-const browserPort = process.env.FLOWPROXY_CDP_PORT ?? "9222";
+const browserPort = process.env.CAPYBARA_CDP_PORT ?? "9222";
 const browserUrl = `http://127.0.0.1:${browserPort}`;
 const appExecutable = path.resolve(
-  process.env.FLOWPROXY_APP_EXECUTABLE ??
-    "F:/codex-proxy/target/release/flowproxy-desktop.exe",
+  process.env.CAPYBARA_APP_EXECUTABLE ??
+    "F:/codex-proxy/target/release/capybara-desktop.exe",
 );
 const resultPath = path.resolve(
   "artifacts/stage3-lifecycle-audit.json",
@@ -58,7 +58,7 @@ async function runPowerShell(script) {
 }
 
 async function findApplicationPid() {
-  const configuredPid = Number(process.env.FLOWPROXY_APP_PID);
+  const configuredPid = Number(process.env.CAPYBARA_APP_PID);
   if (Number.isInteger(configuredPid) && configuredPid > 0) {
     return configuredPid;
   }
@@ -68,12 +68,12 @@ async function findApplicationPid() {
     .replaceAll("'", "''");
   const output = await runPowerShell(`
     $target = '${normalizedExecutable}';
-    Get-CimInstance Win32_Process -Filter "Name = 'flowproxy-desktop.exe'" |
+    Get-CimInstance Win32_Process -Filter "Name = 'capybara-desktop.exe'" |
       Where-Object { $_.ExecutablePath -and $_.ExecutablePath.ToLowerInvariant() -eq $target } |
       Select-Object -First 1 -ExpandProperty ProcessId
   `);
   const pid = Number(output);
-  assert(Number.isInteger(pid) && pid > 0, "FlowProxy release process was not found.");
+  assert(Number.isInteger(pid) && pid > 0, "CapybaraProxy release process was not found.");
   return pid;
 }
 
@@ -181,7 +181,7 @@ async function findPageTarget() {
     await delay(250);
   }
 
-  throw new Error("FlowProxy WebView2 CDP endpoint did not become available.");
+  throw new Error("CapybaraProxy WebView2 CDP endpoint did not become available.");
 }
 
 function createCdpClient(webSocketUrl) {
@@ -208,7 +208,7 @@ function createCdpClient(webSocketUrl) {
   const ready = new Promise((resolve, reject) => {
     socket.onopen = resolve;
     socket.onerror = () =>
-      reject(new Error("Could not connect to the FlowProxy WebView."));
+      reject(new Error("Could not connect to the CapybaraProxy WebView."));
   });
 
   return {
@@ -304,7 +304,7 @@ try {
   const startResult = await page.invoke("start_runtime");
   assert(
     startResult?.ok,
-    `FlowProxy Runtime did not start: ${JSON.stringify(startResult)}`,
+    `CapybaraProxy Runtime did not start: ${JSON.stringify(startResult)}`,
   );
   await page.waitFor(
     `document.body.textContent?.includes("Connected") === true`,
@@ -433,10 +433,10 @@ audit.exit.appStillAlive = livePids;
 audit.exit.mihomoStillAlive = liveMihomoPids;
 await writeFile(resultPath, `${JSON.stringify(audit, null, 2)}\n`);
 
-assert(livePids.length === 0, "FlowProxy did not exit after the controlled exit request.");
+assert(livePids.length === 0, "CapybaraProxy did not exit after the controlled exit request.");
 assert(
   liveMihomoPids.length === 0,
-  "Mihomo was not cleaned up after FlowProxy exited.",
+  "Mihomo was not cleaned up after CapybaraProxy exited.",
 );
 
 process.stdout.write(`${JSON.stringify(audit, null, 2)}\n`);
