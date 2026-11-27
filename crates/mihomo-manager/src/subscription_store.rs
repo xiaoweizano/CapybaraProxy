@@ -657,11 +657,7 @@ mod tests {
             .adopt_legacy(input("Legacy", "proxies:\n  - name: A\n", 3))
             .expect("adopt legacy"));
         assert!(!store
-            .adopt_legacy(input(
-                "Second legacy",
-                "proxies:\n  - name: B\n",
-                4
-            ))
+            .adopt_legacy(input("Second legacy", "proxies:\n  - name: B\n", 4))
             .expect("second adoption is a no-op"));
         assert_eq!(store.list().expect("list").len(), 1);
         assert_eq!(store.list().expect("list")[0].name, "Legacy");

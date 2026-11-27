@@ -342,6 +342,8 @@ export const en = {
     network: "Network",
     integration: "System integration",
     systemProxy: "System proxy",
+    systemProxyRemembered:
+      "Saved as on. FlowProxy re-applies the system proxy once the core connects.",
     launchAtLogin: "Launch at login",
     tunInterface: "TUN interface",
     detectionOnly: "Detection only",

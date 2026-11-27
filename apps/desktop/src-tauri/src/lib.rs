@@ -784,6 +784,7 @@ fn set_system_proxy_enabled(
 ) -> CommandResult<SystemIntegrationStatus> {
     match state.system_integration.set_system_proxy_enabled(enabled) {
         Ok(status) => {
+            persist_system_proxy_choice(state.inner(), enabled);
             emit_system_integration_event(
                 &app,
                 SystemIntegrationEvent::Status {
@@ -794,6 +795,28 @@ fn set_system_proxy_enabled(
         }
         Err(failure) => CommandResult::failure(publish_integration_failure(&app, failure)),
     }
+}
+
+/// Remembers whether the operator wants FlowProxy to own the system proxy.
+///
+/// The OS value is restored on every exit, so without this a relaunch would
+/// leave the system proxy off even though the operator turned it on. A save
+/// failure is logged and ignored: the toggle already took effect.
+fn persist_system_proxy_choice(state: &AppState, enabled: bool) {
+    let mut settings = state.settings();
+    if settings.system_proxy_enabled == enabled {
+        return;
+    }
+    settings.system_proxy_enabled = enabled;
+    let settings = settings.normalized();
+    if let Err(error) = state.settings_store.save(&settings) {
+        log_native_error("remembering the system proxy choice", error);
+        return;
+    }
+    *state
+        .settings
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner()) = settings;
 }
 
 #[tauri::command]
@@ -1402,6 +1425,47 @@ const AUTO_REFRESH_INITIAL_DELAY: Duration = Duration::from_secs(30);
 /// Minimum spacing between checks, so a short interval cannot spin the loop.
 const AUTO_REFRESH_MIN_SPACING: Duration = Duration::from_secs(60);
 
+/// Re-applies the saved system-proxy choice after a launch.
+///
+/// The OS was restored to the operator's own settings on the previous exit, so
+/// the proxy is off at this point by design. This waits for the core to
+/// connect and then enables FlowProxy's proxy again, which is what "I turned it
+/// on last time" should mean. A core that never connects leaves the OS
+/// untouched.
+fn spawn_restore_system_proxy(app: tauri::AppHandle) {
+    let result = std::thread::Builder::new()
+        .name("flowproxy-restore-system-proxy".to_owned())
+        .spawn(move || {
+            // The core starts on its own thread and can take a few seconds;
+            // poll cheaply rather than sleeping for a fixed worst case.
+            let deadline = Instant::now() + Duration::from_secs(30);
+            while Instant::now() < deadline {
+                let state = app.state::<AppState>();
+                if state.runtime.state() == RuntimeState::Connected {
+                    let outcome = state.system_integration.restore_enabled_proxy();
+                    if let Some(error) = outcome.integration_error {
+                        log_native_error("restoring the system proxy at launch", &error);
+                        emit_system_integration_event(
+                            &app,
+                            SystemIntegrationEvent::Error { error },
+                        );
+                    } else if outcome.integration_changed {
+                        emit_integration_status(&app, state.system_integration.as_ref());
+                    }
+                    return;
+                }
+                std::thread::sleep(Duration::from_millis(500));
+            }
+            log_native_error(
+                "restoring the system proxy at launch",
+                "the core did not connect within 30 seconds; the system proxy stays as it is",
+            );
+        });
+    if let Err(error) = result {
+        log_native_error("starting the system-proxy restore worker", error);
+    }
+}
+
 /// Connects the core once at launch when the operator asked for it.
 ///
 /// Runs on its own thread so a slow core start never delays the window. The
@@ -1737,6 +1801,9 @@ pub fn run() {
             spawn_runtime_health_loop(app.handle().clone());
             if loaded_settings.settings.auto_connect {
                 spawn_auto_connect(app.handle().clone());
+            }
+            if loaded_settings.settings.system_proxy_enabled {
+                spawn_restore_system_proxy(app.handle().clone());
             }
             restore_window_preferences(app.handle(), &loaded_settings.settings);
             if loaded_settings.settings.silent_start {

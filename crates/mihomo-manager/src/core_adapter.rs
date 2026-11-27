@@ -113,7 +113,9 @@ impl MihomoCoreAdapter {
             usage: metadata
                 .as_ref()
                 .and_then(|metadata| metadata.usage.clone()),
-            proxy_count: metadata.as_ref().map(|metadata| metadata.proxy_count as u32),
+            proxy_count: metadata
+                .as_ref()
+                .map(|metadata| metadata.proxy_count as u32),
             updated_at_ms: metadata
                 .as_ref()
                 .map(|metadata| metadata.imported_at_ms)

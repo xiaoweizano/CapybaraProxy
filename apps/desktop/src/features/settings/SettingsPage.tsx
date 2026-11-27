@@ -161,6 +161,12 @@ export function SettingsPage() {
   const tunCapability = integration.status?.capabilities.tun;
   const systemProxyEnabled =
     integration.status?.system_proxy.state === "enabled";
+  // The choice is remembered even while the OS value is off: FlowProxy restores
+  // the journal on exit, so between launches the backend reports "disabled"
+  // although the operator's intent is still "on". Say so instead of dropping
+  // the switch back to off.
+  const systemProxyRemembered =
+    settings.systemProxyEnabled && !systemProxyEnabled;
   const launchAtLoginEnabled =
     integration.status?.launch_at_login.enabled === true;
   const integrationPending = integration.pendingAction !== null;
@@ -395,6 +401,11 @@ export function SettingsPage() {
               icon={<RadioTower aria-hidden="true" size={16} />}
               title={t("settings.systemProxy")}
               caption={systemProxyCapability?.message ?? capabilityFallback}
+              detail={
+                systemProxyRemembered
+                  ? t("settings.systemProxyRemembered")
+                  : undefined
+              }
               checked={systemProxyEnabled}
               disabled={systemProxyDisabled}
               onChange={(checked) =>

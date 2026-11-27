@@ -143,6 +143,10 @@ pub(crate) struct DesktopSettings {
     /// so the new nodes take effect without a manual restart.
     #[serde(default)]
     pub restart_after_subscription_update: bool,
+    /// Whether FlowProxy should own the system proxy. Persisted so a restart
+    /// re-applies it instead of silently leaving the OS on the old value.
+    #[serde(default)]
+    pub system_proxy_enabled: bool,
     /// How many settings groups the Settings page shows.
     #[serde(default)]
     pub settings_mode: SettingsMode,
@@ -313,6 +317,7 @@ impl DesktopSettings {
         if self.substore_url.is_empty() {
             self.substore_token.clear();
         }
+        // Mirrors the proxy backend: blank entries carry no meaning.
         self.subscription_user_agent = self
             .subscription_user_agent
             .map(|value| value.trim().to_owned())
@@ -357,6 +362,7 @@ impl Default for DesktopSettings {
             subscription_user_agent: None,
             proxy_bypass: None,
             restart_after_subscription_update: false,
+            system_proxy_enabled: false,
             settings_mode: SettingsMode::default(),
             silent_start: false,
             motion: MotionPreference::default(),
@@ -616,6 +622,7 @@ mod tests {
             subscription_user_agent: Some("ClashParty/1.0".to_owned()),
             proxy_bypass: Some("localhost;*.internal".to_owned()),
             restart_after_subscription_update: true,
+            system_proxy_enabled: true,
             settings_mode: SettingsMode::Relaxed,
             silent_start: true,
             motion: MotionPreference::Reduced,

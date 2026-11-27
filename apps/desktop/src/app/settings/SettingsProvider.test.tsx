@@ -156,6 +156,7 @@ describe("SettingsProvider", () => {
       subscription_user_agent: null,
       proxy_bypass: null,
       restart_after_subscription_update: false,
+      system_proxy_enabled: false,
       settings_mode: "standard",
       silent_start: false,
       motion: "full",

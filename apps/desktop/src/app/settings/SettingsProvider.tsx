@@ -97,6 +97,7 @@ const DEFAULT_PREFERENCES: AppPreferences = {
   subscriptionUserAgent: null,
   proxyBypass: "",
   restartAfterSubscriptionUpdate: false,
+  systemProxyEnabled: false,
   settingsMode: "standard",
   silentStart: false,
   motion: DEFAULT_MOTION,
@@ -132,6 +133,7 @@ function fromNativeSettings(settings: DesktopSettings): AppPreferences {
     proxyBypass: settings.proxy_bypass ?? "",
     restartAfterSubscriptionUpdate:
       settings.restart_after_subscription_update ?? false,
+    systemProxyEnabled: settings.system_proxy_enabled ?? false,
     settingsMode: settings.settings_mode ?? "standard",
     silentStart: settings.silent_start ?? false,
     motion: settings.motion ?? DEFAULT_MOTION,
@@ -167,6 +169,7 @@ function toNativeSettings(settings: AppPreferences): DesktopSettings {
     subscription_user_agent: settings.subscriptionUserAgent,
     proxy_bypass: settings.proxyBypass.trim() === "" ? null : settings.proxyBypass,
     restart_after_subscription_update: settings.restartAfterSubscriptionUpdate,
+    system_proxy_enabled: settings.systemProxyEnabled,
     settings_mode: settings.settingsMode,
     silent_start: settings.silentStart,
     motion: settings.motion,

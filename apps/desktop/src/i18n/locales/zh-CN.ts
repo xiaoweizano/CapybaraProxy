@@ -331,6 +331,8 @@ export const zhCN: ResourceShape = {
     network: "网络",
     integration: "系统集成",
     systemProxy: "系统代理",
+    systemProxyRemembered:
+      "已记录为开启。核心连接后 FlowProxy 会重新应用系统代理。",
     launchAtLogin: "开机启动",
     tunInterface: "TUN 接口",
     detectionOnly: "仅探测",

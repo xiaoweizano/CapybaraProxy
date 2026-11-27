@@ -38,6 +38,8 @@ export type AppPreferences = {
   proxyBypass: string;
   /** Restart the core after an automatic subscription refresh. */
   restartAfterSubscriptionUpdate: boolean;
+  /** Whether the operator wants FlowProxy to own the system proxy. */
+  systemProxyEnabled: boolean;
   /** How many settings groups the Settings page shows. */
   settingsMode: SettingsMode;
   /** Start with the main window hidden so only the tray icon appears. */

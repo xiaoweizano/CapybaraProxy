@@ -35,6 +35,8 @@ export type DesktopSettings = {
   proxy_bypass?: string | null;
   /** Restart the core after an automatic subscription refresh. */
   restart_after_subscription_update?: boolean;
+  /** Whether FlowProxy owns the system proxy; restored on the next launch. */
+  system_proxy_enabled?: boolean;
   /** How many settings groups the Settings page shows. */
   settings_mode?: SettingsMode;
   /** Start with the main window hidden so only the tray icon appears. */
@@ -109,6 +111,8 @@ function isDesktopSettings(value: unknown): value is DesktopSettings {
       typeof value.proxy_bypass === "string") &&
     (value.restart_after_subscription_update === undefined ||
       typeof value.restart_after_subscription_update === "boolean") &&
+    (value.system_proxy_enabled === undefined ||
+      typeof value.system_proxy_enabled === "boolean") &&
     (value.settings_mode === undefined ||
       value.settings_mode === "simple" ||
       value.settings_mode === "standard" ||

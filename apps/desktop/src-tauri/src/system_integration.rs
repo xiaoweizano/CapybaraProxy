@@ -99,6 +99,7 @@ pub trait RuntimeControl: Send + Sync {
     fn stop(&self) -> Result<RuntimeChange, RuntimeFailure>;
     fn restart(&self) -> Result<RuntimeChange, RuntimeFailure>;
     fn poll_health(&self) -> Option<RuntimeChange>;
+    fn state(&self) -> RuntimeState;
 }
 
 impl<A> RuntimeControl for RuntimeManager<A>
@@ -123,6 +124,10 @@ where
 
     fn poll_health(&self) -> Option<RuntimeChange> {
         RuntimeManager::poll_health(self)
+    }
+
+    fn state(&self) -> RuntimeState {
+        RuntimeManager::state(self)
     }
 }
 
@@ -461,6 +466,62 @@ where
     fn platform_failure(&self, action: &str, error: &PlatformError) -> IntegrationFailure {
         let runtime_error = self.record_platform_error(action, error);
         IntegrationFailure::platform(runtime_error)
+    }
+
+    /// Re-applies an operator's saved "system proxy on" choice after a launch.
+    ///
+    /// The OS keeps whatever the operator's proxy client left behind, and
+    /// FlowProxy restores the journal on exit, so a fresh launch starts with
+    /// the proxy pointing somewhere else. This re-enables it once the core is
+    /// connected, but never touches a proxy FlowProxy does not already own
+    /// unless the operator asked for it in settings.
+    pub fn restore_enabled_proxy(&self) -> HealthOutcome {
+        let mut integration_error = None;
+        let mut integration_changed = false;
+
+        if self.runtime.state() != RuntimeState::Connected {
+            return HealthOutcome {
+                runtime_change: None,
+                integration_error,
+                integration_changed,
+            };
+        }
+
+        let snapshot_result = {
+            let mut platform = self.lock_platform();
+            platform.proxy_snapshot()
+        };
+        let existing = match snapshot_result {
+            Ok(snapshot) => snapshot,
+            Err(error) => {
+                return HealthOutcome {
+                    runtime_change: None,
+                    integration_error: Some(
+                        self.record_platform_error("read the system proxy", &error),
+                    ),
+                    integration_changed: false,
+                }
+            }
+        };
+
+        if existing.managed && existing.active {
+            return HealthOutcome {
+                runtime_change: None,
+                integration_error: None,
+                integration_changed: false,
+            };
+        }
+
+        match self.set_system_proxy_enabled(true) {
+            Ok(_) => integration_changed = true,
+            Err(failure) => integration_error = Some(failure.error),
+        }
+
+        HealthOutcome {
+            runtime_change: None,
+            integration_error,
+            integration_changed,
+        }
     }
 
     fn record_platform_error(&self, action: &str, error: &PlatformError) -> RuntimeError {
@@ -890,6 +951,10 @@ mod tests {
             })
         }
 
+        fn state(&self) -> RuntimeState {
+            self.snapshot().state
+        }
+
         fn poll_health(&self) -> Option<RuntimeChange> {
             self.record("runtime.health");
             let next = self.health.lock().expect("runtime health").take();
@@ -1080,6 +1145,70 @@ mod tests {
         assert_eq!(status.platform, PlatformKind::Windows);
         assert!(!status.system_proxy.managed);
         assert_eq!(status.launch_at_login.state, LaunchAtLoginState::Disabled);
+    }
+
+    #[test]
+    fn restore_enabled_proxy_leaves_a_stopped_core_alone() {
+        let (integration, _runtime, events) = integration(RuntimeState::Stopped);
+
+        let outcome = integration.restore_enabled_proxy();
+
+        assert!(outcome.integration_error.is_none());
+        assert!(!outcome.integration_changed);
+        assert!(
+            !events
+                .lock()
+                .expect("event log")
+                .iter()
+                .any(|event| event == "platform.enable"),
+            "a stopped core must never touch the system proxy"
+        );
+    }
+
+    #[test]
+    fn restore_enabled_proxy_reapplies_the_bypass_list_once_connected() {
+        let (integration, _runtime, events) = integration(RuntimeState::Connected);
+        integration
+            .set_proxy_bypass(Some("localhost;*.internal".to_owned()))
+            .expect("save the bypass list");
+
+        let outcome = integration.restore_enabled_proxy();
+
+        assert!(outcome.integration_error.is_none());
+        assert!(outcome.integration_changed);
+        assert!(events
+            .lock()
+            .expect("event log")
+            .iter()
+            .any(|event| event == "platform.enable"));
+    }
+
+    #[test]
+    fn restore_enabled_proxy_is_a_no_op_when_the_proxy_is_already_active() {
+        let (integration, _runtime, events) = integration(RuntimeState::Connected);
+        integration
+            .set_system_proxy_enabled(true)
+            .expect("enable the system proxy");
+
+        let enables_before = events
+            .lock()
+            .expect("event log")
+            .iter()
+            .filter(|event| *event == "platform.enable")
+            .count();
+        let outcome = integration.restore_enabled_proxy();
+
+        assert!(!outcome.integration_changed);
+        assert_eq!(
+            events
+                .lock()
+                .expect("event log")
+                .iter()
+                .filter(|event| *event == "platform.enable")
+                .count(),
+            enables_before,
+            "an already-active managed proxy must not be enabled twice"
+        );
     }
 
     #[test]

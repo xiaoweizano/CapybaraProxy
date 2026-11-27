@@ -74,6 +74,14 @@ where
         self.lock_inner().logs.entries()
     }
 
+    /// The Runtime's current state, without taking the operation lock.
+    ///
+    /// Health loops call this on every tick to decide whether a follow-up
+    /// action (such as re-applying the system proxy) is worth attempting.
+    pub fn state(&self) -> RuntimeState {
+        self.lock_inner().state
+    }
+
     pub fn controlled_proxy_endpoint(&self) -> Result<String, RuntimeFailure> {
         let _operation = self.lock_operation();
         {
