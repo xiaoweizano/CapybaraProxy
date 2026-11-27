@@ -21,6 +21,7 @@ vi.mock("../platform/runtime", () => ({
   closeConnection: vi.fn(),
   getConnections: vi.fn(),
   getCoreInfo: vi.fn(),
+  getCoreVersions: vi.fn(),
   getProfiles: vi.fn(),
   getSubscriptionSnapshot: vi.fn(),
   getDelayHistory: vi.fn(),

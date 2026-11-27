@@ -1,10 +1,13 @@
-use crate::binary::{random_hex, resolve_verified_binary, VerifiedMihomoBinary};
+use crate::binary::{
+    random_hex, resolve_verified_binary, sha256_file, verify_binary_version, VerifiedMihomoBinary,
+};
 use crate::config::ConfigStore;
 use crate::control_api::{
     close_all_connections, close_connection, parse_connections, parse_proxy_groups, parse_rules,
     read_core_preferences, select_proxy, test_delay, test_group_delay, update_core_preferences,
     LoopbackApiClient,
 };
+use crate::core_versions::CoreVersionStore;
 use crate::subscription_store::{StoredSubscription, SubscriptionInput, SubscriptionStore};
 use crate::MihomoAdapter;
 use flowproxy_contracts::{
@@ -64,7 +67,20 @@ struct LogPump {
 
 impl MihomoCoreAdapter {
     pub fn discover(config_directory: PathBuf) -> Result<Self, RuntimeError> {
-        let binary = resolve_verified_binary(default_binary_candidates(&config_directory))?;
+        // An operator-supplied build, when registered and activated, wins over
+        // the bundled core. Its digest was recorded at registration and is
+        // re-checked on every activation, so it is verified either way.
+        let store = CoreVersionStore::new(config_directory.join("cores"));
+        let binary = match store.active_binary() {
+            Ok(Some(path)) if path.is_file() => {
+                let digest = sha256_file(&path)?;
+                verify_binary_version(&path)?;
+                VerifiedMihomoBinary::from_verified(path, digest)
+            }
+            // No registered build, or it disappeared since activation: fall
+            // back to the bundled core rather than failing to start.
+            _ => resolve_verified_binary(default_binary_candidates(&config_directory))?,
+        };
         Ok(Self::new(
             binary,
             ConfigStore::new(config_directory.join("config.yaml")),

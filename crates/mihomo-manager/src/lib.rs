@@ -2,6 +2,7 @@ mod binary;
 mod config;
 mod control_api;
 mod core_adapter;
+pub mod core_versions;
 pub mod subscription;
 pub mod subscription_convert;
 pub mod subscription_fetch;
@@ -16,12 +17,13 @@ use flowproxy_contracts::{
 };
 
 pub use binary::{
-    resolve_verified_binary, verify_binary_file, verify_binary_version, VerifiedMihomoBinary,
-    LOCKED_MIHOMO_SHA256, LOCKED_MIHOMO_VERSION,
+    resolve_verified_binary, sha256_file, verify_binary_file, verify_binary_version,
+    VerifiedMihomoBinary, LOCKED_MIHOMO_SHA256, LOCKED_MIHOMO_VERSION,
 };
 pub use config::{render_direct_profile, render_direct_profile_with, ConfigStore};
 pub use control_api::{parse_connections, parse_proxy_groups, parse_rules, LoopbackApiClient};
 pub use core_adapter::MihomoCoreAdapter;
+pub use core_versions::{CoreVersion, CoreVersionStore};
 
 pub fn validate_loopback_endpoint(endpoint: &str) -> Result<(), RuntimeError> {
     let authority = endpoint.strip_prefix("http://").ok_or_else(|| {

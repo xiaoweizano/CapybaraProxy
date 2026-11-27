@@ -11,6 +11,10 @@ export type NativeCommandName =
   | "restart_runtime"
   | "simulate_runtime_crash"
   | "get_core_info"
+  | "get_core_versions"
+  | "register_core_version"
+  | "activate_core_version"
+  | "open_core_versions_directory"
   | "get_telemetry"
   | "get_proxy_groups"
   | "select_proxy"
@@ -45,6 +49,7 @@ export type NativeCommandName =
   | "list_substore_subscriptions"
   | "import_substore_subscription"
   | "open_log_directory"
+  | "export_diagnostics"
   | "clear_log_files";
 
 export type NativeEventName =

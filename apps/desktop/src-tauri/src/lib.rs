@@ -1,3 +1,4 @@
+mod diagnostics;
 mod logging;
 mod settings;
 mod speed_icon;
@@ -21,6 +22,7 @@ use settings::{
 };
 use std::collections::VecDeque;
 use std::fmt::Display;
+use std::fs;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -121,6 +123,8 @@ struct AppState {
     tray_summary: Mutex<Option<TraySummary>>,
     /// Per-day transfer counters that survive a core restart.
     traffic: traffic::TrafficLedger,
+    /// Installed core builds, when a settings directory is known.
+    core_versions: Option<flowproxy_mihomo_manager::CoreVersionStore>,
     /// Last connection counters seen, so the ledger only adds the delta.
     traffic_sample: Mutex<Option<(u64, u64)>>,
     /// Recent latency measurements, oldest first. Bounded so a long session
@@ -146,6 +150,9 @@ impl AppState {
             exit_gate: ExitGate::default(),
             logs,
             tray_summary: Mutex::new(None),
+            core_versions: settings_directory.as_ref().map(|directory| {
+                flowproxy_mihomo_manager::CoreVersionStore::new(directory.join("cores"))
+            }),
             traffic: traffic::TrafficLedger::new(settings_directory.unwrap_or_default()),
             traffic_sample: Mutex::new(None),
             delay_history: Mutex::new(VecDeque::new()),
@@ -1881,6 +1888,136 @@ fn import_substore_subscription(
     CommandResult::success(profiles)
 }
 
+/// Lists the bundled core plus every registered build.
+#[tauri::command]
+fn get_core_versions(
+    state: State<'_, AppState>,
+) -> CommandResult<Vec<flowproxy_mihomo_manager::CoreVersion>> {
+    let Some(store) = state.core_versions.as_ref() else {
+        return CommandResult::failure(RuntimeError::new(
+            RuntimeErrorCode::Internal,
+            "The core versions directory is unavailable.",
+            false,
+        ));
+    };
+    match store.list() {
+        Ok(versions) => CommandResult::success(versions),
+        Err(error) => CommandResult::failure(error),
+    }
+}
+
+/// Registers a build the operator placed in the cores directory.
+#[tauri::command]
+fn register_core_version(
+    state: State<'_, AppState>,
+    id: String,
+) -> CommandResult<Vec<flowproxy_mihomo_manager::CoreVersion>> {
+    let Some(store) = state.core_versions.as_ref() else {
+        return CommandResult::failure(RuntimeError::new(
+            RuntimeErrorCode::Internal,
+            "The core versions directory is unavailable.",
+            false,
+        ));
+    };
+    if let Err(error) = store.register(&id) {
+        return CommandResult::failure(error);
+    }
+    match store.list() {
+        Ok(versions) => CommandResult::success(versions),
+        Err(error) => CommandResult::failure(error),
+    }
+}
+
+/// Switches the core the next start uses. `None` restores the bundled build.
+#[tauri::command]
+fn activate_core_version(
+    state: State<'_, AppState>,
+    id: Option<String>,
+) -> CommandResult<Vec<flowproxy_mihomo_manager::CoreVersion>> {
+    let Some(store) = state.core_versions.as_ref() else {
+        return CommandResult::failure(RuntimeError::new(
+            RuntimeErrorCode::Internal,
+            "The core versions directory is unavailable.",
+            false,
+        ));
+    };
+    if let Err(error) = store.activate(id.as_deref()) {
+        return CommandResult::failure(error);
+    }
+    match store.list() {
+        Ok(versions) => CommandResult::success(versions),
+        Err(error) => CommandResult::failure(error),
+    }
+}
+
+/// Opens the directory an operator drops a new core build into.
+#[tauri::command]
+fn open_core_versions_directory(state: State<'_, AppState>) -> CommandResult<String> {
+    let Some(store) = state.core_versions.as_ref() else {
+        return CommandResult::failure(RuntimeError::new(
+            RuntimeErrorCode::Internal,
+            "The core versions directory is unavailable.",
+            false,
+        ));
+    };
+    let directory = store.directory().to_path_buf();
+    if let Err(error) = fs::create_dir_all(&directory) {
+        return CommandResult::failure(RuntimeError::new(
+            RuntimeErrorCode::Internal,
+            format!("The core versions directory could not be created: {error}"),
+            true,
+        ));
+    }
+    match logging::open_path(&directory) {
+        Ok(()) => CommandResult::success(directory.to_string_lossy().into_owned()),
+        Err(error) => CommandResult::failure(RuntimeError::new(
+            RuntimeErrorCode::Internal,
+            format!("The core versions directory could not be opened: {error}"),
+            true,
+        )),
+    }
+}
+/// Writes a redacted diagnostic bundle and opens the folder that holds it.
+///
+/// Everything stays local: the file is written beside the log files and the
+/// folder is opened in the platform file manager. A bug report can attach it.
+#[tauri::command]
+fn export_diagnostics(app: tauri::AppHandle, state: State<'_, AppState>) -> CommandResult<String> {
+    let snapshot = state.runtime.snapshot();
+    let core = state.runtime.core_info().ok();
+    let subscription = state.runtime.subscription_snapshot().ok();
+    let settings = state.settings();
+    let target = app
+        .path()
+        .download_dir()
+        .or_else(|_| app.path().desktop_dir())
+        .unwrap_or_else(|_| state.logs.directory().to_path_buf());
+
+    let input = diagnostics::DiagnosticInput {
+        app_version: env!("CARGO_PKG_VERSION"),
+        os: std::env::consts::OS,
+        settings: &settings,
+        runtime: &snapshot,
+        core: core.as_ref(),
+        subscription: subscription.as_ref(),
+        log_directory: state.logs.directory(),
+    };
+
+    match diagnostics::write_bundle(&target, &input) {
+        Ok(path) => {
+            if let Err(error) = diagnostics::open_folder(&target) {
+                log_native_error("opening the diagnostics folder", error);
+            }
+            CommandResult::success(path.to_string_lossy().into_owned())
+        }
+        Err(error) => CommandResult::failure(RuntimeError::new(
+            RuntimeErrorCode::Internal,
+            format!("The diagnostic bundle could not be written: {error}"),
+            true,
+        )),
+    }
+}
+
 /// Opens the directory that holds the rotating log files.
 #[tauri::command]
 fn open_log_directory(state: State<'_, AppState>) -> CommandResult<String> {
@@ -1917,6 +2054,10 @@ pub fn run() {
             restart_runtime,
             simulate_runtime_crash,
             get_core_info,
+            get_core_versions,
+            register_core_version,
+            activate_core_version,
+            open_core_versions_directory,
             get_telemetry,
             get_proxy_groups,
             select_proxy,
@@ -1951,6 +2092,7 @@ pub fn run() {
             list_substore_subscriptions,
             import_substore_subscription,
             open_log_directory,
+            export_diagnostics,
             clear_log_files,
         ])
         .setup(|app| {

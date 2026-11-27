@@ -57,6 +57,16 @@ export type RuntimeBridgeResult<T> =
   | { status: "error"; error: RuntimeError }
   | { status: "unavailable" };
 
+/** One installed Mihomo build. */
+export type CoreVersion = {
+  /** File name inside the core directory; `bundled` for the shipped core. */
+  id: string;
+  version: string;
+  sha256: string;
+  active: boolean;
+  size_bytes: number;
+};
+
 export type CoreInfo = {
   backend: RuntimeBackend;
   version: string;
@@ -314,6 +324,20 @@ function isRuntimeBackend(value: unknown): value is RuntimeBackend {
   return value === "demo" || value === "mihomo";
 }
 
+function isCoreVersion(value: unknown): value is CoreVersion {
+  return (
+    isRecord(value) &&
+    isString(value.id) &&
+    isString(value.version) &&
+    isString(value.sha256) &&
+    typeof value.active === "boolean" &&
+    isNonNegativeInteger(value.size_bytes)
+  );
+}
+
+const isCoreVersionList = (value: unknown): value is CoreVersion[] =>
+  Array.isArray(value) && value.every(isCoreVersion);
+
 function isCoreInfo(value: unknown): value is CoreInfo {
   return (
     isRecord(value) &&
@@ -503,6 +527,10 @@ async function executeRuntimeCommand<T>(
     | "restart_runtime"
     | "simulate_runtime_crash"
     | "get_core_info"
+    | "get_core_versions"
+    | "register_core_version"
+    | "activate_core_version"
+    | "open_core_versions_directory"
     | "get_telemetry"
     | "get_proxy_groups"
     | "select_proxy"
@@ -529,6 +557,7 @@ async function executeRuntimeCommand<T>(
     | "list_substore_subscriptions"
     | "import_substore_subscription"
     | "open_log_directory"
+    | "export_diagnostics"
     | "clear_log_files",
   isValidData: (value: unknown) => value is T,
   args?: Record<string, unknown>,
@@ -561,6 +590,36 @@ export function getRuntimeSnapshot(): Promise<
 
 export function getCoreInfo(): Promise<RuntimeBridgeResult<CoreInfo>> {
   return executeRuntimeCommand("get_core_info", isCoreInfo);
+}
+
+/** Lists the bundled core plus every registered build. */
+export function getCoreVersions(): Promise<RuntimeBridgeResult<CoreVersion[]>> {
+  return executeRuntimeCommand("get_core_versions", isCoreVersionList);
+}
+
+/** Registers a build the operator placed in the cores directory. */
+export function registerCoreVersion(
+  id: string,
+): Promise<RuntimeBridgeResult<CoreVersion[]>> {
+  return executeRuntimeCommand("register_core_version", isCoreVersionList, {
+    id,
+  });
+}
+
+/** Switches the core the next start uses; `null` restores the bundled one. */
+export function activateCoreVersion(
+  id: string | null,
+): Promise<RuntimeBridgeResult<CoreVersion[]>> {
+  return executeRuntimeCommand("activate_core_version", isCoreVersionList, {
+    id,
+  });
+}
+
+/** Opens the directory an operator drops a build into. */
+export function openCoreVersionsDirectory(): Promise<
+  RuntimeBridgeResult<string>
+> {
+  return executeRuntimeCommand("open_core_versions_directory", isString);
 }
 
 export function getTelemetry(): Promise<RuntimeBridgeResult<TelemetrySnapshot>> {
@@ -878,6 +937,11 @@ export function importSubStoreSubscription(
 /** Opens the rotating log directory in the platform file manager. */
 export function openLogDirectory(): Promise<RuntimeBridgeResult<string>> {
   return executeRuntimeCommand("open_log_directory", isString);
+}
+
+/** Writes a redacted diagnostic bundle and opens its folder. */
+export function exportDiagnostics(): Promise<RuntimeBridgeResult<string>> {
+  return executeRuntimeCommand("export_diagnostics", isString);
 }
 
 /** Deletes every log file FlowProxy created. */

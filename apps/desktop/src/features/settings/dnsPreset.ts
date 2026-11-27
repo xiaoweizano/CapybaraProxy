@@ -188,36 +188,4 @@ export function parseDnsBlock(overrideYaml: string | null | undefined): DnsPrese
   return preset;
 }
 
-/**
- * Merges a rendered `dns:` block into an existing override document.
- *
- * Every other top-level block is preserved: the override form is not the only
- * thing an operator may keep there.
- */
-export function applyDnsBlock(
-  overrideYaml: string | null | undefined,
-  block: string | null,
-): string {
-  const lines = (overrideYaml ?? "").split("\n");
-  const kept: string[] = [];
-  let skipping = false;
-  for (const line of lines) {
-    if (/^dns:\s*(#.*)?$/.test(line)) {
-      skipping = true;
-      continue;
-    }
-    if (skipping) {
-      if (line.trim() === "" || line.startsWith(" ") || line.startsWith("\t")) {
-        continue;
-      }
-      skipping = false;
-    }
-    kept.push(line);
-  }
-
-  const rest = kept.join("\n").replace(/\n{3,}/g, "\n\n").trim();
-  if (!block) {
-    return rest === "" ? "" : `${rest}\n`;
-  }
-  return rest === "" ? block : `${rest}\n${block}`;
-}
+export { applyDnsBlock, applyOverrideBlock } from "./overrideBlock";

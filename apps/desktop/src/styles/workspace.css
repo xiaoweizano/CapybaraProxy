@@ -277,7 +277,7 @@
 .proxy-node {
   display: grid;
   min-width: 0;
-  grid-template-columns: 20px minmax(130px, 1fr) 64px 31px 76px;
+  grid-template-columns: 20px minmax(130px, 1fr) 64px 31px 31px 76px;
   align-items: center;
   gap: 10px;
   min-height: 54px;
@@ -975,7 +975,7 @@
   }
 
   .proxy-node {
-    grid-template-columns: 20px minmax(110px, 1fr) 58px 31px;
+    grid-template-columns: 20px minmax(110px, 1fr) 58px 31px 31px;
   }
 
   .proxy-node .workspace-action-button {
@@ -1349,4 +1349,97 @@
 .rules-hits {
   color: var(--text-faint);
   font-variant-numeric: tabular-nums;
+}
+
+.rule-tester-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.rule-tester-form .proxy-search {
+  flex: 1 1 260px;
+}
+
+.rule-tester-result {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid rgba(var(--accent-rgb), 0.2);
+  border-radius: var(--radius-sm);
+  background: rgba(var(--accent-rgb), 0.06);
+}
+
+.rule-tester-result p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.proxy-favorite.is-favorite {
+  color: var(--accent-cyan);
+  border-color: rgba(var(--accent-rgb), 0.32);
+}
+
+.proxy-node-favorite-mark {
+  margin-right: 5px;
+  vertical-align: -1px;
+  color: var(--accent-cyan);
+}
+
+.core-version-list {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 12px;
+}
+
+.core-version-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+
+.core-version-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.core-version-copy strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+}
+
+.core-version-copy small {
+  color: var(--text-faint);
+  font-size: 0.75rem;
+}
+
+.core-version-active {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(var(--accent-rgb), 0.14);
+  color: var(--accent-cyan);
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
+
+.core-version-register {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.core-version-register .proxy-search {
+  flex: 1 1 260px;
 }

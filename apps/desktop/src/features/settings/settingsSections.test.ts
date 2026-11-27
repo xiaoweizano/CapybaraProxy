@@ -21,6 +21,7 @@ describe("settings sections", () => {
       expect.arrayContaining(["subscription", "logs", "core"]),
     );
     expect(ids).not.toContain("tray");
+    expect(ids).not.toContain("coreVersions");
     expect(ids).not.toContain("advanced");
     expect(ids).not.toContain("dns");
     expect(ids).not.toContain("substore");
@@ -35,6 +36,7 @@ describe("settings sections", () => {
       "subscription",
       "logs",
       "core",
+      "coreVersions",
       "tray",
       "advanced",
       "dns",

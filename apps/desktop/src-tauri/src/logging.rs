@@ -254,9 +254,17 @@ fn iso8601(epoch_seconds: i64) -> String {
 }
 
 /// Opens the log directory in the platform file manager.
+/// Opens any folder in the platform file manager.
+pub(crate) fn open_path(directory: &std::path::Path) -> std::io::Result<()> {
+    open_directory_path(directory)
+}
+
 pub(crate) fn open_directory(store: &LogFileStore) -> std::io::Result<()> {
-    fs::create_dir_all(store.directory())?;
-    let path = store.directory();
+    open_directory_path(store.directory())
+}
+
+fn open_directory_path(path: &std::path::Path) -> std::io::Result<()> {
+    fs::create_dir_all(path)?;
 
     #[cfg(target_os = "windows")]
     let result = std::process::Command::new("explorer.exe").arg(path).spawn();

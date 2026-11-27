@@ -15,6 +15,14 @@ pub struct VerifiedMihomoBinary {
 }
 
 impl VerifiedMihomoBinary {
+    /// Builds a verified binary from a digest the caller already checked.
+    ///
+    /// Used for an operator-supplied build, whose digest comes from the
+    /// version index rather than the locked release.
+    pub fn from_verified(path: PathBuf, digest: String) -> Self {
+        Self { path, digest }
+    }
+
     pub fn path(&self) -> &Path {
         &self.path
     }
@@ -30,6 +38,26 @@ impl VerifiedMihomoBinary {
             digest: LOCKED_MIHOMO_SHA256.to_owned(),
         }
     }
+}
+
+/// Hashes a file without comparing it to the locked release.
+///
+/// Registration of an operator-supplied build needs the digest, not a match.
+pub fn sha256_file(path: &Path) -> Result<String, RuntimeError> {
+    let mut file = File::open(path)
+        .map_err(|error| core_error(format!("The Mihomo core could not be opened: {error}")))?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0_u8; 64 * 1024];
+    loop {
+        let read = file
+            .read(&mut buffer)
+            .map_err(|error| core_error(format!("The Mihomo core could not be read: {error}")))?;
+        if read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..read]);
+    }
+    Ok(hasher.finalize_hex())
 }
 
 pub fn verify_binary_file(path: &Path, expected_sha256: &str) -> Result<String, RuntimeError> {

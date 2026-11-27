@@ -1,6 +1,7 @@
 import {
   ChevronDown,
   CircleCheck,
+  Star,
   CircleDashed,
   Gauge,
   History,
@@ -21,8 +22,10 @@ import {
 } from "../../platform/runtime";
 import {
   readStoredCollapsed,
+  readStoredFavorites,
   readStoredSort,
   writeStoredCollapsed,
+  writeStoredFavorites,
   writeStoredSort,
   type NodeSort,
 } from "../../shared/proxyView";
@@ -82,16 +85,33 @@ function filterGroups<T extends { name: string; nodes: ProxyNode[] }>(
  * operator scanning for a usable node wants; the previous order is kept for
  * equal or missing values so the list does not reshuffle on every probe.
  */
-function sortNodes(nodes: ProxyNode[], sort: NodeSort, delays: Record<string, number | null>): ProxyNode[] {
-  if (sort === "name") {
-    return [...nodes].sort((left, right) => left.name.localeCompare(right.name));
+function sortNodes(
+  nodes: ProxyNode[],
+  sort: NodeSort,
+  delays: Record<string, number | null>,
+  favorites: ReadonlySet<string>,
+): ProxyNode[] {
+  const ordered = (() => {
+    if (sort === "name") {
+      return [...nodes].sort((left, right) => left.name.localeCompare(right.name));
+    }
+    if (sort === "delay") {
+      const delayOf = (node: ProxyNode): number =>
+        delays[node.name] ?? node.delay_ms ?? Number.POSITIVE_INFINITY;
+      return [...nodes].sort((left, right) => delayOf(left) - delayOf(right));
+    }
+    return nodes;
+  })();
+
+  if (favorites.size === 0) {
+    return ordered;
   }
-  if (sort === "delay") {
-    const delayOf = (node: ProxyNode): number =>
-      delays[node.name] ?? node.delay_ms ?? Number.POSITIVE_INFINITY;
-    return [...nodes].sort((left, right) => delayOf(left) - delayOf(right));
-  }
-  return nodes;
+  // Favourites float to the top while keeping the chosen order inside each
+  // half; filtering is stable, so the relative order is preserved.
+  return [
+    ...ordered.filter((node) => favorites.has(node.name)),
+    ...ordered.filter((node) => !favorites.has(node.name)),
+  ];
 }
 
 export function ProxiesPage() {
@@ -120,6 +140,9 @@ export function ProxiesPage() {
   );
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() =>
     readStoredCollapsed(window.localStorage),
+  );
+  const [favorites, setFavorites] = useState<Set<string>>(() =>
+    readStoredFavorites(window.localStorage),
   );
   const [notice, setNotice] = useState<string | null>(null);
   const deferredQuery = useDeferredValue(query);
@@ -183,6 +206,19 @@ export function ProxiesPage() {
   const setSort = (next: NodeSort) => {
     setSortState(next);
     writeStoredSort(window.localStorage, next);
+  };
+
+  const toggleFavorite = (name: string) => {
+    setFavorites((current) => {
+      const next = new Set(current);
+      if (next.has(name)) {
+        next.delete(name);
+      } else {
+        next.add(name);
+      }
+      writeStoredFavorites(window.localStorage, next);
+      return next;
+    });
   };
 
   const toggleGroup = (name: string) => {
@@ -364,7 +400,7 @@ export function ProxiesPage() {
                 <div className="proxy-node-list">
                   {(sort === "default"
                     ? group.nodes
-                    : sortNodes(group.nodes, sort, {})
+                    : sortNodes(group.nodes, sort, {}, favorites)
                   ).map((node) => (
                     <div
                       className="proxy-node"
@@ -470,7 +506,7 @@ export function ProxiesPage() {
                 id={`group-nodes-${group.name}`}
                 hidden={collapsedGroups.has(group.name)}
               >
-                {sortNodes(group.nodes, sort, testedDelays).map((node) => {
+                {sortNodes(group.nodes, sort, testedDelays, favorites).map((node) => {
                   const selected = node.name === group.selected;
                   const delay = testedDelays[node.name] ?? node.delay_ms;
 
@@ -487,7 +523,16 @@ export function ProxiesPage() {
                         )}
                       </span>
                       <span className="proxy-node-details">
-                        <strong>{node.name}</strong>
+                        <strong>
+                          {favorites.has(node.name) ? (
+                            <Star
+                              className="proxy-node-favorite-mark"
+                              aria-hidden="true"
+                              size={12}
+                            />
+                          ) : null}
+                          {node.name}
+                        </strong>
                         <small>
                           {node.proxy_type} / UDP {node.udp ? "on" : "off"}
                         </small>
@@ -506,6 +551,32 @@ export function ProxiesPage() {
                       >
                         {delay === null ? t("proxies.notTested") : `${delay} ms`}
                       </span>
+                      <button
+                        className={
+                          favorites.has(node.name)
+                            ? "workspace-icon-button proxy-favorite is-favorite"
+                            : "workspace-icon-button proxy-favorite"
+                        }
+                        type="button"
+                        aria-pressed={favorites.has(node.name)}
+                        aria-label={
+                          favorites.has(node.name)
+                            ? t("proxies.unfavorite", { name: node.name })
+                            : t("proxies.favorite", { name: node.name })
+                        }
+                        title={
+                          favorites.has(node.name)
+                            ? t("proxies.unfavorite", { name: node.name })
+                            : t("proxies.favorite", { name: node.name })
+                        }
+                        onClick={() => toggleFavorite(node.name)}
+                      >
+                        <Star
+                          aria-hidden="true"
+                          size={15}
+                          fill={favorites.has(node.name) ? "currentColor" : "none"}
+                        />
+                      </button>
                       <button
                         className="workspace-icon-button"
                         type="button"

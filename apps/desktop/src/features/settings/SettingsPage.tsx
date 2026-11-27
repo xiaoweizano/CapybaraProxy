@@ -25,6 +25,7 @@ import { UI_SCALE_STEPS } from "../../shared/uiScale";
 import type { LanguageId } from "../../i18n/language";
 import type { CoreLogLevel } from "../../platform/runtime";
 import {
+  exportDiagnostics,
   importSubStoreSubscription,
   listSubStoreSubscriptions,
   openLogDirectory,
@@ -40,6 +41,7 @@ import type { TraySpeedDisplay } from "../../platform/settings";
 import type { MotionPreference } from "../../shared/motion";
 import { useBridgeResource } from "../../app/runtime/useBridgeResource";
 import { getSubscriptionSnapshot, setSubscriptionOverrideYaml } from "../../platform/runtime";
+import { applyOverrideBlock } from "./overrideBlock";
 import {
   DEFAULT_FAKE_IP_RANGE,
   DNS_PRESETS,
@@ -51,6 +53,13 @@ import {
   type DnsPreset,
 } from "./dnsPreset";
 import { MihomoCorePanel } from "../runtime/MihomoCorePanel";
+import {
+  activateCoreVersion,
+  getCoreVersions,
+  openCoreVersionsDirectory,
+  registerCoreVersion,
+  type CoreVersion,
+} from "../../platform/runtime";
 import {
   ResourceFeedback,
   WorkspacePage,
@@ -197,7 +206,6 @@ export function SettingsPage() {
   const capabilityFallback = integration.isLoading
     ? t("settings.checkingCapability")
     : t("settings.integrationUnavailable");
-  const tunState = tunCapability?.state;
   const sections = visibleSections(settings.settingsMode);
 
   const shows = (id: SettingsSectionId): boolean =>
@@ -424,30 +432,15 @@ export function SettingsPage() {
                 void integration.setSystemProxyEnabled(checked)
               }
             />
-            <div className="workspace-setting-row">
-              <span className="workspace-setting-icon">
-                <ShieldCheck aria-hidden="true" size={16} />
-              </span>
-              <span>
-                <strong>{t("settings.tunInterface")}</strong>
-                <small>{t("settings.detectionOnly")}</small>
-                <span className="workspace-setting-detail">
-                  {tunCapability?.message ??
-                    (integration.isLoading
-                      ? t("settings.checkingElevation")
-                      : t("settings.tunDisabled"))}
-                </span>
-              </span>
-              <span className="workspace-status-pill" data-state={tunState ?? "unverified"}>
-                {tunState === "available"
-                  ? t("common.ready")
-                  : tunState === "blocked"
-                    ? t("common.blocked")
-                    : tunState === "unsupported"
-                      ? t("common.unsupported")
-                      : t("common.unverified")}
-              </span>
-            </div>
+            <TunRow
+              capability={tunCapability}
+              loading={integration.isLoading}
+              fallback={
+                integration.isLoading
+                  ? t("settings.checkingElevation")
+                  : t("settings.tunDisabled")
+              }
+            />
           </div>
           <ProxyBypassField controlsDisabled={controlsDisabled} />
         </SettingsSection>
@@ -543,6 +536,10 @@ export function SettingsPage() {
 
       {shows("core") ? <MihomoCorePanel /> : null}
 
+      {shows("coreVersions") ? (
+        <CoreVersionsSection controlsDisabled={controlsDisabled} />
+      ) : null}
+
       {shows("tray") ? (
         <SettingsSection definition={settingsSection("tray")}>
           <div className="workspace-option-list">
@@ -628,6 +625,268 @@ export function SettingsPage() {
  * a second configuration path: saving here replaces only the `dns:` block and
  * keeps whatever else the operator wrote there.
  */
+/**
+ * TUN switch.
+ *
+ * TUN is a whole top-level block, so enabling it writes a `tun:` block into the
+ * active subscription's override, the same channel the DNS form uses. The
+ * switch is only offered when the platform reports the capability as
+ * available (elevation plus the Wintun driver); otherwise the row explains
+ * why and stays read-only.
+ */
+/**
+ * Installed core builds.
+ *
+ * FlowProxy ships one locked core. An operator who wants a newer build drops
+ * the file into the cores folder, registers it (which records its digest), and
+ * switches to it. Registration is the verification step: a build whose digest
+ * cannot be read never appears in the list. A switch takes effect on the next
+ * start, so the running core is never replaced underneath the operator.
+ */
+function CoreVersionsSection({ controlsDisabled }: { controlsDisabled: boolean }) {
+  const { t } = useTranslation();
+  const versions = useBridgeResource(getCoreVersions, true);
+  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [fileId, setFileId] = useState("");
+  const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const list = versions.data ?? [];
+
+  const apply = async (
+    action: () => Promise<
+      | { status: "ok"; data: CoreVersion[] }
+      | { status: "error"; error: { message: string } }
+      | { status: "unavailable" }
+    >,
+    id: string,
+  ) => {
+    setPendingId(id);
+    setError(null);
+    setNotice(null);
+    try {
+      const result = await action();
+      if (result.status === "ok") {
+        versions.setData(() => result.data);
+        setNotice(t("settings.coreVersionChanged"));
+      } else {
+        setError(
+          result.status === "error"
+            ? result.error.message
+            : t("settings.substoreBridgeUnavailable"),
+        );
+      }
+    } finally {
+      setPendingId(null);
+    }
+  };
+
+  return (
+    <SettingsSection
+      definition={settingsSection("coreVersions")}
+    >
+      <p className="workspace-hint">{t("settings.coreVersionsHint")}</p>
+      <div className="core-version-list">
+        {list.map((version) => (
+          <div className="core-version-row" key={version.id}>
+            <span className="core-version-copy">
+              <strong>
+                {version.version}
+                {version.active ? (
+                  <span className="core-version-active">
+                    {t("settings.coreVersionActive")}
+                  </span>
+                ) : null}
+              </strong>
+              <small>
+                {version.id === "bundled"
+                  ? t("settings.coreVersionBundled")
+                  : version.id}
+                {" · "}
+                {version.sha256.slice(0, 12)}
+              </small>
+            </span>
+            <button
+              className="workspace-action-button"
+              type="button"
+              disabled={
+                controlsDisabled || version.active || pendingId !== null
+              }
+              onClick={() =>
+                void apply(
+                  () =>
+                    activateCoreVersion(
+                      version.id === "bundled" ? null : version.id,
+                    ),
+                  version.id,
+                )
+              }
+            >
+              {version.active
+                ? t("settings.coreVersionInUse")
+                : pendingId === version.id
+                  ? t("settings.coreVersionSwitching")
+                  : t("settings.coreVersionUse")}
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <form
+        className="core-version-register"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const id = fileId.trim();
+          if (id === "") {
+            return;
+          }
+          void apply(() => registerCoreVersion(id), id).then(() =>
+            setFileId(""),
+          );
+        }}
+      >
+        <label className="proxy-search">
+          <input
+            type="text"
+            value={fileId}
+            placeholder={t("settings.coreVersionFileName")}
+            aria-label={t("settings.coreVersionFileName")}
+            spellCheck={false}
+            disabled={controlsDisabled || pendingId !== null}
+            onChange={(event) => setFileId(event.target.value)}
+          />
+        </label>
+        <button
+          className="workspace-action-button"
+          type="submit"
+          disabled={
+            controlsDisabled || fileId.trim() === "" || pendingId !== null
+          }
+        >
+          {t("settings.coreVersionRegister")}
+        </button>
+        <button
+          className="workspace-action-button"
+          type="button"
+          disabled={pendingId !== null}
+          onClick={() => void openCoreVersionsDirectory()}
+        >
+          {t("settings.coreVersionOpenFolder")}
+        </button>
+      </form>
+
+      {error ? (
+        <p className="settings-inline-hint" role="alert">
+          {error}
+        </p>
+      ) : notice ? (
+        <p className="settings-inline-hint" role="status">
+          {notice}
+        </p>
+      ) : (
+        <p className="settings-inline-hint">{t("settings.coreVersionRestartHint")}</p>
+      )}
+    </SettingsSection>
+  );
+}
+function TunRow({
+  capability,
+  loading,
+  fallback,
+}: {
+  capability: { state: string; message: string } | undefined;
+  loading: boolean;
+  fallback: string;
+}) {
+  const { t } = useTranslation();
+  const stored = useBridgeResource(getSubscriptionSnapshot, true);
+  const [enabled, setEnabled] = useState(
+    () => /^tun:\s*$/m.test(stored.data?.override_yaml ?? "") &&
+      /enhance-mode|stack/.test(stored.data?.override_yaml ?? ""),
+  );
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const subscriptionId = stored.data?.id ?? null;
+  const available = capability?.state === "available";
+  const hasSubscription = stored.data?.has_subscription === true;
+
+  const toggle = async (next: boolean) => {
+    if (!subscriptionId) {
+      return;
+    }
+    setPending(true);
+    setError(null);
+    try {
+      // `stack: system` is the Windows default and what Wintun expects;
+      // `auto-route` makes the core install the routes itself.
+      const block = next
+        ? "tun:\n  enable: true\n  stack: system\n  auto-route: true\n  auto-detect-interface: true\n"
+        : null;
+      const merged = applyOverrideBlock(
+        stored.data?.override_yaml,
+        "tun",
+        block,
+      );
+      const result = await setSubscriptionOverrideYaml(
+        subscriptionId,
+        merged.trim() === "" ? null : merged,
+      );
+      if (result.status === "ok") {
+        setEnabled(next);
+        await stored.reload();
+      } else {
+        setError(
+          result.status === "error"
+            ? result.error.message
+            : t("settings.substoreBridgeUnavailable"),
+        );
+      }
+    } finally {
+      setPending(false);
+    }
+  };
+
+  return (
+    <>
+      <div className="workspace-setting-row">
+        <span className="workspace-setting-icon">
+          <ShieldCheck aria-hidden="true" size={16} />
+        </span>
+        <span>
+          <strong>{t("settings.tunInterface")}</strong>
+          <small>
+            {available
+              ? t("settings.tunAvailableHint")
+              : t("settings.detectionOnly")}
+          </small>
+          <span className="workspace-setting-detail">
+            {capability?.message ?? fallback}
+          </span>
+          {!available && hasSubscription ? (
+            <span className="workspace-setting-detail">
+              {t("settings.tunNeedsElevation")}
+            </span>
+          ) : null}
+          {error ? (
+            <span className="workspace-setting-detail" role="alert">
+              {error}
+            </span>
+          ) : null}
+        </span>
+        <button
+          className="workspace-switch"
+          type="button"
+          role="switch"
+          aria-label={t("settings.tunInterface")}
+          aria-checked={enabled}
+          disabled={!available || !hasSubscription || pending || loading}
+          onClick={() => void toggle(!enabled)}
+        >
+          <span aria-hidden="true" />
+        </button>
+      </div>
+    </>
+  );
+}
 function DnsSection({ controlsDisabled }: { controlsDisabled: boolean }) {
   const { t } = useTranslation();
   const stored = useBridgeResource(getSubscriptionSnapshot, true);
@@ -981,6 +1240,21 @@ function LogSection({ controlsDisabled }: { controlsDisabled: boolean }) {  cons
     }
   };
 
+  const exportBundle = async () => {
+    setPending(true);
+    setStatus(null);
+    try {
+      const result = await exportDiagnostics();
+      if (result.status === "ok") {
+        setStatus(t("settings.diagnosticsExported", { path: result.data }));
+      } else if (result.status === "error") {
+        setStatus(result.error.message);
+      }
+    } finally {
+      setPending(false);
+    }
+  };
+
   const clearFiles = async () => {
     setPending(true);
     setStatus(null);
@@ -1009,6 +1283,14 @@ function LogSection({ controlsDisabled }: { controlsDisabled: boolean }) {  cons
           >
             <ScrollText aria-hidden="true" size={14} />
             {t("settings.openLogDirectory")}
+          </button>
+          <button
+            className="workspace-action-button"
+            type="button"
+            disabled={pending}
+            onClick={() => void exportBundle()}
+          >
+            {t("settings.exportDiagnostics")}
           </button>
           <button
             className="workspace-action-button"

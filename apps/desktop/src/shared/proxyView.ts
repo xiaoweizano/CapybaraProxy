@@ -10,6 +10,7 @@ export type NodeSort = "default" | "delay" | "name";
 
 const SORT_STORAGE_KEY = "flowproxy.proxies.sort";
 const COLLAPSED_STORAGE_KEY = "flowproxy.proxies.collapsed";
+const FAVORITES_STORAGE_KEY = "flowproxy.proxies.favorites";
 
 type Reader = { getItem(key: string): string | null };
 type Writer = { setItem(key: string, value: string): void };
@@ -67,5 +68,33 @@ export function writeStoredCollapsed(
     );
   } catch {
     // Same as above: losing this preference is not worth an error.
+  }
+}
+
+export function readStoredFavorites(storage: Reader): Set<string> {
+  try {
+    const raw = storage.getItem(FAVORITES_STORAGE_KEY);
+    if (!raw) {
+      return new Set();
+    }
+    const parsed: unknown = JSON.parse(raw);
+    return new Set(
+      Array.isArray(parsed)
+        ? parsed.filter((value): value is string => typeof value === "string")
+        : [],
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+export function writeStoredFavorites(
+  storage: Writer,
+  favorites: ReadonlySet<string>,
+): void {
+  try {
+    storage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify([...favorites].sort()));
+  } catch {
+    // A full quota only loses the preference, never the page.
   }
 }

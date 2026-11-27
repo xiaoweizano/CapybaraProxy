@@ -1,4 +1,4 @@
-import { Route, Search } from "lucide-react";
+import { FlaskConical, Route, Search } from "lucide-react";
 import { useDeferredValue, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useRuntime } from "../../app/runtime/runtimeContext";
@@ -17,6 +17,7 @@ import {
   RuntimeDisconnected,
   WorkspacePage,
 } from "../workspace/WorkspaceUi";
+import { matchRules, type RuleVerdict } from "./ruleMatcher";
 
 const MAX_VISIBLE_RULES = 500;
 
@@ -115,6 +116,8 @@ export function RulesPage() {
       />
 
       {searchField}
+
+      <RuleTester connected={isConnected} />
 
       {!isConnected ? (
         offlineRules.length > 0 ? (
@@ -311,6 +314,99 @@ function ProvidersPanel({ connected }: { connected: boolean }) {
           </tbody>
         </table>
       </div>
+    </section>
+  );
+}
+
+/**
+ * Answers "which rule decides this domain" without touching the core.
+ *
+ * The verdict is a lower bound: rules that need the resolved address, a
+ * rule-set body or the OS process cannot be evaluated here, and the panel
+ * says how many of those were skipped before the match.
+ */
+function RuleTester({ connected }: { connected: boolean }) {
+  const { t } = useTranslation();
+  const rules = useBridgeResource(getRules, connected);
+  const [target, setTarget] = useState("");
+  const [verdict, setVerdict] = useState<RuleVerdict | null>(null);
+
+  if (!connected || (rules.data?.length ?? 0) === 0) {
+    return null;
+  }
+
+  const evaluate = () => {
+    setVerdict(matchRules(rules.data ?? [], target));
+  };
+
+  return (
+    <section className="workspace-panel rule-tester-panel">
+      <div className="workspace-panel-heading">
+        <div>
+          <span className="workspace-kicker">{t("rules.testerKicker")}</span>
+          <h2>{t("rules.testerHeading")}</h2>
+        </div>
+        <span className="workspace-icon-button" aria-hidden="true">
+          <FlaskConical size={15} />
+        </span>
+      </div>
+      <form
+        className="rule-tester-form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          evaluate();
+        }}
+      >
+        <label className="proxy-search">
+          <Search aria-hidden="true" size={15} />
+          <input
+            type="text"
+            value={target}
+            placeholder={t("rules.testerPlaceholder")}
+            aria-label={t("rules.testerPlaceholder")}
+            spellCheck={false}
+            onChange={(event) => {
+              setTarget(event.target.value);
+              setVerdict(null);
+            }}
+          />
+        </label>
+        <button
+          className="workspace-primary-button"
+          type="submit"
+          disabled={target.trim() === ""}
+        >
+          {t("rules.testerRun")}
+        </button>
+      </form>
+      {verdict ? (
+        verdict.matched ? (
+          <div className="rule-tester-result" role="status">
+            <p>
+              {t("rules.testerMatched", {
+                type: verdict.matched.rule_type,
+                target: verdict.matched.proxy,
+              })}
+            </p>
+            <p className="workspace-code">
+              {verdict.matched.rule_type}
+              {verdict.matched.payload ? `,${verdict.matched.payload}` : ""}
+              {`,${verdict.matched.proxy}`}
+            </p>
+            {verdict.skipped.length > 0 ? (
+              <p className="settings-inline-hint">
+                {t("rules.testerSkipped", { count: verdict.skipped.length })}
+              </p>
+            ) : null}
+          </div>
+        ) : (
+          <p className="settings-inline-hint" role="status">
+            {t("rules.testerNoMatch")}
+          </p>
+        )
+      ) : (
+        <p className="settings-inline-hint">{t("rules.testerHint")}</p>
+      )}
     </section>
   );
 }

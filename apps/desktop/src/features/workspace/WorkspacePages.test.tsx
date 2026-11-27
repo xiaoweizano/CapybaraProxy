@@ -287,7 +287,8 @@ describe("real data workspace pages", () => {
 
     expect(await screen.findByText("example.com")).toBeInTheDocument();
     expect(screen.getByText("DOMAIN-SUFFIX")).toBeInTheDocument();
-    expect(getRulesMock).toHaveBeenCalledTimes(1);
+    // The rule table is read by the list and again by the tester panel.
+    expect(getRulesMock).toHaveBeenCalledTimes(2);
 
     await user.type(
       screen.getByRole("searchbox", { name: "Filter rules" }),

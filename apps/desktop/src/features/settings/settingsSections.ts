@@ -13,6 +13,7 @@ export type SettingsSectionId =
   | "subscription"
   | "logs"
   | "core"
+  | "coreVersions"
   | "tray"
   | "advanced"
   | "dns"
@@ -72,6 +73,13 @@ export const SETTINGS_SECTIONS: SettingsSectionDefinition[] = [
     titleKey: "settings.core",
     kickerKey: "settings.coreKicker",
     minimumMode: "standard",
+  },
+  {
+    id: "coreVersions",
+    index: "06b",
+    titleKey: "settings.coreVersions",
+    kickerKey: "settings.coreVersionsKicker",
+    minimumMode: "relaxed",
   },
   {
     id: "tray",

@@ -303,8 +303,10 @@ describe("SettingsPage system integration", () => {
         "Elevation and Wintun were detected, but TUN activation is not enabled in this phase.",
       ),
     ).toBeInTheDocument();
+    // The switch is present so the capability message has a target, but it is
+    // disabled while the platform reports TUN as unavailable.
     expect(
-      screen.queryByRole("switch", { name: "TUN interface" }),
-    ).not.toBeInTheDocument();
+      screen.getByRole("switch", { name: "TUN interface" }),
+    ).toBeDisabled();
   });
 });

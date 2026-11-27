@@ -632,12 +632,9 @@ where
         }
 
         match self.system.wintun_installed() {
-            Ok(false) => CapabilityStatus::blocked(
-                "The Wintun driver library is not installed.",
-            ),
-            Ok(true) => CapabilityStatus::unavailable(
-                CapabilityState::Unverified,
-                "Elevation and Wintun were detected, but TUN activation is not enabled in this phase.",
+            Ok(false) => CapabilityStatus::blocked("The Wintun driver library is not installed."),
+            Ok(true) => CapabilityStatus::available(
+                "Elevation and Wintun were detected; TUN can be enabled.",
             ),
             Err(error) => CapabilityStatus::unavailable(
                 CapabilityState::Unverified,
