@@ -11,7 +11,7 @@ mod system_proxy;
 use flowproxy_contracts::{
     ConnectionPage, CoreInfo, CorePreferences, DelayProbeSettings, GroupDelayResult, LogLevel,
     ProfileInfo, ProxyGroup, RoutingMode, RuleItem, RuntimeError, RuntimeErrorCode,
-    StartupPreferences, SubscriptionSnapshot, TelemetrySnapshot,
+    StartupPreferences, SubscriptionSnapshot, SubscriptionUsage, TelemetrySnapshot,
 };
 
 pub use binary::{
@@ -131,11 +131,21 @@ pub trait MihomoAdapter: Send {
     /// refreshed later. A pasted document has no source and passes `None`.
     fn set_pending_subscription_url(&mut self, _url: Option<String>) {}
 
+    /// Records the usage header that came with the document being imported.
+    /// A pasted document passes `None` so stale numbers cannot survive it.
+    fn set_pending_subscription_usage(&mut self, _usage: Option<SubscriptionUsage>) {}
+
     fn connections(&mut self) -> Result<ConnectionPage, RuntimeError> {
         Err(unsupported_adapter_data("active connections"))
     }
 
     fn close_connection(&mut self, _connection_id: &str) -> Result<(), RuntimeError> {
+        Err(unsupported_adapter_data("connection control"))
+    }
+
+    /// Closes every open connection. The default reports the capability as
+    /// unsupported, matching [`close_connection`](Self::close_connection).
+    fn close_all_connections(&mut self) -> Result<(), RuntimeError> {
         Err(unsupported_adapter_data("connection control"))
     }
 
@@ -210,6 +220,10 @@ where
         self.as_mut().set_pending_subscription_url(url)
     }
 
+    fn set_pending_subscription_usage(&mut self, usage: Option<SubscriptionUsage>) {
+        self.as_mut().set_pending_subscription_usage(usage)
+    }
+
     fn health(&mut self) -> Result<(), RuntimeError> {
         self.as_mut().health()
     }
@@ -264,6 +278,10 @@ where
 
     fn close_connection(&mut self, connection_id: &str) -> Result<(), RuntimeError> {
         self.as_mut().close_connection(connection_id)
+    }
+
+    fn close_all_connections(&mut self) -> Result<(), RuntimeError> {
+        self.as_mut().close_all_connections()
     }
 
     fn rules(&mut self) -> Result<Vec<RuleItem>, RuntimeError> {

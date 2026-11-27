@@ -507,6 +507,15 @@ pub(crate) fn close_connection(
     Ok(())
 }
 
+/// Closes every open connection at once.
+///
+/// Mihomo treats `DELETE /connections` as "close all"; the response body is
+/// empty on success.
+pub(crate) fn close_all_connections(client: &LoopbackApiClient) -> Result<(), RuntimeError> {
+    client.request_json("DELETE", "/connections", None)?;
+    Ok(())
+}
+
 pub(crate) fn select_proxy(
     client: &LoopbackApiClient,
     group: &str,

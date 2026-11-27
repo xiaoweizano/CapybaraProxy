@@ -3,10 +3,11 @@ import {
   CircleDashed,
   Gauge,
   Radio,
+  Search,
   Server,
   Timer,
 } from "lucide-react";
-import { useState } from "react";
+import { useDeferredValue, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useRuntime } from "../../app/runtime/runtimeContext";
 import { useBridgeResource } from "../../app/runtime/useBridgeResource";
@@ -39,6 +40,52 @@ const modeOptions: Array<{
   },
 ];
 
+type NodeSort = "default" | "delay" | "name";
+
+/** Keeps groups and nodes matching the filter; drops groups left empty. */
+function filterGroups<T extends { name: string; nodes: ProxyNode[] }>(
+  groups: T[],
+  query: string,
+): T[] {
+  const normalized = query.trim().toLowerCase();
+  if (normalized === "") {
+    return groups;
+  }
+
+  return groups
+    .map((group) => {
+      const groupMatches = group.name.toLowerCase().includes(normalized);
+      return {
+        ...group,
+        nodes: groupMatches
+          ? group.nodes
+          : group.nodes.filter((node) =>
+              node.name.toLowerCase().includes(normalized),
+            ),
+      };
+    })
+    .filter((group) => group.nodes.length > 0);
+}
+
+/**
+ * Orders a group's nodes.
+ *
+ * `delay` puts the fastest first and unmeasured nodes last, which is what an
+ * operator scanning for a usable node wants; the previous order is kept for
+ * equal or missing values so the list does not reshuffle on every probe.
+ */
+function sortNodes(nodes: ProxyNode[], sort: NodeSort, delays: Record<string, number | null>): ProxyNode[] {
+  if (sort === "name") {
+    return [...nodes].sort((left, right) => left.name.localeCompare(right.name));
+  }
+  if (sort === "delay") {
+    const delayOf = (node: ProxyNode): number =>
+      delays[node.name] ?? node.delay_ms ?? Number.POSITIVE_INFINITY;
+    return [...nodes].sort((left, right) => delayOf(left) - delayOf(right));
+  }
+  return nodes;
+}
+
 export function ProxiesPage() {
   const { t } = useTranslation();
   const {
@@ -56,6 +103,11 @@ export function ProxiesPage() {
   const [pendingDelay, setPendingDelay] = useState<string | null>(null);
   const [pendingGroup, setPendingGroup] = useState<string | null>(null);
   const [pendingMode, setPendingMode] = useState<RoutingMode | null>(null);
+  const [pendingAll, setPendingAll] = useState(false);
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<NodeSort>("default");
+  const [notice, setNotice] = useState<string | null>(null);
+  const deferredQuery = useDeferredValue(query);
   const [testedDelays, setTestedDelays] = useState<Record<string, number | null>>(
     {},
   );
@@ -67,6 +119,8 @@ export function ProxiesPage() {
     ? offline.data.groups
     : [];
   const activeMode = corePreferences?.mode ?? null;
+  const visibleGroups = filterGroups(proxyGroups, deferredQuery);
+  const visibleOfflineGroups = filterGroups(offlineGroups, deferredQuery);
 
   const chooseProxy = async (group: string, node: ProxyNode) => {
     if (pendingSelection || node.name === proxyGroups.find((item) => item.name === group)?.selected) {
@@ -124,6 +178,32 @@ export function ProxiesPage() {
     }
   };
 
+  /** Probes every group in sequence so the core is not flooded at once. */
+  const testAllGroups = async () => {
+    if (pendingAll || pendingGroup) {
+      return;
+    }
+
+    setPendingAll(true);
+    setNotice(null);
+    try {
+      let measured = 0;
+      for (const group of proxyGroups) {
+        if (group.nodes.length === 0) {
+          continue;
+        }
+        const delays = await measureGroupDelay(group.name);
+        if (delays) {
+          measured += Object.keys(delays).length;
+          setTestedDelays((current) => ({ ...current, ...delays }));
+        }
+      }
+      setNotice(t("proxies.testedGroups", { count: measured }));
+    } finally {
+      setPendingAll(false);
+    }
+  };
+
   return (
     <WorkspacePage
       eyebrow={t("proxies.eyebrow")}
@@ -170,6 +250,57 @@ export function ProxiesPage() {
         <p className="workspace-hint">{t("proxies.probeSettingsMoved")}</p>
       </section>
 
+      {(isConnected ? proxyGroups.length : offlineGroups.length) > 0 ? (
+        <div className="proxy-toolbar">
+          <label className="proxy-search">
+            <Search aria-hidden="true" size={15} />
+            <input
+              type="search"
+              value={query}
+              placeholder={t("proxies.searchPlaceholder")}
+              aria-label={t("proxies.searchLabel")}
+              spellCheck={false}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </label>
+          <div className="workspace-segmented" aria-label={t("proxies.sortLabel")}>
+            {(["default", "delay", "name"] as const).map((option) => (
+              <button
+                key={option}
+                type="button"
+                aria-pressed={sort === option}
+                onClick={() => setSort(option)}
+              >
+                {option === "default"
+                  ? t("proxies.sortDefault")
+                  : option === "delay"
+                    ? t("proxies.sortDelay")
+                    : t("proxies.sortName")}
+              </button>
+            ))}
+          </div>
+          {isConnected && proxyGroups.length > 0 ? (
+            <button
+              className="workspace-action-button proxy-toolbar-action"
+              type="button"
+              disabled={pendingAll || pendingGroup !== null}
+              onClick={() => void testAllGroups()}
+            >
+              <Timer aria-hidden="true" size={14} />
+              {pendingAll
+                ? t("proxies.testingAllGroups")
+                : t("proxies.testAllGroups")}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {notice ? (
+        <p className="workspace-feedback" role="status">
+          {notice}
+        </p>
+      ) : null}
+
       {!isConnected ? (
         offlineGroups.length > 0 ? (
           <div className="proxy-groups">
@@ -177,7 +308,7 @@ export function ProxiesPage() {
               <Radio aria-hidden="true" size={16} />
               <span>{t("proxies.offlineNotice")}</span>
             </div>
-            {offlineGroups.map((group) => (
+            {visibleOfflineGroups.map((group) => (
               <section
                 className="workspace-panel proxy-group-panel"
                 key={group.name}
@@ -196,7 +327,10 @@ export function ProxiesPage() {
                 </div>
 
                 <div className="proxy-node-list">
-                  {group.nodes.map((node) => (
+                  {(sort === "default"
+                    ? group.nodes
+                    : sortNodes(group.nodes, sort, {})
+                  ).map((node) => (
                     <div
                       className="proxy-node"
                       key={`${group.name}-${node.name}`}
@@ -233,9 +367,13 @@ export function ProxiesPage() {
             <p>{t("proxies.emptyBody")}</p>
           </div>
         </div>
+      ) : visibleGroups.length === 0 ? (
+        <p className="workspace-hint" role="status">
+          {t("proxies.searchEmpty", { query: deferredQuery.trim() })}
+        </p>
       ) : (
         <div className="proxy-groups">
-          {proxyGroups.map((group) => (
+          {visibleGroups.map((group) => (
             <section
               className="workspace-panel proxy-group-panel"
               key={group.name}
@@ -266,7 +404,7 @@ export function ProxiesPage() {
               </div>
 
               <div className="proxy-node-list">
-                {group.nodes.map((node) => {
+                {sortNodes(group.nodes, sort, testedDelays).map((node) => {
                   const selected = node.name === group.selected;
                   const delay = testedDelays[node.name] ?? node.delay_ms;
 

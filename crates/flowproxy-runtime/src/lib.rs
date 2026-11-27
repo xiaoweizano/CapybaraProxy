@@ -7,7 +7,7 @@ use flowproxy_contracts::{
     ConnectionPage, CoreInfo, CorePreferences, DelayProbeSettings, GroupDelayResult, LogLevel,
     ProfileInfo, ProxyGroup, RoutingMode, RuleItem, RuntimeBackend, RuntimeError, RuntimeErrorCode,
     RuntimeLogEntry, RuntimeLogLevel, RuntimeSnapshot, RuntimeState, StartupPreferences,
-    SubscriptionSnapshot, TelemetrySnapshot,
+    SubscriptionSnapshot, SubscriptionUsage, TelemetrySnapshot,
 };
 use flowproxy_mihomo_manager::MihomoAdapter;
 use log_buffer::LogBuffer;
@@ -405,6 +405,11 @@ where
         })
     }
 
+    /// Closes every open connection in one call.
+    pub fn close_all_connections(&self) -> Result<(), RuntimeFailure> {
+        self.adapter_data("connection control", A::close_all_connections)
+    }
+
     pub fn rules(&self) -> Result<Vec<RuleItem>, RuntimeFailure> {
         self.adapter_data("rules", A::rules)
     }
@@ -503,6 +508,12 @@ where
     pub fn set_pending_subscription_url(&self, url: Option<String>) {
         let _operation = self.lock_operation();
         self.lock_adapter().set_pending_subscription_url(url);
+    }
+
+    /// Records the usage header captured with the next subscription import.
+    pub fn set_pending_subscription_usage(&self, usage: Option<SubscriptionUsage>) {
+        let _operation = self.lock_operation();
+        self.lock_adapter().set_pending_subscription_usage(usage);
     }
 
     /// Returns the URL the stored subscription was imported from.

@@ -146,6 +146,19 @@ export type ProfileInfo = {
 };
 
 /**
+ * Traffic and expiry numbers a provider reports in `subscription-userinfo`.
+ * Every field is optional because providers omit what they do not track.
+ */
+export type SubscriptionUsage = {
+  upload_bytes: number | null;
+  download_bytes: number | null;
+  /** `0` is how many providers spell "unlimited". */
+  total_bytes: number | null;
+  /** Expiry in epoch milliseconds. */
+  expire_at_ms: number | null;
+};
+
+/**
  * Groups and rules read from the stored subscription while the Runtime is
  * stopped. Read-only: it never reflects a running core.
  */
@@ -157,6 +170,10 @@ export type SubscriptionSnapshot = {
   source_url?: string | null;
   /** Import timestamp in epoch milliseconds. */
   updated_at_ms?: number | null;
+  /** Name the operator gave the subscription. */
+  name?: string | null;
+  /** Usage and expiry captured at the last import. */
+  usage?: SubscriptionUsage | null;
 };
 
 /** An entry listed by an external Sub-Store backend. */
@@ -441,6 +458,7 @@ async function executeRuntimeCommand<T>(
     | "set_core_preferences"
     | "get_connections"
     | "close_connection"
+    | "close_all_connections"
     | "get_rules"
     | "get_profiles"
     | "get_subscription_snapshot"
@@ -561,6 +579,14 @@ export function closeConnection(
   );
 }
 
+/** Closes every open connection in one call. */
+export function closeAllConnections(): Promise<RuntimeBridgeResult<null>> {
+  return executeRuntimeCommand(
+    "close_all_connections",
+    (value): value is null => value === null,
+  );
+}
+
 export function getRules(): Promise<RuntimeBridgeResult<RuleItem[]>> {
   return executeRuntimeCommand(
     "get_rules",
@@ -580,6 +606,17 @@ export function getProfiles(): Promise<RuntimeBridgeResult<ProfileInfo[]>> {
 const isProfileList = (value: unknown): value is ProfileInfo[] =>
   Array.isArray(value) && value.every(isProfileInfo);
 
+function isSubscriptionUsage(value: unknown): value is SubscriptionUsage {
+  return (
+    isRecord(value) &&
+    (value.upload_bytes === null || isNonNegativeInteger(value.upload_bytes)) &&
+    (value.download_bytes === null ||
+      isNonNegativeInteger(value.download_bytes)) &&
+    (value.total_bytes === null || isNonNegativeInteger(value.total_bytes)) &&
+    (value.expire_at_ms === null || Number.isInteger(value.expire_at_ms))
+  );
+}
+
 function isSubscriptionSnapshot(value: unknown): value is SubscriptionSnapshot {
   return (
     isRecord(value) &&
@@ -593,7 +630,13 @@ function isSubscriptionSnapshot(value: unknown): value is SubscriptionSnapshot {
       isString(value.source_url)) &&
     (value.updated_at_ms === undefined ||
       value.updated_at_ms === null ||
-      Number.isInteger(value.updated_at_ms))
+      Number.isInteger(value.updated_at_ms)) &&
+    (value.name === undefined ||
+      value.name === null ||
+      isString(value.name)) &&
+    (value.usage === undefined ||
+      value.usage === null ||
+      isSubscriptionUsage(value.usage))
   );
 }
 

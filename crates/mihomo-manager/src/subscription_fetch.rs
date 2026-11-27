@@ -9,7 +9,7 @@
 use crate::subscription::{preflight, MAX_SUBSCRIPTION_BYTES};
 use crate::subscription_convert;
 use crate::system_proxy;
-use flowproxy_contracts::{RuntimeError, RuntimeErrorCode};
+use flowproxy_contracts::{RuntimeError, RuntimeErrorCode, SubscriptionUsage};
 use std::io::Read;
 use std::time::Duration;
 
@@ -21,7 +21,10 @@ const MAX_REDIRECTS: usize = 5;
 /// Providers decide the response format from the client name. A Clash
 /// identifier is required to get a YAML profile; anything else is served the
 /// base64 share-link list that phone clients consume.
-const USER_AGENT: &str = concat!("clash.meta/", env!("CARGO_PKG_VERSION"), " (FlowProxy)");
+pub const DEFAULT_USER_AGENT: &str =
+    concat!("clash.meta/", env!("CARGO_PKG_VERSION"), " (FlowProxy)");
+/// Longest operator-supplied User-Agent accepted in settings.
+const MAX_USER_AGENT_CHARS: usize = 512;
 
 /// Validates a subscription URL without revealing it in the error message.
 pub fn validate_url(url: &str) -> Result<(), RuntimeError> {
@@ -49,8 +52,26 @@ pub fn validate_url(url: &str) -> Result<(), RuntimeError> {
 /// Errors never contain the URL. Operators get a stable message and can check
 /// the address themselves.
 pub fn fetch(url: &str) -> Result<String, RuntimeError> {
-    let (response, _) = send_request(url)?;
-    read_subscription_body(response)
+    fetch_with_user_agent(url, None).map(|(document, _)| document)
+}
+
+/// Same as [`fetch`], plus the usage numbers from the response header.
+///
+/// `user_agent` overrides the built-in Clash identifier; an empty or invalid
+/// value falls back to [`DEFAULT_USER_AGENT`] instead of failing the import.
+pub fn fetch_with_user_agent(
+    url: &str,
+    user_agent: Option<&str>,
+) -> Result<(String, SubscriptionUsage), RuntimeError> {
+    let (response, _) = send_request_with(url, &[], user_agent)?;
+    let usage = parse_subscription_userinfo(
+        response
+            .headers()
+            .get("subscription-userinfo")
+            .and_then(|value| value.to_str().ok()),
+    );
+    let document = read_subscription_body(response)?;
+    Ok((document, usage))
 }
 
 /// Fetches a document that is *not* a subscription, such as a Sub-Store API
@@ -64,26 +85,24 @@ pub fn fetch_text(
     headers: &[(&str, &str)],
     max_bytes: usize,
 ) -> Result<String, RuntimeError> {
-    let (response, _) = send_request_with(url, headers)?;
+    let (response, _) = send_request_with(url, headers, None)?;
     read_body(response, max_bytes)
-}
-
-fn send_request(url: &str) -> Result<(reqwest::blocking::Response, bool), RuntimeError> {
-    send_request_with(url, &[])
 }
 
 fn send_request_with(
     url: &str,
     headers: &[(&str, &str)],
+    user_agent: Option<&str>,
 ) -> Result<(reqwest::blocking::Response, bool), RuntimeError> {
     validate_url(url)?;
+    let user_agent = normalize_user_agent(user_agent);
 
     // Subscription hosts are usually only reachable through the proxy client
     // the operator already runs, so the system proxy is consulted before the
     // first attempt. It is a hint, not a requirement: an unparsable setting
     // falls back to reqwest's own configuration.
     let proxy = system_proxy::proxy_url_for(url);
-    let client = build_client(proxy.as_deref())?;
+    let client = build_client(proxy.as_deref(), user_agent)?;
 
     let mut request = client.get(url);
     for (name, value) in headers {
@@ -95,7 +114,7 @@ fn send_request_with(
         Err(error) if proxy.is_some() && is_transport_error(&error) => {
             // A proxy client can exit without clearing the system proxy. One
             // short direct attempt keeps the import working in that case.
-            let mut retry = build_direct_client()?.get(url);
+            let mut retry = build_direct_client(user_agent)?.get(url);
             for (name, value) in headers {
                 retry = retry.header(*name, *value);
             }
@@ -172,8 +191,11 @@ fn too_large(max_bytes: usize) -> RuntimeError {
     ))
 }
 
-fn build_client(proxy: Option<&str>) -> Result<reqwest::blocking::Client, RuntimeError> {
-    let mut builder = client_builder(REQUEST_TIMEOUT);
+fn build_client(
+    proxy: Option<&str>,
+    user_agent: &str,
+) -> Result<reqwest::blocking::Client, RuntimeError> {
+    let mut builder = client_builder(REQUEST_TIMEOUT, user_agent);
 
     // An unusable proxy entry is ignored rather than turned into an import
     // error: the request can still succeed directly. Without a system proxy
@@ -186,14 +208,65 @@ fn build_client(proxy: Option<&str>) -> Result<reqwest::blocking::Client, Runtim
     builder.build().map_err(client_start_error)
 }
 
-fn build_direct_client() -> Result<reqwest::blocking::Client, RuntimeError> {
-    client_builder(DIRECT_RETRY_TIMEOUT)
+fn build_direct_client(user_agent: &str) -> Result<reqwest::blocking::Client, RuntimeError> {
+    client_builder(DIRECT_RETRY_TIMEOUT, user_agent)
         .no_proxy()
         .build()
         .map_err(client_start_error)
 }
 
-fn client_builder(timeout: Duration) -> reqwest::blocking::ClientBuilder {
+/// Returns the configured User-Agent when it is a single printable header
+/// value, otherwise the built-in Clash identifier.
+fn normalize_user_agent(candidate: Option<&str>) -> &str {
+    match candidate.map(str::trim) {
+        Some(value)
+            if !value.is_empty()
+                && value.len() <= MAX_USER_AGENT_CHARS
+                && !value.chars().any(|character| character.is_control()) =>
+        {
+            value
+        }
+        _ => DEFAULT_USER_AGENT,
+    }
+}
+
+/// Parses a `subscription-userinfo` header.
+///
+/// The header is a `key=value; key=value` list sent by Clash-compatible
+/// providers: `upload`, `download`, `total` in bytes and `expire` in epoch
+/// seconds. Anything unparsable is skipped, so a provider that only reports
+/// some fields still shows what it did report.
+pub fn parse_subscription_userinfo(header: Option<&str>) -> SubscriptionUsage {
+    let Some(header) = header else {
+        return SubscriptionUsage::default();
+    };
+
+    let mut usage = SubscriptionUsage::default();
+    for entry in header.split(';') {
+        let Some((key, value)) = entry.split_once('=') else {
+            continue;
+        };
+        let key = key.trim().to_ascii_lowercase();
+        let value = value.trim().trim_matches('"');
+        match key.as_str() {
+            "upload" => usage.upload_bytes = value.parse::<u64>().ok(),
+            "download" => usage.download_bytes = value.parse::<u64>().ok(),
+            "total" => usage.total_bytes = value.parse::<u64>().ok(),
+            "expire" => {
+                usage.expire_at_ms = value
+                    .parse::<i64>()
+                    .ok()
+                    .filter(|seconds| *seconds > 0)
+                    // Providers send seconds; the UI formats milliseconds.
+                    .and_then(|seconds| seconds.checked_mul(1_000))
+            }
+            _ => {}
+        }
+    }
+    usage
+}
+
+fn client_builder(timeout: Duration, user_agent: &str) -> reqwest::blocking::ClientBuilder {
     reqwest::blocking::Client::builder()
         .timeout(timeout)
         .redirect(reqwest::redirect::Policy::custom(|attempt| {
@@ -211,7 +284,7 @@ fn client_builder(timeout: Duration) -> reqwest::blocking::ClientBuilder {
             }
             attempt.follow()
         }))
-        .user_agent(USER_AGENT)
+        .user_agent(user_agent)
 }
 
 fn client_start_error(error: reqwest::Error) -> RuntimeError {
@@ -284,7 +357,49 @@ fn invalid(message: impl Into<String>) -> RuntimeError {
 
 #[cfg(test)]
 mod tests {
-    use super::validate_url;
+    use super::{
+        normalize_user_agent, parse_subscription_userinfo, validate_url, DEFAULT_USER_AGENT,
+    };
+
+    #[test]
+    fn parses_subscription_userinfo() {
+        let usage = parse_subscription_userinfo(Some(
+            "upload=1024; download=2048; total=10737418240; expire=1767225600",
+        ));
+
+        assert_eq!(usage.upload_bytes, Some(1_024));
+        assert_eq!(usage.download_bytes, Some(2_048));
+        assert_eq!(usage.total_bytes, Some(10 * 1024 * 1024 * 1024));
+        assert_eq!(usage.expire_at_ms, Some(1_767_225_600_000));
+    }
+
+    #[test]
+    fn userinfo_tolerates_spacing_quotes_and_missing_fields() {
+        let usage = parse_subscription_userinfo(Some(" download=\"12\" ; total=0 "));
+
+        assert_eq!(usage.upload_bytes, None);
+        assert_eq!(usage.download_bytes, Some(12));
+        assert_eq!(usage.total_bytes, Some(0));
+        assert_eq!(usage.expire_at_ms, None);
+    }
+
+    #[test]
+    fn userinfo_ignores_garbage_and_absent_header() {
+        assert!(parse_subscription_userinfo(None).is_empty());
+        assert!(parse_subscription_userinfo(Some("nonsense")).is_empty());
+        assert!(parse_subscription_userinfo(Some("upload=abc; expire=0")).is_empty());
+    }
+
+    #[test]
+    fn user_agent_falls_back_when_the_override_is_unusable() {
+        assert_eq!(normalize_user_agent(None), DEFAULT_USER_AGENT);
+        assert_eq!(normalize_user_agent(Some("   ")), DEFAULT_USER_AGENT);
+        assert_eq!(normalize_user_agent(Some("clash\r\nX: 1")), DEFAULT_USER_AGENT);
+        assert_eq!(
+            normalize_user_agent(Some(" ClashParty/1.0 ")),
+            "ClashParty/1.0"
+        );
+    }
 
     #[test]
     fn accepts_http_and_https() {

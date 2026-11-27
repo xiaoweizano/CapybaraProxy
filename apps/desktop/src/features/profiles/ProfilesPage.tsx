@@ -30,6 +30,96 @@ import {
 
 type ImportMode = "url" | "yaml";
 
+function formatTraffic(bytes: number): string {
+  const GIBIBYTE = 1024 ** 3;
+  const MEBIBYTE = 1024 ** 2;
+  if (bytes >= GIBIBYTE) {
+    return `${(bytes / GIBIBYTE).toFixed(2)} GB`;
+  }
+  if (bytes >= MEBIBYTE) {
+    return `${(bytes / MEBIBYTE).toFixed(1)} MB`;
+  }
+  return `${(bytes / 1024).toFixed(0)} KB`;
+}
+
+/**
+ * Usage and expiry reported by the provider.
+ *
+ * Renders nothing when the header was absent, which is the normal case for a
+ * pasted subscription. `total_bytes === 0` is how providers spell "unlimited".
+ */
+function SubscriptionUsagePanel() {
+  const { t, i18n } = useTranslation();
+  const stored = useBridgeResource(getSubscriptionSnapshot, true);
+  // Read the clock once per mount instead of on every render, so the expiry
+  // badge cannot flip back and forth while the page re-renders.
+  const [now] = useState(() => Date.now());
+  const usage = stored.data?.usage;
+  if (!usage) {
+    return null;
+  }
+
+  const dateFormatter = new Intl.DateTimeFormat(i18n.language, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+  const used =
+    (usage.upload_bytes ?? 0) + (usage.download_bytes ?? 0);
+  const unlimited = usage.total_bytes === 0;
+  const usedLabel =
+    typeof usage.total_bytes === "number" && !unlimited
+      ? t("profiles.usageUsed", {
+          used: formatTraffic(used),
+          total: formatTraffic(usage.total_bytes),
+        })
+      : t("profiles.usageUnlimited", { used: formatTraffic(used) });
+  const percent =
+    typeof usage.total_bytes === "number" && usage.total_bytes > 0
+      ? Math.min(100, Math.round((used / usage.total_bytes) * 100))
+      : null;
+  const expired =
+    typeof usage.expire_at_ms === "number" &&
+    usage.expire_at_ms > 0 &&
+    usage.expire_at_ms < now;
+
+  return (
+    <div className="subscription-usage">
+      <span className="workspace-kicker">{t("profiles.usageKicker")}</span>
+      <div className="subscription-usage-numbers">
+        <strong>{usedLabel}</strong>
+        <span>
+          {t("profiles.usageUpload")} {formatTraffic(usage.upload_bytes ?? 0)}
+          {" · "}
+          {t("profiles.usageDownload")}{" "}
+          {formatTraffic(usage.download_bytes ?? 0)}
+        </span>
+      </div>
+      {percent !== null ? (
+        <div
+          className="subscription-usage-bar"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={percent}
+        >
+          <span style={{ width: `${percent}%` }} data-exhausted={percent >= 100} />
+        </div>
+      ) : null}
+      <span className="subscription-usage-expire" data-expired={expired}>
+        {typeof usage.expire_at_ms === "number" && usage.expire_at_ms > 0
+          ? expired
+            ? t("profiles.usageExpired", {
+                time: dateFormatter.format(usage.expire_at_ms),
+              })
+            : t("profiles.usageExpire", {
+                time: dateFormatter.format(usage.expire_at_ms),
+              })
+          : t("profiles.usageExpireUnknown")}
+      </span>
+    </div>
+  );
+}
+
 export function ProfilesPage() {
   const { t } = useTranslation();
   const { snapshot, measureGroupDelay } = useRuntime();
@@ -336,6 +426,7 @@ export function ProfilesPage() {
             ))}
           </div>
         )}
+        <SubscriptionUsagePanel />
       </section>
 
       <section className="workspace-panel">

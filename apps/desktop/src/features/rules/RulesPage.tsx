@@ -1,8 +1,9 @@
-import { Route } from "lucide-react";
+import { Route, Search } from "lucide-react";
+import { useDeferredValue, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useRuntime } from "../../app/runtime/runtimeContext";
 import { useBridgeResource } from "../../app/runtime/useBridgeResource";
-import { getRules, getSubscriptionSnapshot } from "../../platform/runtime";
+import { getRules, getSubscriptionSnapshot, type RuleItem } from "../../platform/runtime";
 import {
   LoadingState,
   RefreshButton,
@@ -13,9 +14,26 @@ import {
 
 const MAX_VISIBLE_RULES = 500;
 
+/** Keeps rules whose type, payload or target contains `query`. */
+function filterRules(rules: RuleItem[], query: string): RuleItem[] {
+  const normalized = query.trim().toLowerCase();
+  if (normalized === "") {
+    return rules;
+  }
+
+  return rules.filter(
+    (rule) =>
+      rule.rule_type.toLowerCase().includes(normalized) ||
+      rule.payload.toLowerCase().includes(normalized) ||
+      rule.proxy.toLowerCase().includes(normalized),
+  );
+}
+
 export function RulesPage() {
   const { t } = useTranslation();
   const { snapshot } = useRuntime();
+  const [query, setQuery] = useState("");
+  const deferredQuery = useDeferredValue(query);
   const isConnected = snapshot?.state === "connected";
   const rules = useBridgeResource(getRules, isConnected);
   // Offline fallback: the stored subscription's rule table.
@@ -23,7 +41,32 @@ export function RulesPage() {
   const offlineRules = offline.data?.has_subscription
     ? offline.data.rules
     : [];
-  const visibleRules = rules.data?.slice(0, MAX_VISIBLE_RULES) ?? [];
+  const visibleRules = filterRules(rules.data ?? [], deferredQuery).slice(
+    0,
+    MAX_VISIBLE_RULES,
+  );
+  const visibleOfflineRules = filterRules(
+    offlineRules,
+    deferredQuery,
+  ).slice(0, MAX_VISIBLE_RULES);
+  const filtering = deferredQuery.trim() !== "";
+  const totalRules = isConnected
+    ? (rules.data?.length ?? 0)
+    : offlineRules.length;
+
+  const searchField = totalRules > 0 ? (
+    <label className="filter-search rules-search">
+      <Search aria-hidden="true" size={15} />
+      <input
+        type="search"
+        value={query}
+        placeholder={t("rules.searchPlaceholder")}
+        aria-label={t("rules.searchLabel")}
+        spellCheck={false}
+        onChange={(event) => setQuery(event.target.value)}
+      />
+    </label>
+  ) : null;
 
   return (
     <WorkspacePage
@@ -35,6 +78,8 @@ export function RulesPage() {
         error={rules.error}
         unavailable={rules.unavailable}
       />
+
+      {searchField}
 
       {!isConnected ? (
         offlineRules.length > 0 ? (
@@ -52,6 +97,11 @@ export function RulesPage() {
                 {t("rules.count", { count: offlineRules.length })}
               </span>
             </div>
+            {visibleOfflineRules.length === 0 ? (
+              <p className="workspace-hint" role="status">
+                {t("rules.searchEmpty", { query: deferredQuery.trim() })}
+              </p>
+            ) : (
             <div className="workspace-table-wrap">
               <table className="workspace-table">
                 <thead>
@@ -63,7 +113,7 @@ export function RulesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {offlineRules.slice(0, MAX_VISIBLE_RULES).map((rule) => (
+                  {visibleOfflineRules.map((rule) => (
                     <tr key={`offline-${rule.index}-${rule.rule_type}`}>
                       <td>{rule.index + 1}</td>
                       <td>
@@ -78,6 +128,7 @@ export function RulesPage() {
                 </tbody>
               </table>
             </div>
+            )}
           </section>
         ) : (
           <RuntimeDisconnected />
@@ -103,7 +154,7 @@ export function RulesPage() {
 
           {rules.isLoading && rules.data === null ? (
             <LoadingState label={t("rules.loading")} />
-          ) : visibleRules.length === 0 ? (
+          ) : (rules.data?.length ?? 0) === 0 ? (
             <div className="workspace-empty">
               <Route aria-hidden="true" size={22} />
               <div>
@@ -111,6 +162,10 @@ export function RulesPage() {
                 <p>{t("rules.emptyBody")}</p>
               </div>
             </div>
+          ) : visibleRules.length === 0 ? (
+            <p className="workspace-hint" role="status">
+              {t("rules.searchEmpty", { query: deferredQuery.trim() })}
+            </p>
           ) : (
             <div className="workspace-table-wrap">
               <table className="workspace-table">
@@ -135,7 +190,8 @@ export function RulesPage() {
                   ))}
                 </tbody>
               </table>
-              {rules.data && rules.data.length > MAX_VISIBLE_RULES ? (
+              {filtering ? null : rules.data &&
+                rules.data.length > MAX_VISIBLE_RULES ? (
                 <p className="workspace-table-note">
                   Showing the first {MAX_VISIBLE_RULES} rules.
                 </p>

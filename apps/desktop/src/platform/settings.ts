@@ -27,6 +27,10 @@ export type DesktopSettings = {
   subscription_update_hours?: number;
   /** Refresh the stored subscription once, right after launch. */
   update_subscription_on_launch?: boolean;
+  /** Connect the core as soon as FlowProxy launches. */
+  auto_connect?: boolean;
+  /** User-Agent for subscription downloads; `null`/absent keeps the default. */
+  subscription_user_agent?: string | null;
   /** How many settings groups the Settings page shows. */
   settings_mode?: SettingsMode;
   /** Start with the main window hidden so only the tray icon appears. */
@@ -91,6 +95,11 @@ function isDesktopSettings(value: unknown): value is DesktopSettings {
       typeof value.subscription_update_hours === "number") &&
     (value.update_subscription_on_launch === undefined ||
       typeof value.update_subscription_on_launch === "boolean") &&
+    (value.auto_connect === undefined ||
+      typeof value.auto_connect === "boolean") &&
+    (value.subscription_user_agent === undefined ||
+      value.subscription_user_agent === null ||
+      typeof value.subscription_user_agent === "string") &&
     (value.settings_mode === undefined ||
       value.settings_mode === "simple" ||
       value.settings_mode === "standard" ||

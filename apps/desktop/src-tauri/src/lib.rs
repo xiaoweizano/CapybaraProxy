@@ -897,6 +897,14 @@ fn close_connection(
 }
 
 #[tauri::command]
+fn close_all_connections(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> CommandResult<()> {
+    run_data_command(&app, state.runtime.close_all_connections())
+}
+
+#[tauri::command]
 fn get_rules(app: tauri::AppHandle, state: State<'_, AppState>) -> CommandResult<Vec<RuleItem>> {
     run_data_command(&app, state.runtime.rules())
 }
@@ -932,19 +940,31 @@ fn import_subscription(
 ) -> CommandResult<Vec<ProfileInfo>> {
     let document = match (yaml, url) {
         (Some(yaml), _) if !yaml.trim().is_empty() => {
+            // A pasted document has no download and therefore no usage header;
+            // clearing it keeps an earlier import's numbers out of the UI.
+            state.runtime.set_pending_subscription_usage(None);
             // Pasted text goes through the same normalisation as a download so
             // a base64 share-link list works either way.
             flowproxy_mihomo_manager::subscription_convert::normalize(&yaml)
         }
-        (_, Some(url)) => match flowproxy_mihomo_manager::subscription_fetch::fetch(&url) {
-            Ok(document) => {
-                // Remembered so the subscription can be refreshed automatically
-                // and re-downloaded on demand.
-                state.runtime.set_pending_subscription_url(Some(url));
-                document
+        (_, Some(url)) => {
+            let user_agent = state.settings().subscription_user_agent;
+            match flowproxy_mihomo_manager::subscription_fetch::fetch_with_user_agent(
+                &url,
+                user_agent.as_deref(),
+            ) {
+                Ok((document, usage)) => {
+                    // Remembered so the subscription can be refreshed automatically
+                    // and re-downloaded on demand.
+                    state.runtime.set_pending_subscription_url(Some(url));
+                    state
+                        .runtime
+                        .set_pending_subscription_usage((!usage.is_empty()).then_some(usage));
+                    document
+                }
+                Err(error) => return CommandResult::failure(error),
             }
-            Err(error) => return CommandResult::failure(error),
-        },
+        }
         _ => {
             return CommandResult::failure(RuntimeError::new(
                 RuntimeErrorCode::SubscriptionInvalid,
@@ -1000,8 +1020,12 @@ fn refresh_subscription(
         ));
     };
 
-    let document = match flowproxy_mihomo_manager::subscription_fetch::fetch(&url) {
-        Ok(document) => document,
+    let user_agent = state.settings().subscription_user_agent;
+    let (document, usage) = match flowproxy_mihomo_manager::subscription_fetch::fetch_with_user_agent(
+        &url,
+        user_agent.as_deref(),
+    ) {
+        Ok(result) => result,
         Err(error) => return CommandResult::failure(error),
     };
 
@@ -1035,6 +1059,9 @@ fn refresh_subscription(
     // The import path stores the source URL again; keep it so a second refresh
     // still knows where the document came from.
     state.runtime.set_pending_subscription_url(Some(url));
+    state
+        .runtime
+        .set_pending_subscription_usage((!usage.is_empty()).then_some(usage));
     if let Err(failure) = state.runtime.import_subscription(&name, &document) {
         emit_runtime_change(&app, &failure.change);
         return CommandResult::failure(failure.error);
@@ -1223,6 +1250,32 @@ const AUTO_REFRESH_INITIAL_DELAY: Duration = Duration::from_secs(30);
 /// Minimum spacing between checks, so a short interval cannot spin the loop.
 const AUTO_REFRESH_MIN_SPACING: Duration = Duration::from_secs(60);
 
+/// Connects the core once at launch when the operator asked for it.
+///
+/// Runs on its own thread so a slow core start never delays the window. The
+/// system proxy is left alone: a launch-time connect starts the core, and the
+/// operator's existing system-proxy preference is applied on the next start
+/// through the Settings switch.
+fn spawn_auto_connect(app: tauri::AppHandle) {
+    let result = std::thread::Builder::new()
+        .name("flowproxy-auto-connect".to_owned())
+        .spawn(move || {
+            let state = app.state::<AppState>();
+            match state.system_integration.start_runtime() {
+                Ok(change) => emit_runtime_change(&app, &change),
+                Err(failure) => {
+                    if let Some(change) = failure.runtime_change {
+                        emit_runtime_change(&app, &change);
+                    }
+                    log_native_error("connecting automatically at launch", &failure.error);
+                }
+            }
+        });
+    if let Err(error) = result {
+        log_native_error("starting the auto-connect worker", error);
+    }
+}
+
 /// Downloads the stored subscription again and activates it.
 ///
 /// Shared by the launch-time refresh and the interval-based one so both take
@@ -1230,8 +1283,12 @@ const AUTO_REFRESH_MIN_SPACING: Duration = Duration::from_secs(60);
 /// Returns the profile name when the document was accepted.
 fn refresh_stored_subscription(app: &tauri::AppHandle, state: &AppState) -> Option<String> {
     let url = state.runtime.subscription_source_url()?;
-    let document = match flowproxy_mihomo_manager::subscription_fetch::fetch(&url) {
-        Ok(document) => document,
+    let user_agent = state.settings().subscription_user_agent;
+    let (document, usage) = match flowproxy_mihomo_manager::subscription_fetch::fetch_with_user_agent(
+        &url,
+        user_agent.as_deref(),
+    ) {
+        Ok(result) => result,
         Err(error) => {
             log_native_error("downloading the stored subscription", error);
             return None;
@@ -1254,6 +1311,9 @@ fn refresh_stored_subscription(app: &tauri::AppHandle, state: &AppState) -> Opti
         .unwrap_or_else(|| "Imported subscription".to_owned());
 
     state.runtime.set_pending_subscription_url(Some(url));
+    state
+        .runtime
+        .set_pending_subscription_usage((!usage.is_empty()).then_some(usage));
     match state.runtime.import_subscription(&name, &document) {
         Ok(()) => {
             // The webview re-reads profiles and the offline snapshot when this
@@ -1329,8 +1389,12 @@ fn import_substore_subscription(
     ) {
         return CommandResult::failure(error);
     }
-    let document = match flowproxy_mihomo_manager::subscription_fetch::fetch(&url) {
-        Ok(document) => document,
+    let user_agent = state.settings().subscription_user_agent;
+    let (document, usage) = match flowproxy_mihomo_manager::subscription_fetch::fetch_with_user_agent(
+        &url,
+        user_agent.as_deref(),
+    ) {
+        Ok(result) => result,
         Err(error) => return CommandResult::failure(error),
     };
     if document.len() > MAX_SUBSCRIPTION_YAML_BYTES {
@@ -1345,6 +1409,9 @@ fn import_substore_subscription(
     }
 
     state.runtime.set_pending_subscription_url(Some(url));
+    state
+        .runtime
+        .set_pending_subscription_usage((!usage.is_empty()).then_some(usage));
     if let Err(failure) = state.runtime.import_subscription(&name, &document) {
         emit_runtime_change(&app, &failure.change);
         return CommandResult::failure(failure.error);
@@ -1404,6 +1471,7 @@ pub fn run() {
             set_core_preferences,
             get_connections,
             close_connection,
+            close_all_connections,
             get_rules,
             get_profiles,
             get_subscription_snapshot,
@@ -1470,6 +1538,9 @@ pub fn run() {
             }
             install_tray(app)?;
             spawn_runtime_health_loop(app.handle().clone());
+            if loaded_settings.settings.auto_connect {
+                spawn_auto_connect(app.handle().clone());
+            }
             restore_window_preferences(app.handle(), &loaded_settings.settings);
             if loaded_settings.settings.silent_start {
                 if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {

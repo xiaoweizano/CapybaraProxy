@@ -128,6 +128,13 @@ pub(crate) struct DesktopSettings {
     /// Refresh the stored subscription once, right after launch.
     #[serde(default)]
     pub update_subscription_on_launch: bool,
+    /// Start the core as soon as FlowProxy launches.
+    #[serde(default)]
+    pub auto_connect: bool,
+    /// User-Agent sent when downloading subscriptions. Empty keeps the
+    /// built-in Clash identifier, which is what providers expect.
+    #[serde(default)]
+    pub subscription_user_agent: Option<String>,
     /// How many settings groups the Settings page shows.
     #[serde(default)]
     pub settings_mode: SettingsMode,
@@ -298,6 +305,14 @@ impl DesktopSettings {
         if self.substore_url.is_empty() {
             self.substore_token.clear();
         }
+        self.subscription_user_agent = self
+            .subscription_user_agent
+            .map(|value| value.trim().to_owned())
+            .filter(|value| {
+                !value.is_empty()
+                    && value.len() <= 512
+                    && !value.chars().any(char::is_control)
+            });
         self.window_width = self.window_width.map(|width| width.clamp(820, 7680));
         self.window_height = self.window_height.map(|height| height.clamp(680, 4320));
         if self.window_width.is_none() || self.window_height.is_none() {
@@ -322,6 +337,8 @@ impl Default for DesktopSettings {
             delay_timeout_ms: default_delay_timeout_ms(),
             subscription_update_hours: 0,
             update_subscription_on_launch: false,
+            auto_connect: false,
+            subscription_user_agent: None,
             settings_mode: SettingsMode::default(),
             silent_start: false,
             motion: MotionPreference::default(),
@@ -577,6 +594,8 @@ mod tests {
             delay_timeout_ms: 3_000,
             subscription_update_hours: 12,
             update_subscription_on_launch: true,
+            auto_connect: true,
+            subscription_user_agent: Some("ClashParty/1.0".to_owned()),
             settings_mode: SettingsMode::Relaxed,
             silent_start: true,
             motion: MotionPreference::Reduced,

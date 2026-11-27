@@ -20,6 +20,7 @@ export type NativeCommandName =
   | "set_core_preferences"
   | "get_connections"
   | "close_connection"
+  | "close_all_connections"
   | "get_rules"
   | "get_profiles"
   | "get_subscription_snapshot"

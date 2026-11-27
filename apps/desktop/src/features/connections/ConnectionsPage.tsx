@@ -5,14 +5,18 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleX,
+  Search,
+  XCircle,
 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useDeferredValue, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useRuntime } from "../../app/runtime/runtimeContext";
 import { useBridgeResource } from "../../app/runtime/useBridgeResource";
 import {
+  closeAllConnections,
   closeConnection,
   getConnections,
+  type ConnectionSummary,
   type RuntimeError,
 } from "../../platform/runtime";
 import {
@@ -37,6 +41,28 @@ function formatBytes(bytes: number): string {
   return `${(bytes / 1_048_576).toFixed(1)} MB`;
 }
 
+/** Keeps connections whose host, rule, chain or address contains `query`. */
+function filterConnections(
+  connections: ConnectionSummary[],
+  query: string,
+): ConnectionSummary[] {
+  const normalized = query.trim().toLowerCase();
+  if (normalized === "") {
+    return connections;
+  }
+
+  return connections.filter(
+    (connection) =>
+      connection.host.toLowerCase().includes(normalized) ||
+      connection.destination_ip.toLowerCase().includes(normalized) ||
+      connection.rule.toLowerCase().includes(normalized) ||
+      connection.rule_payload.toLowerCase().includes(normalized) ||
+      connection.chains.some((chain) =>
+        chain.toLowerCase().includes(normalized),
+      ),
+  );
+}
+
 export function ConnectionsPage() {
   const { t } = useTranslation();
   const { snapshot } = useRuntime();
@@ -51,6 +77,9 @@ export function ConnectionsPage() {
   );
   const [actionError, setActionError] = useState<RuntimeError | null>(null);
   const [page, setPage] = useState(1);
+  const [query, setQuery] = useState("");
+  const [pendingCloseAll, setPendingCloseAll] = useState(false);
+  const deferredQuery = useDeferredValue(query);
 
   const close = async (connectionId: string) => {
     if (
@@ -107,10 +136,51 @@ export function ConnectionsPage() {
     }
   };
 
-  const visibleConnections =
+  /** Closes every cached connection after the operator confirms. */
+  const closeAll = async () => {
+    if (pendingCloseAll || visibleConnections.length === 0) {
+      return;
+    }
+    if (
+      !window.confirm(
+        t("connections.closeAllConfirm", { count: visibleConnections.length }),
+      )
+    ) {
+      return;
+    }
+
+    setPendingCloseAll(true);
+    setActionError(null);
+    try {
+      const result = await closeAllConnections();
+      if (result.status === "ok") {
+        await connections.reload();
+        setPage(1);
+      } else if (result.status === "error") {
+        setActionError(result.error);
+      }
+    } catch {
+      setActionError({
+        code: "internal",
+        message: "FlowProxy could not close the connections.",
+        retryable: true,
+      });
+    } finally {
+      setPendingCloseAll(false);
+    }
+  };
+
+  const isFiltering = deferredQuery.trim() !== "";
+  const filteredConnections = filterConnections(
     connections.data?.connections.filter(
       (connection) => !closedConnectionIds.has(connection.id),
-    ) ?? [];
+    ) ?? [],
+    deferredQuery,
+  );
+  const visibleConnections = filteredConnections;
+  const totalOpenConnections = (connections.data?.connections ?? []).filter(
+    (connection) => !closedConnectionIds.has(connection.id),
+  ).length;
   const pageCount = Math.max(
     1,
     Math.ceil(visibleConnections.length / CONNECTIONS_PAGE_SIZE),
@@ -148,8 +218,19 @@ export function ConnectionsPage() {
             </div>
             <div className="workspace-panel-actions">
               <span className="workspace-count">
-                {t("connections.count", { count: visibleConnections.length })}
+                {t("connections.count", { count: totalOpenConnections })}
               </span>
+              <button
+                className="workspace-action-button connections-close-all"
+                type="button"
+                disabled={pendingCloseAll || totalOpenConnections === 0}
+                onClick={() => void closeAll()}
+              >
+                <XCircle aria-hidden="true" size={14} />
+                {pendingCloseAll
+                  ? t("connections.closingAll")
+                  : t("connections.closeAll")}
+              </button>
               <RefreshButton
                 isLoading={connections.isLoading}
                 onClick={() => void connections.reload()}
@@ -157,6 +238,20 @@ export function ConnectionsPage() {
               />
             </div>
           </div>
+
+          {totalOpenConnections > 0 ? (
+            <label className="filter-search connections-search">
+              <Search aria-hidden="true" size={15} />
+              <input
+                type="search"
+                value={query}
+                placeholder={t("connections.searchPlaceholder")}
+                aria-label={t("connections.searchLabel")}
+                spellCheck={false}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+            </label>
+          ) : null}
 
           {connections.data ? (
             <div className="connections-summary">
@@ -175,13 +270,19 @@ export function ConnectionsPage() {
           {connections.isLoading && connections.data === null ? (
             <LoadingState label={t("connections.loading")} />
           ) : visibleConnections.length === 0 ? (
-            <div className="workspace-empty">
-              <Cable aria-hidden="true" size={22} />
-              <div>
-                <h2>{t("connections.emptyTitle")}</h2>
-                <p>{t("connections.emptyBody")}</p>
+            totalOpenConnections > 0 && isFiltering ? (
+              <p className="workspace-hint" role="status">
+                {t("connections.searchEmpty", { query: deferredQuery.trim() })}
+              </p>
+            ) : (
+              <div className="workspace-empty">
+                <Cable aria-hidden="true" size={22} />
+                <div>
+                  <h2>{t("connections.emptyTitle")}</h2>
+                  <p>{t("connections.emptyBody")}</p>
+                </div>
               </div>
-            </div>
+            )
           ) : (
             <>
               <div className="connection-list">

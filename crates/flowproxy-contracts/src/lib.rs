@@ -311,6 +311,36 @@ pub struct ConnectionSummary {
     pub started_at_ms: i64,
 }
 
+/// Traffic and expiry numbers a provider sends in its `subscription-userinfo`
+/// response header.
+///
+/// Every field is optional: providers omit what they do not track, and a pasted
+/// subscription has no header at all.
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+pub struct SubscriptionUsage {
+    /// Bytes downloaded through the provider so far.
+    #[serde(default)]
+    pub upload_bytes: Option<u64>,
+    #[serde(default)]
+    pub download_bytes: Option<u64>,
+    /// Total allowance in bytes. `0` is how many providers spell "unlimited".
+    #[serde(default)]
+    pub total_bytes: Option<u64>,
+    /// Expiry as an epoch timestamp in seconds.
+    #[serde(default)]
+    pub expire_at_ms: Option<i64>,
+}
+
+impl SubscriptionUsage {
+    /// True when the provider reported nothing worth showing.
+    pub fn is_empty(&self) -> bool {
+        self.upload_bytes.is_none()
+            && self.download_bytes.is_none()
+            && self.total_bytes.is_none()
+            && self.expire_at_ms.is_none()
+    }
+}
+
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub struct SubscriptionSnapshot {
     /// Groups and nodes read from the imported document. Does not reflect a
@@ -326,6 +356,12 @@ pub struct SubscriptionSnapshot {
     /// Timestamp of the last successful import, in epoch milliseconds.
     #[serde(default)]
     pub updated_at_ms: Option<i64>,
+    /// Name the operator gave the subscription.
+    #[serde(default)]
+    pub name: Option<String>,
+    /// Usage and expiry from the provider, captured at the last import.
+    #[serde(default)]
+    pub usage: Option<SubscriptionUsage>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

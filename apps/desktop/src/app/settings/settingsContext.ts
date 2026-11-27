@@ -29,6 +29,11 @@ export type AppPreferences = {
   subscriptionUpdateHours: number;
   /** Refresh the stored subscription once, right after launch. */
   updateSubscriptionOnLaunch: boolean;
+  /** Connect the core as soon as FlowProxy launches. */
+  autoConnect: boolean;
+  /** User-Agent used when downloading subscriptions; `null` keeps the
+   * Clash identifier providers expect. */
+  subscriptionUserAgent: string | null;
   /** How many settings groups the Settings page shows. */
   settingsMode: SettingsMode;
   /** Start with the main window hidden so only the tray icon appears. */
@@ -87,6 +92,10 @@ export type AppSettingsContextValue = {
   ) => Promise<SettingsUpdateResult>;
   updateUpdateSubscriptionOnLaunch: (
     enabled: boolean,
+  ) => Promise<SettingsUpdateResult>;
+  updateAutoConnect: (enabled: boolean) => Promise<SettingsUpdateResult>;
+  updateSubscriptionUserAgent: (
+    userAgent: string,
   ) => Promise<SettingsUpdateResult>;
   updateSettingsMode: (mode: SettingsMode) => Promise<SettingsUpdateResult>;
   updateSilentStart: (enabled: boolean) => Promise<SettingsUpdateResult>;

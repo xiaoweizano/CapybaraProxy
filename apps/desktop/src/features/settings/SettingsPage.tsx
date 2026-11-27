@@ -142,6 +142,7 @@ export function SettingsPage() {
     updateIpv6,
     updateSubscriptionUpdateHours,
     updateUpdateSubscriptionOnLaunch,
+    updateAutoConnect,
     updateSettingsMode,
     updateSilentStart,
     updateMotion,
@@ -362,6 +363,14 @@ export function SettingsPage() {
               onChange={(checked) => void updateSilentStart(checked)}
             />
             <SettingsSwitchRow
+              icon={<Waves aria-hidden="true" size={16} />}
+              title={t("settings.autoConnect")}
+              caption={t("settings.autoConnectCaption")}
+              checked={settings.autoConnect}
+              disabled={controlsDisabled}
+              onChange={(checked) => void updateAutoConnect(checked)}
+            />
+            <SettingsSwitchRow
               icon={<RadioTower aria-hidden="true" size={16} />}
               title={t("settings.launchAtLogin")}
               caption={
@@ -455,6 +464,8 @@ export function SettingsPage() {
             ))}
           </div>
           <p className="settings-inline-hint">{t("settings.autoUpdateHint")}</p>
+          <AutoUpdateCustom controlsDisabled={controlsDisabled} />
+          <SubscriptionUserAgent controlsDisabled={controlsDisabled} />
         </SettingsSection>
       ) : null}
 
@@ -562,8 +573,117 @@ export function SettingsPage() {
   );
 }
 
-function LogSection({ controlsDisabled }: { controlsDisabled: boolean }) {
+/**
+ * A free-form update interval next to the preset chips.
+ *
+ * The presets cover the common cases; providers that rotate their node list
+ * on an unusual cadence need any whole number of hours. The value is only
+ * saved on blur once it parses inside the range the native side accepts.
+ */
+function AutoUpdateCustom({ controlsDisabled }: { controlsDisabled: boolean }) {
   const { t } = useTranslation();
+  const { settings, updateSubscriptionUpdateHours } = useAppSettings();
+  const [draft, setDraft] = useState(
+    settings.subscriptionUpdateHours > 0 &&
+      !(autoUpdateOptions as readonly number[]).includes(
+        settings.subscriptionUpdateHours,
+      )
+      ? String(settings.subscriptionUpdateHours)
+      : "",
+  );
+  const [invalid, setInvalid] = useState(false);
+
+  const commit = () => {
+    const trimmed = draft.trim();
+    if (trimmed === "") {
+      setInvalid(false);
+      return;
+    }
+    const hours = Number.parseInt(trimmed, 10);
+    if (!Number.isFinite(hours) || hours < 1 || hours > 168) {
+      setInvalid(true);
+      return;
+    }
+    setInvalid(false);
+    if (hours !== settings.subscriptionUpdateHours) {
+      void updateSubscriptionUpdateHours(hours);
+    }
+  };
+
+  return (
+    <div className="delay-probe settings-custom-interval">
+      <label className="subscription-field">
+        <span>{t("settings.autoUpdateCustomLabel")}</span>
+        <input
+          type="number"
+          min={1}
+          max={168}
+          step={1}
+          value={draft}
+          placeholder={String(settings.subscriptionUpdateHours || 0)}
+          disabled={controlsDisabled}
+          onChange={(event) => setDraft(event.target.value)}
+          onBlur={commit}
+        />
+      </label>
+      <p className="settings-inline-hint">
+        {invalid
+          ? t("settings.autoUpdateCustomInvalid")
+          : t("settings.autoUpdateCustomHint")}
+      </p>
+    </div>
+  );
+}
+
+/** The User-Agent sent when downloading a subscription. */
+function SubscriptionUserAgent({
+  controlsDisabled,
+}: {
+  controlsDisabled: boolean;
+}) {
+  const { t } = useTranslation();
+  const { settings, updateSubscriptionUserAgent } = useAppSettings();
+  const [draft, setDraft] = useState(settings.subscriptionUserAgent ?? "");
+
+  const commit = () => {
+    const next = draft.trim();
+    if (next === (settings.subscriptionUserAgent ?? "")) {
+      return;
+    }
+    void updateSubscriptionUserAgent(next);
+  };
+
+  return (
+    <>
+      <SettingsSubheading
+        kicker={t("settings.subscriptionUserAgentCaption")}
+        title={t("settings.subscriptionUserAgent")}
+        icon={<Languages aria-hidden="true" size={16} />}
+      />
+      <div className="delay-probe">
+        <label className="subscription-field subscription-field-wide">
+          <span>{t("settings.subscriptionUserAgent")}</span>
+          <input
+            type="text"
+            value={draft}
+            spellCheck={false}
+            autoComplete="off"
+            maxLength={512}
+            placeholder={t("settings.subscriptionUserAgentPlaceholder")}
+            disabled={controlsDisabled}
+            onChange={(event) => setDraft(event.target.value)}
+            onBlur={commit}
+          />
+        </label>
+      </div>
+      <p className="settings-inline-hint">
+        {t("settings.subscriptionUserAgentHint")}
+      </p>
+    </>
+  );
+}
+
+function LogSection({ controlsDisabled }: { controlsDisabled: boolean }) {  const { t } = useTranslation();
   const { settings, updateLogToFile, updateLogRetentionDays } = useAppSettings();
   const [status, setStatus] = useState<string | null>(null);
   const [pending, setPending] = useState(false);

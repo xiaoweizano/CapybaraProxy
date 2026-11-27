@@ -152,6 +152,8 @@ describe("SettingsProvider", () => {
       delay_timeout_ms: 5000,
       subscription_update_hours: 0,
       update_subscription_on_launch: false,
+      auto_connect: false,
+      subscription_user_agent: null,
       settings_mode: "standard",
       silent_start: false,
       motion: "full",

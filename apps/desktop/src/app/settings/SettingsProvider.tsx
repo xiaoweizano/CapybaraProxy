@@ -93,6 +93,8 @@ const DEFAULT_PREFERENCES: AppPreferences = {
   delayTimeoutMs: DEFAULT_DELAY_TIMEOUT_MS,
   subscriptionUpdateHours: 0,
   updateSubscriptionOnLaunch: false,
+  autoConnect: false,
+  subscriptionUserAgent: null,
   settingsMode: "standard",
   silentStart: false,
   motion: DEFAULT_MOTION,
@@ -123,6 +125,8 @@ function fromNativeSettings(settings: DesktopSettings): AppPreferences {
     delayTimeoutMs: settings.delay_timeout_ms ?? DEFAULT_DELAY_TIMEOUT_MS,
     subscriptionUpdateHours: settings.subscription_update_hours ?? 0,
     updateSubscriptionOnLaunch: settings.update_subscription_on_launch ?? false,
+    autoConnect: settings.auto_connect ?? false,
+    subscriptionUserAgent: settings.subscription_user_agent ?? null,
     settingsMode: settings.settings_mode ?? "standard",
     silentStart: settings.silent_start ?? false,
     motion: settings.motion ?? DEFAULT_MOTION,
@@ -154,6 +158,8 @@ function toNativeSettings(settings: AppPreferences): DesktopSettings {
     delay_timeout_ms: settings.delayTimeoutMs,
     subscription_update_hours: settings.subscriptionUpdateHours,
     update_subscription_on_launch: settings.updateSubscriptionOnLaunch,
+    auto_connect: settings.autoConnect,
+    subscription_user_agent: settings.subscriptionUserAgent,
     settings_mode: settings.settingsMode,
     silent_start: settings.silentStart,
     motion: settings.motion,
@@ -447,6 +453,24 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     [enqueueUpdate],
   );
 
+  const updateAutoConnect = useCallback(
+    (autoConnect: boolean): Promise<SettingsUpdateResult> =>
+      enqueueUpdate({ autoConnect }),
+    [enqueueUpdate],
+  );
+
+  const updateSubscriptionUserAgent = useCallback(
+    (userAgent: string): Promise<SettingsUpdateResult> => {
+      const trimmed = userAgent.trim();
+      return enqueueUpdate({
+        // An empty field means "use the built-in Clash identifier", which the
+        // native side spells as an absent value.
+        subscriptionUserAgent: trimmed === "" ? null : trimmed,
+      });
+    },
+    [enqueueUpdate],
+  );
+
   const updateSettingsMode = useCallback(
     (settingsMode: SettingsMode): Promise<SettingsUpdateResult> =>
       enqueueUpdate({ settingsMode }),
@@ -539,6 +563,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       updateDelayProbe,
       updateSubscriptionUpdateHours,
       updateUpdateSubscriptionOnLaunch,
+      updateAutoConnect,
+      updateSubscriptionUserAgent,
       updateSettingsMode,
       updateSilentStart,
       updateMotion,
@@ -566,6 +592,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       updateDelayProbe,
       updateSubscriptionUpdateHours,
       updateUpdateSubscriptionOnLaunch,
+      updateAutoConnect,
+      updateSubscriptionUserAgent,
       updateSettingsMode,
       updateSilentStart,
       updateMotion,

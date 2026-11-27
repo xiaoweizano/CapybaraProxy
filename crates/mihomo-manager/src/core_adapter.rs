@@ -1,14 +1,15 @@
 use crate::binary::{random_hex, resolve_verified_binary, VerifiedMihomoBinary};
 use crate::config::ConfigStore;
 use crate::control_api::{
-    close_connection, parse_connections, parse_proxy_groups, parse_rules, read_core_preferences,
-    select_proxy, test_delay, test_group_delay, update_core_preferences, LoopbackApiClient,
+    close_all_connections, close_connection, parse_connections, parse_proxy_groups, parse_rules,
+    read_core_preferences, select_proxy, test_delay, test_group_delay, update_core_preferences,
+    LoopbackApiClient,
 };
 use crate::MihomoAdapter;
 use flowproxy_contracts::{
     ConnectionPage, CoreInfo, CorePreferences, DelayProbeSettings, GroupDelayResult, LogLevel,
     ProfileInfo, ProxyGroup, RoutingMode, RuleItem, RuntimeBackend, RuntimeError, RuntimeErrorCode,
-    RuntimeState, StartupPreferences, SubscriptionSnapshot, TelemetrySnapshot,
+    RuntimeState, StartupPreferences, SubscriptionSnapshot, SubscriptionUsage, TelemetrySnapshot,
 };
 use std::collections::VecDeque;
 use std::io::{BufRead, BufReader, Read};
@@ -40,6 +41,9 @@ pub struct MihomoCoreAdapter {
     /// URL of the subscription being imported. Taken once by the next
     /// successful import so the document can be refreshed later.
     pending_subscription_url: Option<String>,
+    /// Usage numbers from the provider, captured while downloading the
+    /// document that is being imported.
+    pending_subscription_usage: Option<SubscriptionUsage>,
 }
 
 struct TelemetrySample {
@@ -75,6 +79,7 @@ impl MihomoCoreAdapter {
             startup_preferences: StartupPreferences::default(),
             delay_probe: DelayProbeSettings::default(),
             pending_subscription_url: None,
+            pending_subscription_usage: None,
         }
     }
 
@@ -445,6 +450,10 @@ impl MihomoAdapter for MihomoCoreAdapter {
         self.pending_subscription_url = url;
     }
 
+    fn set_pending_subscription_usage(&mut self, usage: Option<SubscriptionUsage>) {
+        self.pending_subscription_usage = usage;
+    }
+
     fn select_proxy(&mut self, group: &str, proxy: &str) -> Result<(), RuntimeError> {
         self.ensure_healthy()?;
         select_proxy(self.client()?, group, proxy)
@@ -485,6 +494,11 @@ impl MihomoAdapter for MihomoCoreAdapter {
     fn close_connection(&mut self, connection_id: &str) -> Result<(), RuntimeError> {
         self.ensure_healthy()?;
         close_connection(self.client()?, connection_id)
+    }
+
+    fn close_all_connections(&mut self) -> Result<(), RuntimeError> {
+        self.ensure_healthy()?;
+        close_all_connections(self.client()?)
     }
 
     fn rules(&mut self) -> Result<Vec<RuleItem>, RuntimeError> {
@@ -547,6 +561,9 @@ impl MihomoAdapter for MihomoCoreAdapter {
             proxy_count: prepared.proxy_count,
             source_url: self.pending_subscription_url.take(),
             update_interval_minutes: None,
+            // A pasted document has no header to read, so an older import's
+            // numbers must not survive it.
+            usage: self.pending_subscription_usage.take(),
         };
         write_subscription_metadata(&self.config_store, &metadata)?;
         Ok(())
@@ -571,6 +588,8 @@ impl MihomoAdapter for MihomoCoreAdapter {
             has_subscription: true,
             source_url: metadata.as_ref().and_then(|m| m.source_url.clone()),
             updated_at_ms: metadata.as_ref().map(|m| m.imported_at_ms),
+            name: metadata.as_ref().map(|m| m.name.clone()),
+            usage: metadata.as_ref().and_then(|m| m.usage.clone()),
         })
     }
 
@@ -1060,6 +1079,10 @@ struct SubscriptionMetadata {
     /// Automatic refresh interval in minutes. `None` disables it.
     #[serde(default)]
     update_interval_minutes: Option<u32>,
+    /// Provider-reported usage captured with the download. Absent for a pasted
+    /// document and for older metadata files.
+    #[serde(default)]
+    usage: Option<SubscriptionUsage>,
 }
 
 const SUBSCRIPTION_METADATA_SUFFIX: &str = ".subscription.json";

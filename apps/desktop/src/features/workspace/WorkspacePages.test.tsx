@@ -10,6 +10,7 @@ import {
 import { SettingsProvider } from "../../app/settings/SettingsProvider";
 import {
   clearSubscription,
+  closeAllConnections,
   closeConnection,
   getConnections,
   getProfiles,
@@ -34,6 +35,7 @@ vi.mock("../../platform/runtime", async (importOriginal) => {
   return {
     ...actual,
     clearSubscription: vi.fn(),
+    closeAllConnections: vi.fn(),
     closeConnection: vi.fn(),
     getConnections: vi.fn(),
     getProfiles: vi.fn(),
@@ -53,6 +55,7 @@ const getConnectionsMock = vi.mocked(getConnections);
 const getProfilesMock = vi.mocked(getProfiles);
 const getRulesMock = vi.mocked(getRules);
 const closeConnectionMock = vi.mocked(closeConnection);
+const closeAllConnectionsMock = vi.mocked(closeAllConnections);
 
 const connectedSnapshot: RuntimeSnapshot = {
   backend: "mihomo",
@@ -204,6 +207,10 @@ describe("real data workspace pages", () => {
       status: "ok",
       data: null,
     });
+    closeAllConnectionsMock.mockReset().mockResolvedValue({
+      status: "ok",
+      data: null,
+    });
   });
 
   it("renders real proxy groups and delegates selection and delay tests", async () => {
@@ -230,12 +237,45 @@ describe("real data workspace pages", () => {
     expect(await screen.findByText("88 ms")).toBeInTheDocument();
   });
 
+  it("filters proxy groups and nodes and sorts by latency", async () => {
+    const user = userEvent.setup();
+    renderWithRuntime(<ProxiesPage />);
+
+    expect(await screen.findByText("Tokyo 01")).toBeInTheDocument();
+
+    await user.type(
+      screen.getByRole("searchbox", { name: "Filter proxy groups and nodes" }),
+      "singapore",
+    );
+    expect(screen.queryByText("Tokyo 01")).not.toBeInTheDocument();
+    expect(screen.getByText("Singapore 01")).toBeInTheDocument();
+
+    await user.clear(
+      screen.getByRole("searchbox", { name: "Filter proxy groups and nodes" }),
+    );
+    await user.click(screen.getByRole("button", { name: "By latency" }));
+
+    const nodes = screen.getAllByText(/^(Tokyo 01|Singapore 01)$/);
+    // Tokyo has a measured delay, Singapore has none, so it sorts first.
+    expect(nodes[0]).toHaveTextContent("Tokyo 01");
+  });
+
   it("loads rules from Mihomo and shows its empty state without invented rows", async () => {
+    const user = userEvent.setup();
     renderWithRuntime(<RulesPage />);
 
     expect(await screen.findByText("example.com")).toBeInTheDocument();
     expect(screen.getByText("DOMAIN-SUFFIX")).toBeInTheDocument();
     expect(getRulesMock).toHaveBeenCalledTimes(1);
+
+    await user.type(
+      screen.getByRole("searchbox", { name: "Filter rules" }),
+      "nomatch",
+    );
+    expect(screen.queryByText("example.com")).not.toBeInTheDocument();
+    expect(
+      screen.getByText("No rule matches “nomatch”."),
+    ).toBeInTheDocument();
   });
 
   it("loads connections and closes a selected connection once", async () => {
@@ -258,8 +298,33 @@ describe("real data workspace pages", () => {
     expect(getConnectionsMock).toHaveBeenCalledTimes(2);
   });
 
-  it("paginates large connection lists and keeps only one page rendered", async () => {
+  it("filters connections and closes every connection after confirmation", async () => {
     const user = userEvent.setup();
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    renderWithRuntime(<ConnectionsPage />);
+
+    expect(await screen.findByText("example.com")).toBeInTheDocument();
+
+    await user.type(
+      screen.getByRole("searchbox", { name: "Filter connections" }),
+      "nomatch",
+    );
+    expect(screen.queryByText("example.com")).not.toBeInTheDocument();
+    expect(
+      screen.getByText("No connection matches “nomatch”."),
+    ).toBeInTheDocument();
+
+    await user.clear(
+      screen.getByRole("searchbox", { name: "Filter connections" }),
+    );
+    await user.click(screen.getByRole("button", { name: "Close all" }));
+
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    expect(closeAllConnectionsMock).toHaveBeenCalledTimes(1);
+    confirmSpy.mockRestore();
+  });
+
+  it("paginates large connection lists and keeps only one page rendered", async () => {    const user = userEvent.setup();
     getConnectionsMock.mockResolvedValueOnce({
       status: "ok",
       data: {
