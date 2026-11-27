@@ -78,21 +78,6 @@ release SHA-256：`55BAC6DE0CFC0FC3AD0C832800D27753E82C8EE3FBB80AD1C06B813CA0786
 - 默认关闭请求会隐藏窗口并保留进程；切换关闭偏好后，原生命令和本地持久化均通过测试。
 - A/C 标准窗口、900px 窄窗口、实际最小 820×680 窗口以及 Settings 截图均已生成，检查范围内没有横向溢出或可见组件越界；最小高度下允许纵向滚动。
 
-运行截图：
-
-- `artifacts/screenshots/release-overview-a.png`
-- `artifacts/screenshots/release-overview-c.png`
-- `artifacts/screenshots/release-overview-a-narrow.png`
-- `artifacts/screenshots/release-overview-c-narrow.png`
-- `artifacts/screenshots/release-overview-a-minimum.png`
-- `artifacts/screenshots/release-overview-c-minimum.png`
-- `artifacts/screenshots/release-settings-a.png`
-- `artifacts/screenshots/release-settings-c.png`
-- `artifacts/screenshots/release-settings-a-narrow.png`
-- `artifacts/screenshots/release-settings-c-narrow.png`
-- `artifacts/screenshots/release-settings-a-minimum.png`
-- `artifacts/screenshots/release-settings-c-minimum.png`
-
 ## 5. 资源短测
 
 测试对象为 release 程序及其 WebView2 进程树。CPU 百分比按单核增量折算，不代表整机或多核总占用百分比。

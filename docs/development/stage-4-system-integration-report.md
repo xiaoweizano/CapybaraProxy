@@ -109,10 +109,7 @@ RustSec 允许级警告：
 截图脚本：`scripts/capture-stage4-tauri.mjs`  
 证据脚本结果：`status: passed`，两套主题均重载并保持主题选择。
 
-| 主题 | 页面截图 | Integration 截图 |
-| --- | --- | --- |
-| A Cyber Flow | `artifacts/screenshots/stage4-settings-a.png` | `artifacts/screenshots/stage4-settings-a-integration.png` |
-| C Warm Flow | `artifacts/screenshots/stage4-settings-c.png` | `artifacts/screenshots/stage4-settings-c-integration.png` |
+A/C 两套主题的 Settings 页与系统集成面板均已检查。
 
 实测布局：
 

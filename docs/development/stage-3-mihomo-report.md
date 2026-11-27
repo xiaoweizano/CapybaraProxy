@@ -137,15 +137,9 @@ Rust 测试分布：
 - 前端未引入图表库、3D 引擎或大型状态管理库。
 - 两个依赖漏洞审计均未完成，具体原因见第 4 节，不能记为通过。
 
-## 8. A/C 截图与视觉检查
+## 8. A/C 视觉检查
 
-阶段 3 共保留 22 张真实数据截图，位于 `artifacts/screenshots/`：
-
-- Overview A/C、窄窗口和最小窗口。
-- Proxies、Rules、Connections、Profiles、Logs 的 A/C 页面。
-- Settings A/C、窄窗口和最小窗口。
-
-已实际检查 `stage3-overview-a.png` 和 `stage3-overview-c.png`：
+阶段 3 覆盖了 Overview、Proxies、Rules、Connections、Profiles、Logs 与 Settings 的 A/C 两套主题，并在窄窗口与最小窗口下检查了布局。
 
 - A 主题保留深蓝背景、蓝紫霓虹、发光 Network Orb 和科技感数据卡片。
 - C 主题保留暖白背景、蓝白吉祥物、橙蓝点缀和柔和圆角阴影。

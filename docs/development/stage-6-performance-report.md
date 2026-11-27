@@ -56,26 +56,11 @@ Android 视觉与性能见阶段 5 报告；本轮 Android 只补齐签名产物
 
 ## 4. 视觉证据
 
-### 4.1 桌面端
+视觉检查覆盖 7 个页面 × 2 套主题（cyber_flow / warm_flow）× 3 种视口
+（1280×820、900×820、820×680）。检查时 `runtime.state` 为 `connected`，
+页面渲染的是真实数据而非空态。
 
-`artifacts/screenshots/stage6/` 共 42 张：
-
-- 路由：overview、proxies、rules、connections、profiles、logs、settings（7 个）
-- 主题：`cyber_flow`、`warm_flow`
-- 视口：1280×820、900×820、820×680
-
-对应证据文件 `artifacts/stage6-visual-evidence.json` 记录了每张图的布局矩形、必要选择器命中数和文本长度。该文件生成时 `runtime.state` 为 `connected`，说明页面渲染的是真实数据而非空态。
-
-未人工逐张核对全部 42 张的视觉保真度；这一项仍待人工目视确认。
-
-### 4.2 本轮新增的产物截屏
-
-`artifacts/screenshots/packaged-acceptance/`：
-
-- `overview-initial.png`：安装后首次启动
-- `profiles-before-import.png` / `profiles-form-filled.png` / `profiles-after-import.png`：订阅导入流程
-- `overview-after-start.png`：Runtime 连接成功
-- `proxies-live.png`：真实导入节点在 Proxies 页面
+未人工逐张核对全部截图的视觉保真度；这一项仍待人工目视确认。
 
 ## 5. 可分发产物验收
 

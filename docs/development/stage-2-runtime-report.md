@@ -95,22 +95,9 @@ release 程序：
 - C 主题在页面重载后保持，随后可恢复 A 主题。
 - 验收结束后通过 `request_application_exit` 受控退出；应用进程数为 0，`9333` 无监听进程。
 
-## 6. A/C 主题截图与布局
+## 6. A/C 主题布局检查
 
-最终 release 已重新生成 12 张截图：
-
-- `artifacts/screenshots/stage2-overview-a.png`
-- `artifacts/screenshots/stage2-overview-c.png`
-- `artifacts/screenshots/stage2-overview-a-narrow.png`
-- `artifacts/screenshots/stage2-overview-c-narrow.png`
-- `artifacts/screenshots/stage2-overview-a-minimum.png`
-- `artifacts/screenshots/stage2-overview-c-minimum.png`
-- `artifacts/screenshots/stage2-settings-a.png`
-- `artifacts/screenshots/stage2-settings-c.png`
-- `artifacts/screenshots/stage2-settings-a-narrow.png`
-- `artifacts/screenshots/stage2-settings-c-narrow.png`
-- `artifacts/screenshots/stage2-settings-a-minimum.png`
-- `artifacts/screenshots/stage2-settings-c-minimum.png`
+最终 release 已按 A/C 两套主题、三种窗口尺寸完成视觉检查。
 
 截图脚本在 1280x820、900x820 和 820x680 下检查页面横向溢出及关键组件边界，全部通过。最小高度允许页面纵向滚动。
 

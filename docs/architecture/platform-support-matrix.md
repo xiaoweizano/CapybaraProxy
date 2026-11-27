@@ -86,8 +86,6 @@
 - APK SHA-256：
   `2F8D01ED6A8BE2CF6E4A97247B242917FC39D752E1E34E91DFF0ED29AD518562`。
 - APK Signature Scheme v2 和 4 字节 zipalign 校验通过。
-- 设备截图和原始证据：
-  `docs/development/screenshots/stage5`。
 
 ### Android VPN 边界
 

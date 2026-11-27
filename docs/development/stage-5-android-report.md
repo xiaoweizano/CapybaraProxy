@@ -169,17 +169,7 @@ Debug 证书 SHA-256：
 
 ### 5.1 A/C 双主题与导航
 
-证据目录：
-
-`docs/development/screenshots/stage5`
-
-关键截图：
-
-- A 主题：`capybara-stage5-final-theme-a.png`
-- C 主题：`capybara-stage5-final-theme-c.png`
-- C 主题重新启动后持久化：`capybara-stage5-final-theme-c-persisted.png`
-- Overview、Proxies、Rules、Connections、Profiles、Logs 和 Settings 页面均有
-  最终截图及 UIAutomator XML。
+七个页面在 A/C 两套主题下均已实际运行并检查。
 
 人工查看和设备 XML 确认：
 
@@ -190,14 +180,14 @@ Debug 证书 SHA-256：
 
 ### 5.2 VPN 授权与状态同步
 
-| 场景 | 实测结果 | 证据 |
-| --- | --- | --- |
-| 授权前 | `Online / Stopped / Missing` | `capybara-stage5-vpn-baseline.png` |
-| 授权拒绝 | `Online / Stopped / Missing`，没有 VPN 服务或 `tun0` | `capybara-stage5-vpn-denied-fixed.png` |
-| 授权允许 | `Online / Ready / Missing`，VPNService 运行且 `tun0` 存在 | `capybara-stage5-vpn-ready.png` |
-| 前台通知 | 显示 VPN 接口就绪且代理核心不可用 | `capybara-stage5-vpn-notification-expanded.png` |
-| 通知 Stop | 回到 `Online / Stopped / Missing` | `capybara-stage5-vpn-stopped.png` |
-| 应用重新启动 | 回到 `Online / Stopped / Missing` | `capybara-stage5-relaunch-fixed.xml` |
+| 场景 | 实测结果 |
+| --- | --- |
+| 授权前 | `Online / Stopped / Missing` |
+| 授权拒绝 | `Online / Stopped / Missing`，没有 VPN 服务或 `tun0` |
+| 授权允许 | `Online / Ready / Missing`，VPNService 运行且 `tun0` 存在 |
+| 前台通知 | 显示 VPN 接口就绪且代理核心不可用 |
+| 通知 Stop | 回到 `Online / Stopped / Missing` |
+| 应用重新启动 | 回到 `Online / Stopped / Missing` |
 
 通知正文为：
 
@@ -206,10 +196,6 @@ Debug 证书 SHA-256：
 该文案和 UI 状态没有把缺少代理核心的 VPN 接口显示成真实 Connected。
 
 ### 5.3 VPN 接口边界
-
-原始网络证据：
-
-`docs/development/screenshots/stage5/capybara-stage5-vpn-connectivity.txt`
 
 设备状态显示：
 

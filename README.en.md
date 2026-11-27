@@ -1,277 +1,137 @@
+<div align="center">
+
+<img src="assets/brand/app-icon.png" width="128" alt="CapybaraProxy">
+
 # CapybaraProxy
 
-> **Your Network. Your Flow.**
->
-> 中文版：[README.md](README.md)
+**A cross-platform proxy client built on the Mihomo core**
 
-CapybaraProxy is a cross-platform proxy client. It bundles and supervises the Mihomo core, and puts subscriptions, proxy groups, rules, connections and the system proxy behind one interface instead of asking you to edit YAML or drive a command line.
+[简体中文](README.md) · [English](README.en.md)
 
-This repository contains a working Windows desktop build, plus the UI and service skeleton for Android.
+![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Android-2ea44f)
+![Tauri](https://img.shields.io/badge/Tauri-2-24C8DB)
+![Rust](https://img.shields.io/badge/Rust-1.77-000000)
+![React](https://img.shields.io/badge/React-19-61DAFB)
+![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6)
+![License](https://img.shields.io/badge/license-GPL--3.0-blue)
 
----
-
-## Contents
-
-- [Feature overview](#feature-overview)
-- [Getting started](#getting-started)
-- [The interface](#the-interface)
-- [Settings](#settings)
-- [Where data lives](#where-data-lives)
-- [System integration and safety boundaries](#system-integration-and-safety-boundaries)
-- [Local development](#local-development)
-- [Checks and builds](#checks-and-builds)
-- [Repository layout](#repository-layout)
-- [Documentation index](#documentation-index)
-- [Confirmed product decisions](#confirmed-product-decisions)
-- [Current stage and limits](#current-stage-and-limits)
+</div>
 
 ---
 
-## Feature overview
+## What CapybaraProxy is
 
-### Subscriptions
+CapybaraProxy bundles and supervises the Mihomo core and puts subscriptions, proxy groups, rules, connections and the system proxy behind one interface. You do not edit YAML, and you do not start the core by hand.
 
-- **Subscription library**: keep several subscriptions and switch which one is active at any time. Each is stored separately and can be removed on its own.
-- **Several import paths**: a subscription URL, Clash / Mihomo YAML, or `ss://` `vmess://` `vless://` `trojan://` `hysteria2://` `tuic://` share links (converted automatically).
-- **Usage and expiry**: parses the provider's `subscription-userinfo` header and shows used traffic, total allowance and expiry.
-- **Overrides**: each subscription can keep its own custom rules and override YAML, and both survive a refresh. Control keys (ports, secret, `allow-lan`, …) stay owned by CapybaraProxy and cannot be overridden.
-- **Automatic refresh**: refresh on launch and on a schedule (presets, or any interval from 1 to 168 hours), optionally restarting the core after an update.
-- **Sub-Store**: point at a backend with an `x-api-token`, list its subscriptions and import one in a click.
+The installer ships a verified Mihomo binary and geodata, so it works right after install. The control port, API secret and listening ports always belong to the client — a subscription cannot change them.
 
-### Proxying
+## Features
 
-- Rule, Global and Direct modes, switchable while running without a restart.
-- Proxy groups support search by name, sorting by latency or name, collapsing, and pinning favourite nodes. All of that view state is remembered.
-- Per-node latency checks, per-group checks, and a single action that probes every group. A latency history sits at the bottom of the page.
+**Subscriptions**
+- Subscription library: keep several and switch at any time, each stored independently and removable on its own
+- Import paths: subscription URL, Clash / Mihomo YAML, or `ss://` `vmess://` `vless://` `trojan://` `hysteria2://` `tuic://` share links (converted automatically)
+- Parses `subscription-userinfo` to show used traffic, total allowance and expiry
+- Overrides: each subscription can keep custom rules and override YAML that survive a refresh; ports and secret stay under client control
+- Automatic updates on launch and on a schedule (presets, or any 1–168 hour interval), optionally restarting the core afterwards
+- Sub-Store: point at a backend and list or import its subscriptions in a click
 
-### Observation
+**Proxying**
+- Rule, Global and Direct modes, switchable while running without a restart
+- Group search, sorting by latency or name, collapsing, and pinning favourites — the view state is remembered
+- Per-node checks, per-group checks, and one action for every group; a latency history stays on the page
 
-- The Overview page shows live upload/download rates, a traffic chart, session duration, and **today** and **last 7 days** totals that CapybaraProxy counts itself — these survive a core restart.
-- The Connections page expands a row into full detail (host, destination, matched rule, chain, upload volume, start time), with search and a confirmed "close all".
-- The Rules page shows how many live connections each rule is currently handling, and lists the rule-set and proxy-set providers the profile declares.
-- **Rule tester**: type a domain or IP and it walks the rule table in order to say which rule decides the route. Rule types it cannot evaluate (GEO, rule sets, process names, …) are listed explicitly rather than guessed at.
-- The Logs page filters by level, searches, pauses and clears the view.
+**Observation**
+- Overview: live rates, traffic chart, session duration, and **today** / **last 7 days** totals counted per day by the client (they survive a core restart)
+- Connections: expand a row for full detail (host, destination, matched rule, chain, upload volume, start time), with search and a confirmed "close all"
+- Rules: live hit count per rule, plus the rule-set and proxy-set providers the profile declares
+- Rule tester: type a domain or IP and it walks the rule table to say which rule decides the route; rule types it cannot evaluate are listed rather than guessed
+- Logs: level filter, search, pause, clear view
 
-### System
+**System**
+- Windows per-user system proxy, journalled: your own values come back on exit and the client's proxy is re-applied after the next launch
+- A configurable bypass list, backed up and restored the same way
+- TUN switch, available when the process is elevated and Wintun is installed
+- Launch at login, silent start, connect on launch
+- Tray: state and current node, routing-mode switching, open log folder, live speed icon
+- Rotating daily logs with a retention setting; a one-click **redacted** diagnostic bundle (no subscription URLs, tokens or secrets; nothing is uploaded)
 
-- Windows per-user system proxy (three registry values), journalled and restored: your own values come back on exit, and CapybaraProxy's proxy is re-applied after the next launch.
-- A configurable system-proxy bypass list, backed up and restored the same way.
-- A TUN switch, available when the process is elevated and the Wintun driver is present; it writes a `tun:` block into the active subscription's override.
-- Launch at login, silent start, and connect on launch.
-- System tray: state and current node, routing-mode switching, open log folder, and a live speed icon.
-- Rotating daily log files with a configurable retention window, plus a one-click **redacted** diagnostic bundle (no subscription URLs, tokens or secrets; nothing is uploaded).
+**Getting around**
+- `Ctrl/Cmd + K` command palette: jump to a page, switch the routing mode, or select a node
 
-### Getting around
+## Tech stack
 
-- `Ctrl/Cmd + K` opens a command palette: jump to a page, switch the routing mode, or select a node directly.
+| Layer | Choice |
+|---|---|
+| Desktop shell | Tauri 2 |
+| Front end | React 19 + TypeScript (strict) + Vite |
+| Core logic | Rust (four crates: contracts / runtime / mihomo-manager / platform) |
+| Proxy core | Mihomo (bundled; SHA-256 and version verified before launch) |
+| Android | Kotlin + Jetpack Compose + `VpnService` |
+| Tests | Vitest (131) + cargo test (228) |
+| Packaging | tauri-bundler (NSIS) |
 
----
+## Development
 
-## Getting started
-
-### Install
-
-Run `CapybaraProxy_<version>_x64-setup.exe` and install for the current user; no administrator rights are required. The installer bundles a verified Mihomo core and geodata, so nothing has to be placed by hand.
-
-### Upgrading from an earlier version
-
-The product was renamed from FlowProxy to CapybaraProxy, and the app identifier
-changed with it: the config directory moved from `%APPDATA%com.flowproxy.desktop`
-to `%APPDATA%com.capybara.proxy`.
-
-On first launch the new build **copies** the old directory across (settings,
-subscriptions, traffic ledger, logs). The old directory is left untouched and can
-be deleted once you are satisfied. The copy only runs when the new directory has
-no `settings.json` yet, so data written by the renamed build is never
-overwritten.
-
-System state — the launch-at-login entry and the system proxy — is rewritten
-against the new path on the next start.
-
-### First run
-
-1. Open **Subscriptions**, paste subscription YAML or enter a subscription URL, then choose **Import subscription**.
-2. Go back to **Overview** and choose **Connect**.
-3. Once the state reads "Connected", **Proxy groups** lists the real nodes from the subscription.
-4. To take over system traffic, open **Settings → System integration** and enable **System proxy**.
-5. The interface language switches under **Settings → Appearance → Language** (English / 简体中文) and persists.
-
-> If the core is already running when you import a subscription or change an override, restart it to load the new configuration. With "restart after update" enabled, an automatic refresh takes care of that itself.
-
----
-
-## The interface
-
-### Overview
-
-Connect / disconnect, live rates, traffic chart, session duration, today and last-7-days totals, proxy group and node selection, latency measurement, node map, active connection count.
-
-### Proxy groups
-
-Three routing modes; search, sort, collapse and pinning for groups and nodes; per-node and per-group latency checks; a latency history at the bottom. While the core is stopped the page shows a read-only preview from the stored subscription, clearly labelled as such.
-
-### Rules
-
-The rule table, search, live hit counts per rule, the rule-set and proxy-set providers, and the rule tester.
-
-### Connections
-
-A connection list with search, per-row detail, per-row close, close-all with confirmation, and pagination.
-
-### Subscriptions
-
-The subscription library (switch / remove), the import form, update, bulk latency checks, the usage panel, and editors for custom rules and override YAML.
-
-### Logs
-
-Live events, level filter, search, pause, clear view, open log folder.
-
-### Settings
-
-Groups are shown according to a "configuration mode" (Simple / Standard / Relaxed) as a single column of full-width cards with group navigation at the top. See the next section.
-
----
-
-## Settings
-
-| Group | Contents |
-| --- | --- |
-| Appearance | Theme (Cyber Flow / Warm Flow), language, interface scale, settings mode |
-| Window & startup | Close-button behaviour (hide to tray / exit), silent start, connect on launch, launch at login |
-| System integration | System proxy switch, bypass list, TUN switch, startup status |
-| Subscription | Update on launch, automatic update interval, restart after update, subscription User-Agent |
-| Logs | Write to disk, retention days, open folder, export diagnostics, clear files |
-| Core | Log level, IPv6 |
-| Core versions | Register, switch and fall back between Mihomo builds |
-| Tray | Show state and node, speed display (icon digits / tooltip only / hidden), motion preference |
-| Advanced core | Unified delay, concurrent TCP, fixed mixed port, latency probe URL and timeout |
-| DNS | Preset or custom resolvers, Fake-IP range |
-| Sub-Store | Backend address, token, list and import subscriptions |
-
----
-
-## Where data lives
-
-| Content | Location |
-| --- | --- |
-| Settings | `settings.json` in the app config directory |
-| Subscription documents and metadata | `<config dir>/mihomo/subscriptions/` |
-| Active subscription index | `<config dir>/mihomo/subscriptions.json` |
-| Generated runtime configuration | `<config dir>/mihomo/config.yaml` |
-| System proxy journal | `<config dir>/system-proxy.json` |
-| Daily traffic ledger | `<config dir>/traffic.json` |
-| Core version index and builds | `<config dir>/cores/` |
-| Logs | Daily files in the OS application log directory |
-
-On Windows the app config directory is usually `%APPDATA%\com.capybara.proxy`. All of these files are plaintext and **not encrypted**; subscription files carry provider credentials and are protected by file permissions only.
-
----
-
-## System integration and safety boundaries
-
-### What CapybaraProxy owns
-
-Mihomo's control port, API secret, proxy listening port, `allow-lan` and bind address are **not** decided by the subscription. On import these top-level keys are removed and replaced with values CapybaraProxy generates at start:
-
-| Removed key | Value CapybaraProxy writes |
-| --- | --- |
-| `mixed-port`, `port`, `socks-port`, `redir-port`, `tproxy-port` | A reserved loopback port |
-| `external-controller` and its variants | `-ext-ctl 127.0.0.1:<port>` on the command line |
-| `secret` | Randomly generated per start, passed via `-secret` |
-| `allow-lan` | `false` |
-| `bind-address`, `lan-allowed-ips`, `lan-disallowed-ips` | `127.0.0.1` |
-| `authentication`, `external-ui` | Removed |
-
-The rest of the subscription is preserved byte for byte, including comments, anchors and rule order.
-
-### Verification
-
-- The core binary is checked for SHA-256 and `-v` output before it is executed.
-- A configuration runs `mihomo -t -d <working dir> -f <file>` before it becomes active.
-- Subscription URLs must be `http://` or `https://`, with length and character limits; downloads have a timeout, a size cap and redirect rules, and `https` may not be downgraded to `http`.
-- Subscription URLs embed tokens, so they **never appear in any log or error message**.
-- Subscription identifiers are validated and cannot be used for path traversal.
-
-### Platform status
-
-| Platform | Status |
-| --- | --- |
-| Windows 10 x64 | Verified: real core, system proxy, launch at login, tray, TUN (elevation + Wintun) |
-| macOS / Linux | Unverified: no unverified system-modifying backend is called; capabilities report `unverified` |
-| Android | UI, themes and a `VpnService` skeleton; real Mihomo native and TUN are not wired up yet |
-
----
-
-## Local development
-
-```powershell
+```bash
 pnpm install
+
 pnpm dev          # front end only, for UI work
 pnpm tauri:dev    # the full desktop app
-```
 
-Optional environment variables (offline builds or behind a proxy):
-
-```powershell
-$env:CARGO_HOME = 'F:\codex-install\cargo-home'
-$env:CARGO_TARGET_DIR = 'F:\codex-install\cargo-target'
-$env:CARGO_NET_OFFLINE = 'true'
-$env:HTTP_PROXY = 'http://127.0.0.1:7890'
-$env:HTTPS_PROXY = 'http://127.0.0.1:7890'
-$env:NO_PROXY = 'localhost,127.0.0.1'
-```
-
-If a development build has no bundled core, point at a verified executable:
-
-```powershell
-$env:CAPYBARA_MIHOMO_PATH = 'F:\path\to\mihomo.exe'
-```
-
-### Core lookup order
-
-At start the core is looked up in this order; the first hit is checked for SHA-256 and version:
-
-1. The file named by `CAPYBARA_MIHOMO_PATH`
-2. `mihomo.exe` next to `capybara-desktop.exe`
-3. `resources\mihomo.exe` next to it
-4. `resources\mihomo\mihomo.exe` (the installer layout)
-5. `mihomo\mihomo.exe` next to it
-6. `mihomo\mihomo.exe` in the config directory
-
-A build registered and activated under **Core versions** takes precedence over all of the above.
-
-### Building the installer
-
-```powershell
-node scripts/prepare-bundle-resources.mjs
-pnpm tauri:build
-```
-
-`apps/desktop/src-tauri/resources/` is not committed (about 74 MB of binaries); the script above copies them by fixed hash.
-
----
-
-## Checks and builds
-
-```powershell
 pnpm lint
 pnpm typecheck
-pnpm test                      # front-end unit tests
-pnpm build
+pnpm test
 node scripts/verify-locale-keys.mjs   # English/Chinese locale key parity
+```
 
+Rust side:
+
+```bash
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 ```
 
-Current state: 131 front-end tests and 228 Rust tests pass; `clippy -D warnings` is clean; the two locale files agree on 525 keys.
+Packaging:
 
-GitHub Actions (`.github/workflows/verify.yml`) runs the checks above on every push and pull request; dependency auditing reports without blocking. See `docs/development/ci.md`.
+```powershell
+node scripts/prepare-bundle-resources.mjs   # stages Mihomo and geodata by fixed hash
+pnpm tauri:build                             # produces the NSIS installer
+```
 
-The other `verify-*.mjs` scripts are local acceptance tools: they launch an installed build and drive the UI over CDP, so they are not part of CI.
+`apps/desktop/src-tauri/resources/` is not committed (about 74 MB of binaries); the script above copies it. After changing the icon, regenerate every platform size:
 
----
+```bash
+pnpm tauri icon assets/brand/app-icon.png
+```
+
+Optional environment variables: `CAPYBARA_MIHOMO_PATH` points at a verified core, `CAPYBARA_CONFIG_ROOT` overrides the config directory. Offline builds use `CARGO_NET_OFFLINE=true`.
+
+## Where data lives
+
+Everything sits in the app config directory (usually `%APPDATA%\com.capybara.proxy\` on Windows):
+
+| Path | Contents |
+|---|---|
+| `settings.json` | Interface and behaviour settings |
+| `mihomo/subscriptions/` | Subscription documents and metadata |
+| `mihomo/subscriptions.json` | The active subscription |
+| `mihomo/config.yaml` | The generated runtime configuration |
+| `system-proxy.json` | System proxy backup and ownership record |
+| `traffic.json` | Daily traffic ledger |
+| `cores/` | Registered core builds |
+
+All of these are plaintext and **not encrypted**; subscription files carry provider credentials, so protect them with file permissions.
+
+Upgrading from the previous name (FlowProxy) copies the old directory `%APPDATA%\com.flowproxy.desktop\` across on first launch. The old directory is left in place and can be deleted once you are satisfied.
+
+## Known limits
+
+- **TUN needs elevation**: without an elevated process or the Wintun driver the switch stays disabled and explains why
+- **Windows only is verified**: macOS / Linux system integration stays `unverified`; no unverified modifying API is called
+- **Android is not wired to the real core yet**: UI, themes and the `VpnService` skeleton are done, the Mihomo native layer and TUN are not
+- **One active subscription at a time**: the library holds parallel profiles but offers no rollback to a previous version of the same subscription
+- **No self-update**: core builds are placed in `cores/` and registered by hand
 
 ## Repository layout
 
@@ -280,65 +140,34 @@ apps/
   desktop/          Tauri desktop app (React + TypeScript + Rust)
   android/          Android app (Kotlin + Jetpack Compose)
 crates/
-  capybara-contracts   Data contracts shared across platforms
-  capybara-runtime     Runtime state machine and logging
+  capybara-contracts        Data contracts shared across platforms
+  capybara-runtime          Runtime state machine and logging
   capybara-mihomo-manager   Mihomo child process, control API, subscriptions, profiles
-  capybara-platform    Platform capabilities (system proxy, startup, TUN probe)
+  capybara-platform         Platform capabilities (system proxy, startup, TUN probe)
 packages/
   design-tokens     Design tokens shared by desktop and Android
 docs/              Product, UI, architecture and per-stage reports
 scripts/           Resource preparation, acceptance and verification scripts
 ```
 
----
+## Documentation
 
-## Documentation index
+- Product requirements: `docs/product/product-requirements.md`
+- UI: `docs/ui-design/` (references, both themes, mascot, component spec)
+- Architecture: `docs/architecture/` (overview, desktop, Android, performance, platform matrix)
+- Development: `docs/development/` (stage reports, subscription limits, CI notes)
 
-- Product: `docs/product/product-requirements.md`
-- UI: `docs/ui-design/design-reference.md`, `theme-cyber-flow.md`, `theme-warm-flow.md`, `mascot-guidelines.md`, `component-specification.md`
-- Architecture: `docs/architecture/system-architecture.md`, `desktop-tauri-rust.md`, `android-architecture.md`, `performance-requirements.md`, `platform-support-matrix.md`, `adr-0001-desktop-stack.md`
-- Development: the stage reports (1–6) under `docs/development/`, plus `subscription-scope.md` (subscription limits), `i18n-scope.md` and `ci.md`
-- Visual references: `assets/design-reference/`
+## Disclaimer
 
----
+- **Use it at your own risk.** The software is provided as is, without warranty. The author is not liable for any loss arising from its use or inability to use it.
+- **You supply the subscriptions.** The client downloads and hosts them; it does not vouch for their legality or availability.
+- **The system proxy modifies system settings.** It is restored on exit, but after an abnormal exit check the state under Settings → System integration.
+- **The diagnostic bundle contains no secrets but does contain environment details.** Review it before sharing.
 
-## Confirmed product decisions
+## Third party
 
-1. Product name: CapybaraProxy.
-2. Target platforms: Windows, macOS, Linux, Android.
-3. Proxy core: Mihomo, distributed, started, monitored and managed by CapybaraProxy.
-4. Desktop stack: React + TypeScript + Tauri + Rust.
-5. Android: Kotlin + Jetpack Compose, using Android `VpnService`.
-6. Themes: Cyber Flow by default, Warm Flow switchable.
-7. Closing the main window hides it to the tray and keeps the proxy running; this can be changed to exit in Settings.
-8. Performance first: CPU, memory, background polling and animation are all budgeted.
-9. The UI follows the design references; adapting to a resolution keeps the layout relationships and visual hierarchy rather than pinning pixels.
-10. Android and desktop share design tokens and data contracts; they do not share UI code.
+The proxy core is [Mihomo](https://github.com/MetaCubeX/mihomo), distributed under its own licence; GEOIP / GEOSITE data comes from [meta-rules-dat](https://github.com/MetaCubeX/meta-rules-dat) (GPL-3.0). The icon is an original project asset.
 
----
+## License
 
-## Current stage and limits
-
-### Done
-
-- Stage 1: desktop UI prototype
-- Stage 2: Runtime skeleton, native settings and controlled exit
-- Stage 3: real Mihomo child process, control API and live data pages on Windows
-- Stage 4: Windows system proxy, launch at login, journal recovery and capability states
-- Stage 5: Android Compose UI, A/C themes, `VpnService` authorisation and foreground service
-- Stage 6: performance sampling, subscription import and distributable artifacts
-- Stage 7: subscription library, overrides, DNS / TUN, rule tester, command palette, traffic ledger, diagnostics and CI
-
-### Current limits
-
-- TUN needs an elevated process and the Wintun driver; the switch stays disabled and explains why when either is missing.
-- macOS / Linux system integration remains `unverified`; no unverified modifying backend is called.
-- Android's real Mihomo native layer and TUN are not wired up.
-- One subscription is active at a time; the library holds parallel profiles but there is no "previous version of the same subscription" rollback.
-- The app does not update itself; core builds are placed and registered by hand.
-
----
-
-## Maintenance
-
-Submit documentation updates together with the code change they describe, so this README and `docs/` stay in step. Chinese is the default version; `README.en.md` must be updated in the same commit.
+GPL-3.0 — see [LICENSE](LICENSE).
