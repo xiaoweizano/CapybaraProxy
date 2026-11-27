@@ -1,6 +1,7 @@
 mod capabilities;
 mod startup;
 mod system_proxy;
+mod time_zone;
 
 pub use capabilities::{
     capabilities_from_probe, unverified_capabilities, CapabilityProbe, CapabilityState,
@@ -14,6 +15,7 @@ pub use system_proxy::{
     PlatformError, PlatformErrorKind, ProxyBackend, ProxyRecovery, ProxySettings,
     SystemProxyManager, SystemProxySnapshot,
 };
+pub use time_zone::local_utc_offset_seconds;
 
 #[cfg(windows)]
 mod windows_backend;

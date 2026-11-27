@@ -136,6 +136,16 @@ export type RuleItem = {
   proxy: string;
 };
 
+/** A rule or proxy provider the active profile declares. */
+export type ProviderInfo = {
+  name: string;
+  /** `proxy` or `rule`. */
+  kind: string;
+  vehicle_type: string | null;
+  entry_count: number | null;
+  proxy_count: number | null;
+};
+
 export type ProfileInfo = {
   id: string;
   name: string;
@@ -180,6 +190,20 @@ export type SubscriptionSnapshot = {
   active?: boolean;
   /** Custom rules the operator added on top of the subscription's own. */
   override_rules?: string[];
+  /** The operator's override document, if any. */
+  override_yaml?: string | null;
+};
+
+/** Transfer counters for a day or a rolling window. */
+export type TrafficTotals = {
+  upload_bytes: number;
+  download_bytes: number;
+};
+
+/** Today's accumulated transfer plus a seven-day window. */
+export type TrafficSummary = {
+  today: TrafficTotals;
+  week: TrafficTotals;
 };
 
 /** One latency measurement recorded by the app. */
@@ -410,6 +434,17 @@ function isRuleItem(value: unknown): value is RuleItem {
   );
 }
 
+function isProviderInfo(value: unknown): value is ProviderInfo {
+  return (
+    isRecord(value) &&
+    isString(value.name) &&
+    isString(value.kind) &&
+    (value.vehicle_type === null || isString(value.vehicle_type)) &&
+    (value.entry_count === null || isNonNegativeInteger(value.entry_count)) &&
+    (value.proxy_count === null || isNonNegativeInteger(value.proxy_count))
+  );
+}
+
 function isProfileInfo(value: unknown): value is ProfileInfo {
   return (
     isRecord(value) &&
@@ -479,7 +514,9 @@ async function executeRuntimeCommand<T>(
     | "close_connection"
     | "close_all_connections"
     | "get_delay_history"
+    | "get_traffic_today"
     | "get_rules"
+    | "get_providers"
     | "get_profiles"
     | "get_subscription_snapshot"
     | "import_subscription"
@@ -619,6 +656,15 @@ export function getRules(): Promise<RuntimeBridgeResult<RuleItem[]>> {
   );
 }
 
+/** Reads the providers the active profile declares. */
+export function getProviders(): Promise<RuntimeBridgeResult<ProviderInfo[]>> {
+  return executeRuntimeCommand(
+    "get_providers",
+    (value): value is ProviderInfo[] =>
+      Array.isArray(value) && value.every(isProviderInfo),
+  );
+}
+
 export function getProfiles(): Promise<RuntimeBridgeResult<ProfileInfo[]>> {
   return executeRuntimeCommand(
     "get_profiles",
@@ -665,7 +711,10 @@ function isSubscriptionSnapshot(value: unknown): value is SubscriptionSnapshot {
     (value.active === undefined || typeof value.active === "boolean") &&
     (value.override_rules === undefined ||
       (Array.isArray(value.override_rules) &&
-        value.override_rules.every(isString)))
+        value.override_rules.every(isString))) &&
+    (value.override_yaml === undefined ||
+      value.override_yaml === null ||
+      isString(value.override_yaml))
   );
 }
 
@@ -675,6 +724,22 @@ function isDelayHistoryEntry(value: unknown): value is DelayHistoryEntry {
     isString(value.proxy) &&
     isNonNegativeInteger(value.delay_ms) &&
     Number.isInteger(value.timestamp_ms)
+  );
+}
+
+function isTrafficTotals(value: unknown): value is TrafficTotals {
+  return (
+    isRecord(value) &&
+    isNonNegativeInteger(value.upload_bytes) &&
+    isNonNegativeInteger(value.download_bytes)
+  );
+}
+
+function isTrafficSummary(value: unknown): value is TrafficSummary {
+  return (
+    isRecord(value) &&
+    isTrafficTotals(value.today) &&
+    isTrafficTotals(value.week)
   );
 }
 
@@ -757,6 +822,13 @@ export function setSubscriptionOverrideYaml(
     id,
     yaml,
   });
+}
+
+/** Reads today's accumulated transfer and the rolling seven-day total. */
+export function getTrafficSummary(): Promise<
+  RuntimeBridgeResult<TrafficSummary>
+> {
+  return executeRuntimeCommand("get_traffic_today", isTrafficSummary);
 }
 
 /** Reads the latency measurements the app recorded for the history view. */

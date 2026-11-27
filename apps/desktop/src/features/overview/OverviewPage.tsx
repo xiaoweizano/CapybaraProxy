@@ -10,6 +10,7 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { useBridgeResource } from "../../app/runtime/useBridgeResource";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import {
@@ -18,11 +19,13 @@ import {
 } from "../../app/runtime/runtimeContext";
 import { useTelemetry } from "../../app/runtime/telemetryStore";
 import { useTheme } from "../../app/theme/themeContext";
-import type {
-  ProxyGroup,
-  ProxyNode,
-  RuntimeSnapshot,
-  RuntimeState,
+import {
+  getTrafficSummary,
+  type ProxyGroup,
+  type ProxyNode,
+  type RuntimeSnapshot,
+  type RuntimeState,
+  type TrafficTotals,
 } from "../../platform/runtime";
 import { LatencyGauge } from "./LatencyGauge";
 import { Mascot } from "./Mascot";
@@ -204,6 +207,7 @@ function ConnectionHero({
           <span>{t("overview.sessionTraffic")}</span>
           <strong>{formatSessionTraffic(sessionTraffic)}</strong>
         </div>
+        <DailyTrafficRow />
       </div>
     </article>
   );
@@ -565,5 +569,35 @@ export function OverviewPage() {
         </div>
       </div>
     </section>
+  );
+}
+
+/**
+ * Today's and this week's transfer, from the app's own ledger.
+ *
+ * The session figure above resets when the core restarts; these do not, which
+ * is what makes "how much have I used today" answerable after a relaunch.
+ */
+function DailyTrafficRow() {
+  const { t } = useTranslation();
+  const summary = useBridgeResource(getTrafficSummary, true);
+  const today = summary.data?.today ?? null;
+  const week = summary.data?.week ?? null;
+  const total = (totals: TrafficTotals | null): number | null =>
+    totals === null
+      ? null
+      : totals.upload_bytes + totals.download_bytes;
+
+  return (
+    <div className="hero-daily">
+      <span>
+        {t("overview.dailyTraffic")}
+        <strong>{formatSessionTraffic(total(today))}</strong>
+      </span>
+      <span>
+        {t("overview.weeklyTraffic")}
+        <strong>{formatSessionTraffic(total(week))}</strong>
+      </span>
+    </div>
   );
 }

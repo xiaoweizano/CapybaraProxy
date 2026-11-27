@@ -38,6 +38,18 @@ import {
 } from "../../shared/settingsLimits";
 import type { TraySpeedDisplay } from "../../platform/settings";
 import type { MotionPreference } from "../../shared/motion";
+import { useBridgeResource } from "../../app/runtime/useBridgeResource";
+import { getSubscriptionSnapshot, setSubscriptionOverrideYaml } from "../../platform/runtime";
+import {
+  DEFAULT_FAKE_IP_RANGE,
+  DNS_PRESETS,
+  applyDnsBlock,
+  isValidCidr,
+  isValidResolver,
+  parseDnsBlock,
+  renderDnsBlock,
+  type DnsPreset,
+} from "./dnsPreset";
 import { MihomoCorePanel } from "../runtime/MihomoCorePanel";
 import {
   ResourceFeedback,
@@ -592,6 +604,8 @@ export function SettingsPage() {
         <AdvancedCoreSection controlsDisabled={controlsDisabled} />
       ) : null}
 
+      {shows("dns") ? <DnsSection controlsDisabled={controlsDisabled} /> : null}
+
       {shows("substore") ? (
         <SubStoreSection controlsDisabled={controlsDisabled} />
       ) : null}
@@ -606,6 +620,206 @@ export function SettingsPage() {
  * on an unusual cadence need any whole number of hours. The value is only
  * saved on blur once it parses inside the range the native side accepts.
  */
+/**
+ * DNS settings, written as a `dns:` block into the active subscription's
+ * override document.
+ *
+ * DNS is a whole top-level block, so it belongs in the override rather than in
+ * a second configuration path: saving here replaces only the `dns:` block and
+ * keeps whatever else the operator wrote there.
+ */
+function DnsSection({ controlsDisabled }: { controlsDisabled: boolean }) {
+  const { t } = useTranslation();
+  const stored = useBridgeResource(getSubscriptionSnapshot, true);
+  const [preset, setPreset] = useState<DnsPreset>(() =>
+    parseDnsBlock(stored.data?.override_yaml),
+  );
+  const [pending, setPending] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const subscriptionId = stored.data?.id ?? null;
+  const hasSubscription = stored.data?.has_subscription === true;
+
+  const applyPreset = (name: keyof typeof DNS_PRESETS) => {
+    const entry = DNS_PRESETS[name];
+    setPreset((current) => ({
+      ...current,
+      mode: name === "system" ? "system" : "custom",
+      nameservers: [...entry.nameservers],
+    }));
+  };
+
+  const save = async () => {
+    if (!subscriptionId) {
+      return;
+    }
+    const invalidResolver = preset.nameservers.some(
+      (server) => server.trim() !== "" && !isValidResolver(server),
+    );
+    if (invalidResolver) {
+      setError(t("settings.dnsResolverInvalid"));
+      return;
+    }
+    if (preset.mode === "custom" && preset.fakeIp && !isValidCidr(preset.fakeIpRange)) {
+      setError(t("settings.dnsRangeInvalid"));
+      return;
+    }
+
+    setPending(true);
+    setError(null);
+    setStatus(null);
+    try {
+      const block = renderDnsBlock(preset);
+      const merged = applyDnsBlock(stored.data?.override_yaml, block);
+      const result = await setSubscriptionOverrideYaml(
+        subscriptionId,
+        merged.trim() === "" ? null : merged,
+      );
+      if (result.status === "ok") {
+        await stored.reload();
+        setStatus(t("settings.dnsSaved"));
+      } else {
+        setError(
+          result.status === "error"
+            ? result.error.message
+            : t("settings.substoreBridgeUnavailable"),
+        );
+      }
+    } finally {
+      setPending(false);
+    }
+  };
+
+  return (
+    <SettingsSection definition={settingsSection("dns")}>
+      <p className="workspace-hint">{t("settings.dnsHint")}</p>
+      {!hasSubscription ? (
+        <p className="workspace-hint">{t("settings.dnsNeedsSubscription")}</p>
+      ) : (
+        <>
+          <div className="workspace-option-list">
+            <SettingsSwitchRow
+              icon={<ShieldCheck aria-hidden="true" size={16} />}
+              title={t("settings.dnsCustom")}
+              caption={t("settings.dnsCustomCaption")}
+              checked={preset.mode === "custom"}
+              disabled={controlsDisabled || pending}
+              onChange={(enabled) =>
+                setPreset((current) => ({
+                  ...current,
+                  mode: enabled ? "custom" : "system",
+                }))
+              }
+            />
+          </div>
+
+          {preset.mode === "custom" ? (
+            <>
+              <div className="choice-chips" role="group" aria-label={t("settings.dnsPreset")}>
+                {(
+                  ["cloudflare", "aliyun", "google", "system"] as const
+                ).map((name) => (
+                  <button
+                    key={name}
+                    type="button"
+                    className="choice-chip"
+                    disabled={controlsDisabled || pending}
+                    onClick={() => applyPreset(name)}
+                  >
+                    {t(DNS_PRESETS[name].labelKey)}
+                  </button>
+                ))}
+              </div>
+
+              <SettingsSubheading
+                kicker={t("settings.dnsResolversKicker")}
+                title={t("settings.dnsResolvers")}
+                icon={<RadioTower aria-hidden="true" size={16} />}
+              />
+              <div className="delay-probe">
+                <label className="subscription-field subscription-field-wide">
+                  <span>{t("settings.dnsResolvers")}</span>
+                  <input
+                    type="text"
+                    value={preset.nameservers.join(", ")}
+                    spellCheck={false}
+                    autoComplete="off"
+                    placeholder="1.1.1.1, 1.0.0.1"
+                    disabled={controlsDisabled || pending}
+                    onChange={(event) =>
+                      setPreset((current) => ({
+                        ...current,
+                        nameservers: event.target.value.split(","),
+                      }))
+                    }
+                  />
+                </label>
+              </div>
+              <p className="settings-inline-hint">{t("settings.dnsResolversHint")}</p>
+
+              <div className="workspace-option-list">
+                <SettingsSwitchRow
+                  icon={<Database aria-hidden="true" size={16} />}
+                  title={t("settings.dnsFakeIp")}
+                  caption={t("settings.dnsFakeIpCaption")}
+                  checked={preset.fakeIp}
+                  disabled={controlsDisabled || pending}
+                  onChange={(enabled) =>
+                    setPreset((current) => ({ ...current, fakeIp: enabled }))
+                  }
+                />
+              </div>
+              {preset.fakeIp ? (
+                <div className="delay-probe">
+                  <label className="subscription-field">
+                    <span>{t("settings.dnsFakeIpRange")}</span>
+                    <input
+                      type="text"
+                      value={preset.fakeIpRange}
+                      spellCheck={false}
+                      placeholder={DEFAULT_FAKE_IP_RANGE}
+                      disabled={controlsDisabled || pending}
+                      onChange={(event) =>
+                        setPreset((current) => ({
+                          ...current,
+                          fakeIpRange: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                </div>
+              ) : null}
+            </>
+          ) : null}
+
+          {error ? (
+            <p className="settings-inline-hint" role="alert">
+              {error}
+            </p>
+          ) : status ? (
+            <p className="settings-inline-hint" role="status">
+              {status}
+            </p>
+          ) : null}
+
+          <div className="subscription-actions">
+            <span className="subscription-actions-note">
+              {t("settings.dnsApplyHint")}
+            </span>
+            <button
+              type="button"
+              className="workspace-primary-button"
+              disabled={controlsDisabled || pending}
+              onClick={() => void save()}
+            >
+              {pending ? t("settings.savingOverrides") : t("settings.saveOverrides")}
+            </button>
+          </div>
+        </>
+      )}
+    </SettingsSection>
+  );
+}
 function AutoUpdateCustom({ controlsDisabled }: { controlsDisabled: boolean }) {
   const { t } = useTranslation();
   const { settings, updateSubscriptionUpdateHours } = useAppSettings();

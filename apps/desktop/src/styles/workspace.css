@@ -477,11 +477,79 @@
 .connection-row {
   display: grid;
   min-width: 0;
-  grid-template-columns: 34px minmax(150px, 1.1fr) minmax(130px, 0.9fr) 82px 31px;
+  grid-template-columns: minmax(0, 1fr) 31px;
+  align-items: center;
+  gap: 6px;
+  min-height: 60px;
+  padding-right: 2px;
+  border-top: 1px solid var(--border);
+}
+
+.connection-row-summary {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 34px minmax(150px, 1.1fr) minmax(130px, 0.9fr) 82px 22px;
   align-items: center;
   gap: 11px;
-  min-height: 60px;
-  border-top: 1px solid var(--border);
+  padding: 10px 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.connection-row-summary:hover {
+  color: var(--text-primary);
+}
+
+.connection-row.is-expanded .connection-row-summary {
+  color: var(--accent-cyan);
+}
+
+.connection-disclosure {
+  color: var(--text-faint);
+  transition: transform 160ms ease;
+}
+
+.connection-row.is-expanded .connection-disclosure {
+  transform: rotate(180deg);
+  color: var(--accent-cyan);
+}
+
+.connection-details {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: 8px 18px;
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--panel-soft);
+}
+
+.connection-details > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.connection-details dt {
+  color: var(--text-faint);
+  font-size: 0.6875rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.connection-details dd {
+  overflow: hidden;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .connection-icon,
@@ -1268,4 +1336,17 @@
 
 .profile-card > .workspace-action-button {
   justify-self: end;
+}
+
+.proxy-group-toggle-icon {
+  transition: transform 160ms ease;
+}
+
+.proxy-group-toggle-icon.is-collapsed {
+  transform: rotate(-90deg);
+}
+
+.rules-hits {
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
 }

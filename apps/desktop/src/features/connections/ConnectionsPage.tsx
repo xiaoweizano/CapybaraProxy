@@ -2,6 +2,7 @@ import {
   ArrowDown,
   ArrowUp,
   Cable,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   CircleX,
@@ -64,7 +65,7 @@ function filterConnections(
 }
 
 export function ConnectionsPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { snapshot } = useRuntime();
   const isConnected = snapshot?.state === "connected";
   const connections = useBridgeResource(getConnections, isConnected);
@@ -79,7 +80,14 @@ export function ConnectionsPage() {
   const [page, setPage] = useState(1);
   const [query, setQuery] = useState("");
   const [pendingCloseAll, setPendingCloseAll] = useState(false);
+  // Which row is expanded to show the full details. One at a time keeps the
+  // list height predictable.
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const deferredQuery = useDeferredValue(query);
+  const startedFormatter = new Intl.DateTimeFormat(i18n.language, {
+    dateStyle: "short",
+    timeStyle: "medium",
+  });
 
   const close = async (connectionId: string) => {
     if (
@@ -286,39 +294,101 @@ export function ConnectionsPage() {
           ) : (
             <>
               <div className="connection-list">
-                {pagedConnections.map((connection) => (
-                  <article className="connection-row" key={connection.id}>
-                    <span className="connection-icon" aria-hidden="true">
-                      <Cable size={16} />
-                    </span>
-                    <span className="connection-main">
-                      <strong>
-                        {connection.host || connection.destination_ip}
-                      </strong>
-                      <small>
-                        {connection.destination_ip}:{connection.destination_port}
-                      </small>
-                    </span>
-                    <span className="connection-route">
-                      <strong>{connection.rule}</strong>
-                      <small>{connection.chains.join(" / ")}</small>
-                    </span>
-                    <span className="connection-volume">
-                      <strong>{formatBytes(connection.download_bytes)}</strong>
-                      <small>{connection.network.toUpperCase()}</small>
-                    </span>
-                    <button
-                      className="workspace-icon-button workspace-danger-button"
-                      type="button"
-                      aria-label={t("connections.close", { name: connection.host || connection.destination_ip })}
-                      title={t("connections.close", { name: connection.host || connection.destination_ip })}
-                      disabled={pendingConnection !== null}
-                      onClick={() => void close(connection.id)}
+                {pagedConnections.map((connection) => {
+                  const expanded = expandedId === connection.id;
+                  const name = connection.host || connection.destination_ip;
+                  return (
+                    <article
+                      className={`connection-row${expanded ? " is-expanded" : ""}`}
+                      key={connection.id}
                     >
-                      <CircleX aria-hidden="true" size={16} />
-                    </button>
-                  </article>
-                ))}
+                      <button
+                        className="connection-row-summary"
+                        type="button"
+                        aria-expanded={expanded}
+                        onClick={() =>
+                          setExpandedId(expanded ? null : connection.id)
+                        }
+                      >
+                        <span className="connection-icon" aria-hidden="true">
+                          <Cable size={16} />
+                        </span>
+                        <span className="connection-main">
+                          <strong>{name}</strong>
+                          <small>
+                            {connection.destination_ip}:
+                            {connection.destination_port}
+                          </small>
+                        </span>
+                        <span className="connection-route">
+                          <strong>{connection.rule}</strong>
+                          <small>{connection.chains.join(" / ")}</small>
+                        </span>
+                        <span className="connection-volume">
+                          <strong>
+                            {formatBytes(connection.download_bytes)}
+                          </strong>
+                          <small>{connection.network.toUpperCase()}</small>
+                        </span>
+                        <ChevronDown
+                          className="connection-disclosure"
+                          aria-hidden="true"
+                          size={15}
+                        />
+                      </button>
+                      <button
+                        className="workspace-icon-button workspace-danger-button"
+                        type="button"
+                        aria-label={t("connections.close", { name })}
+                        title={t("connections.close", { name })}
+                        disabled={pendingConnection !== null}
+                        onClick={() => void close(connection.id)}
+                      >
+                        <CircleX aria-hidden="true" size={16} />
+                      </button>
+                      {expanded ? (
+                        <dl className="connection-details">
+                          <div>
+                            <dt>{t("connections.detailHost")}</dt>
+                            <dd>{name}</dd>
+                          </div>
+                          <div>
+                            <dt>{t("connections.detailDestination")}</dt>
+                            <dd>
+                              {connection.destination_ip}:
+                              {connection.destination_port}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt>{t("connections.detailRule")}</dt>
+                            <dd>
+                              {connection.rule}
+                              {connection.rule_payload
+                                ? ` · ${connection.rule_payload}`
+                                : ""}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt>{t("connections.detailChains")}</dt>
+                            <dd>{connection.chains.join(" → ")}</dd>
+                          </div>
+                          <div>
+                            <dt>{t("connections.detailUploaded")}</dt>
+                            <dd>{formatBytes(connection.upload_bytes)}</dd>
+                          </div>
+                          <div>
+                            <dt>{t("connections.detailStarted")}</dt>
+                            <dd>
+                              {startedFormatter.format(
+                                connection.started_at_ms,
+                              )}
+                            </dd>
+                          </div>
+                        </dl>
+                      ) : null}
+                    </article>
+                  );
+                })}
               </div>
               {pageCount > 1 ? (
                 <nav className="connection-pagination" aria-label={t("connections.pagination")}>

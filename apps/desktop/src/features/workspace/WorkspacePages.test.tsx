@@ -45,6 +45,7 @@ vi.mock("../../platform/runtime", async (importOriginal) => {
     getConnections: vi.fn(),
     getProfiles: vi.fn(),
     getRules: vi.fn(),
+    getProviders: vi.fn(),
     getSubscriptionSnapshot: vi.fn(),
     subscribeSubscriptionUpdated: vi.fn(async () => () => undefined),
     refreshSubscription: vi.fn(),

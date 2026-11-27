@@ -3,14 +3,15 @@ mod settings;
 mod speed_icon;
 mod substore;
 mod system_integration;
+mod traffic;
 mod tray_strings;
 mod tray_summary;
 
 use flowproxy_contracts::{
     CommandResult, ConnectionPage, CoreInfo, CorePreferences, DelayHistory, DelayHistoryEntry,
-    DelayProbeSettings, GroupDelayResult, LogLevel, ProfileInfo, ProxyGroup, RoutingMode, RuleItem,
-    RuntimeBackend, RuntimeError, RuntimeErrorCode, RuntimeLogEntry, RuntimeSnapshot, RuntimeState,
-    StartupPreferences, SubscriptionSnapshot, TelemetrySnapshot,
+    DelayProbeSettings, GroupDelayResult, LogLevel, ProfileInfo, ProviderInfo, ProxyGroup,
+    RoutingMode, RuleItem, RuntimeBackend, RuntimeError, RuntimeErrorCode, RuntimeLogEntry,
+    RuntimeSnapshot, RuntimeState, StartupPreferences, SubscriptionSnapshot, TelemetrySnapshot,
 };
 use flowproxy_mihomo_manager::{MihomoAdapter, MihomoCoreAdapter, UnavailableMihomoAdapter};
 use flowproxy_runtime::{RuntimeChange, RuntimeFailure, RuntimeManager};
@@ -20,6 +21,7 @@ use settings::{
 };
 use std::collections::VecDeque;
 use std::fmt::Display;
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
@@ -39,6 +41,9 @@ const TRAY_ID: &str = "flowproxy";
 const TRAY_TOGGLE_CONNECTION_ID: &str = "toggle-connection";
 const TRAY_STATUS_ID: &str = "tray-status";
 const TRAY_NODE_ID: &str = "tray-node";
+/// Prefix of the tray routing-mode entries; the suffix is the wire value.
+const TRAY_MODE_PREFIX: &str = "tray-mode-";
+const TRAY_OPEN_LOGS_ID: &str = "tray-open-logs";
 const APP_VISIBILITY_EVENT: &str = "app-visibility";
 const RUNTIME_STATE_EVENT: &str = "runtime-state-changed";
 const RUNTIME_LOG_EVENT: &str = "runtime-log";
@@ -63,6 +68,45 @@ fn now_ms() -> i64 {
         .unwrap_or(0)
 }
 
+/// Today's date as `YYYY-MM-DD` in local time.
+///
+/// The traffic ledger is keyed by this rather than by an epoch, so a day
+/// boundary matches the operator's clock instead of UTC.
+fn local_date() -> String {
+    let seconds = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_secs())
+        .unwrap_or(0);
+    format_date(seconds as i64 + flowproxy_platform::local_utc_offset_seconds())
+}
+
+/// Converts a Unix timestamp in seconds to `YYYY-MM-DD`.
+///
+/// Implemented here rather than through a date crate: the ledger only needs
+/// a stable day key, and a new dependency for one call is not worth it.
+fn format_date(unix_seconds: i64) -> String {
+    let days = unix_seconds.div_euclid(86_400);
+    // Civil-from-days, after Howard Hinnant's algorithm.
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let day_of_era = z - era * 146_097;
+    let year_of_era =
+        (day_of_era - day_of_era / 1_460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
+    let mut year = year_of_era + era * 400;
+    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+    let month_prime = (5 * day_of_year + 2) / 153;
+    let day = day_of_year - (153 * month_prime + 2) / 5 + 1;
+    let month = if month_prime < 10 {
+        month_prime + 3
+    } else {
+        month_prime - 9
+    };
+    if month <= 2 {
+        year += 1;
+    }
+    format!("{year:04}-{month:02}-{day:02}")
+}
+
 type DesktopAdapter = Box<dyn MihomoAdapter>;
 type DesktopIntegration = SystemIntegration<RuntimeManager<DesktopAdapter>, NativePlatform>;
 
@@ -75,6 +119,10 @@ struct AppState {
     logs: Arc<LogFileStore>,
     /// Summary last rendered into the tray, used to skip redundant rebuilds.
     tray_summary: Mutex<Option<TraySummary>>,
+    /// Per-day transfer counters that survive a core restart.
+    traffic: traffic::TrafficLedger,
+    /// Last connection counters seen, so the ledger only adds the delta.
+    traffic_sample: Mutex<Option<(u64, u64)>>,
     /// Recent latency measurements, oldest first. Bounded so a long session
     /// cannot grow it without limit.
     delay_history: Mutex<VecDeque<DelayHistoryEntry>>,
@@ -87,6 +135,7 @@ impl AppState {
         settings_store: SettingsStore,
         settings: DesktopSettings,
         logs: Arc<LogFileStore>,
+        settings_directory: Option<PathBuf>,
     ) -> Self {
         logs.configure(settings.log_to_file, settings.log_retention_days);
         Self {
@@ -97,8 +146,77 @@ impl AppState {
             exit_gate: ExitGate::default(),
             logs,
             tray_summary: Mutex::new(None),
+            traffic: traffic::TrafficLedger::new(settings_directory.unwrap_or_default()),
+            traffic_sample: Mutex::new(None),
             delay_history: Mutex::new(VecDeque::new()),
         }
+    }
+
+    /// The routing mode the core reports, or `None` while it is down.
+    ///
+    /// The tray marks the active entry from this; a stopped core has no mode
+    /// to show, and its entries are disabled anyway.
+    fn current_routing_mode(&self) -> Option<RoutingMode> {
+        self.runtime
+            .core_preferences()
+            .ok()
+            .and_then(|preferences| preferences.mode)
+    }
+
+    /// Adds the delta since the previous telemetry sample to today's row.
+    ///
+    /// The core's totals restart at zero with it, so a sample smaller than the
+    /// previous one means the core restarted: the new value is the delta on its
+    /// own. A write failure is logged and otherwise ignored — the live rates
+    /// are unaffected.
+    fn accumulate_traffic(&self, upload: u64, download: u64) {
+        let delta = {
+            let mut sample = self
+                .traffic_sample
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            let delta = match *sample {
+                Some((previous_upload, previous_download))
+                    if upload >= previous_upload && download >= previous_download =>
+                {
+                    (upload - previous_upload, download - previous_download)
+                }
+                _ => (upload, download),
+            };
+            *sample = Some((upload, download));
+            delta
+        };
+
+        if delta == (0, 0) {
+            return;
+        }
+        if let Err(error) = self.traffic.record(&local_date(), delta.0, delta.1) {
+            log_native_error("recording the daily traffic total", error);
+        }
+    }
+
+    /// Cumulative upload/download counters, or `None` while the core is down.
+    ///
+    /// A separate read from the tray summary: the summary only asks for
+    /// telemetry when the rates are displayed, while the ledger always wants
+    /// the totals.
+    fn daily_counters(&self) -> Option<(u64, u64)> {
+        if !matches!(
+            self.runtime.snapshot().state,
+            RuntimeState::Connected | RuntimeState::RunningDisconnected
+        ) {
+            // A stopped core resets its counters on the next start, so the
+            // previous sample must not be used as a baseline then.
+            *self
+                .traffic_sample
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()) = None;
+            return None;
+        }
+        self.runtime
+            .telemetry()
+            .ok()
+            .map(|telemetry| (telemetry.total_upload_bytes, telemetry.total_download_bytes))
     }
 
     /// Appends one measurement, dropping the oldest entries past the cap.
@@ -515,6 +633,7 @@ fn remember_window_size(window: &tauri::Window) {
 fn build_tray_menu(
     app: &tauri::AppHandle,
     summary: &TraySummary,
+    mode: Option<RoutingMode>,
 ) -> tauri::Result<Menu<tauri::Wry>> {
     let state = app.state::<AppState>();
     let settings = state.settings();
@@ -552,6 +671,40 @@ fn build_tray_menu(
         TRAY_TOGGLE_CONNECTION_ID,
         connection_label,
         connection_enabled,
+        None::<&str>,
+    )?);
+    // Routing mode is hot-reloadable in Mihomo, so the tray can switch it
+    // without restarting the core. The entries are disabled while it is down.
+    let core_running = matches!(
+        summary.state,
+        RuntimeState::Connected | RuntimeState::RunningDisconnected
+    );
+    for (value, label) in [
+        (RoutingMode::Rule, strings.mode_rule),
+        (RoutingMode::Global, strings.mode_global),
+        (RoutingMode::Direct, strings.mode_direct),
+    ] {
+        // The active mode is marked in the label: a check-mark menu item
+        // needs its own state plumbing, and the label reads in both themes.
+        let label = if mode == Some(value) {
+            format!("✓ {label}")
+        } else {
+            label.to_owned()
+        };
+        items.push(MenuItem::with_id(
+            app,
+            format!("{TRAY_MODE_PREFIX}{}", value.as_wire_value()),
+            label,
+            core_running,
+            None::<&str>,
+        )?);
+    }
+
+    items.push(MenuItem::with_id(
+        app,
+        TRAY_OPEN_LOGS_ID,
+        strings.open_logs,
+        true,
         None::<&str>,
     )?);
     items.push(MenuItem::with_id(
@@ -596,7 +749,8 @@ fn refresh_tray(app: &tauri::AppHandle, state: &AppState, summary: TraySummary) 
         None => true,
     };
     if menu_changed {
-        match build_tray_menu(app, &summary).and_then(|menu| tray.set_menu(Some(menu))) {
+        let mode = state.current_routing_mode();
+        match build_tray_menu(app, &summary, mode).and_then(|menu| tray.set_menu(Some(menu))) {
             Ok(()) => {}
             Err(error) => log_native_error("refreshing the tray menu", error),
         }
@@ -677,9 +831,27 @@ fn run_tray_connection_action(app: &tauri::AppHandle, state: &AppState) {
     refresh_tray_menu(app);
 }
 
+/// Switches the routing mode from the tray.
+///
+/// Goes through the same runtime call the Proxies page uses, so the webview
+/// learns about the change through the usual state events.
+fn run_tray_mode_action(app: &tauri::AppHandle, state: &AppState, mode: &str) {
+    let Some(mode) = RoutingMode::parse(mode) else {
+        return;
+    };
+    match state.runtime.update_core_preferences(Some(mode), None) {
+        Ok(_) => refresh_tray_menu(app),
+        Err(failure) => {
+            emit_runtime_change(app, &failure.change);
+            log_native_error("switching the routing mode from the tray", &failure.error);
+        }
+    }
+}
+
 fn install_tray(app: &tauri::App) -> tauri::Result<()> {
     let initial_summary = app.state::<AppState>().read_tray_summary(true);
-    let menu = build_tray_menu(app.handle(), &initial_summary)?;
+    let initial_mode = app.state::<AppState>().current_routing_mode();
+    let menu = build_tray_menu(app.handle(), &initial_summary, initial_mode)?;
     let language = app.state::<AppState>().settings().language;
     let tooltip = tray_strings::tooltip(
         language,
@@ -696,6 +868,17 @@ fn install_tray(app: &tauri::App) -> tauri::Result<()> {
             TRAY_TOGGLE_CONNECTION_ID => {
                 let state = app.state::<AppState>();
                 run_tray_connection_action(app, state.inner());
+            }
+            TRAY_OPEN_LOGS_ID => {
+                let state = app.state::<AppState>();
+                if let Err(error) = logging::open_directory(&state.logs) {
+                    log_native_error("opening the log directory from the tray", error);
+                }
+            }
+            id if id.starts_with(TRAY_MODE_PREFIX) => {
+                let mode = id.trim_start_matches(TRAY_MODE_PREFIX);
+                let state = app.state::<AppState>();
+                run_tray_mode_action(app, state.inner(), mode);
             }
             "show" => show_main_window(app),
             "exit" => {
@@ -947,6 +1130,12 @@ fn get_delay_history(state: State<'_, AppState>) -> CommandResult<DelayHistory> 
     CommandResult::success(state.delay_history())
 }
 
+/// Returns today's accumulated transfer, plus the last seven days.
+#[tauri::command]
+fn get_traffic_today(state: State<'_, AppState>) -> CommandResult<traffic::TrafficSummary> {
+    CommandResult::success(state.traffic.summary())
+}
+
 #[tauri::command]
 fn get_core_preferences(
     app: tauri::AppHandle,
@@ -997,6 +1186,15 @@ fn close_all_connections(app: tauri::AppHandle, state: State<'_, AppState>) -> C
 #[tauri::command]
 fn get_rules(app: tauri::AppHandle, state: State<'_, AppState>) -> CommandResult<Vec<RuleItem>> {
     run_data_command(&app, state.runtime.rules())
+}
+
+/// Providers the active profile declares. Read-only by design.
+#[tauri::command]
+fn get_providers(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> CommandResult<Vec<ProviderInfo>> {
+    run_data_command(&app, state.runtime.providers())
 }
 
 #[tauri::command]
@@ -1403,6 +1601,12 @@ fn spawn_runtime_health_loop(app: tauri::AppHandle) {
                 // `refresh_tray_menu` instead of a `/proxies` poll per tick.
                 let state_changed = outcome_state_changed;
                 let summary = state.read_tray_summary(state_changed);
+                // The same tick also feeds the daily ledger: the cumulative
+                // counters are only available while the core runs, and the
+                // window may be hidden for hours.
+                if let Some(totals) = state.daily_counters() {
+                    state.accumulate_traffic(totals.0, totals.1);
+                }
                 refresh_tray(&app, state.inner(), summary);
 
                 if launch_refresh_pending {
@@ -1719,12 +1923,14 @@ pub fn run() {
             test_proxy_delay,
             test_group_delay,
             get_delay_history,
+            get_traffic_today,
             get_core_preferences,
             set_core_preferences,
             get_connections,
             close_connection,
             close_all_connections,
             get_rules,
+            get_providers,
             get_profiles,
             get_subscription_snapshot,
             import_subscription,
@@ -1792,6 +1998,7 @@ pub fn run() {
                 settings_store,
                 loaded_settings.settings.clone(),
                 logs,
+                Some(config_directory.clone()),
             ));
             {
                 let state = app.state::<AppState>();
@@ -1906,7 +2113,14 @@ mod tests {
             directory.join("FlowProxy.exe"),
         ));
         let logs = Arc::new(crate::logging::LogFileStore::new(directory.join("logs")));
-        AppState::new(runtime, system_integration, store, settings, logs)
+        AppState::new(
+            runtime,
+            system_integration,
+            store,
+            settings,
+            logs,
+            Some(directory.to_path_buf()),
+        )
     }
 
     #[test]

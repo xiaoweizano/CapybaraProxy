@@ -3,7 +3,13 @@ import { useDeferredValue, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useRuntime } from "../../app/runtime/runtimeContext";
 import { useBridgeResource } from "../../app/runtime/useBridgeResource";
-import { getRules, getSubscriptionSnapshot, type RuleItem } from "../../platform/runtime";
+import {
+  getConnections,
+  getProviders,
+  getRules,
+  getSubscriptionSnapshot,
+  type RuleItem,
+} from "../../platform/runtime";
 import {
   LoadingState,
   RefreshButton,
@@ -13,6 +19,32 @@ import {
 } from "../workspace/WorkspaceUi";
 
 const MAX_VISIBLE_RULES = 500;
+
+/**
+ * Counts live connections per rule target.
+ *
+ * Mihomo reports a connection's matched rule type and payload, while the rule
+ * table lists type + payload + target. Keying on type plus payload joins the
+ * two without assuming the target strings are unique.
+ */
+function countConnectionsByRule(
+  connections: { rule: string; rule_payload: string }[],
+): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const connection of connections) {
+    const key = ruleKey({
+      rule_type: connection.rule,
+      payload: connection.rule_payload,
+    });
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return counts;
+}
+
+function ruleKey(rule: Pick<RuleItem, "rule_type" | "payload">): string {
+  // A NUL cannot appear in a rule type or payload, so it is a safe separator.
+  return `${rule.rule_type}\u0000${rule.payload}`;
+}
 
 /** Keeps rules whose type, payload or target contains `query`. */
 function filterRules(rules: RuleItem[], query: string): RuleItem[] {
@@ -36,6 +68,9 @@ export function RulesPage() {
   const deferredQuery = useDeferredValue(query);
   const isConnected = snapshot?.state === "connected";
   const rules = useBridgeResource(getRules, isConnected);
+  // Hits per rule come from the live connection table; a stopped core has none.
+  const connections = useBridgeResource(getConnections, isConnected);
+  const hits = countConnectionsByRule(connections.data?.connections ?? []);
   // Offline fallback: the stored subscription's rule table.
   const offline = useBridgeResource(getSubscriptionSnapshot, !isConnected);
   const offlineRules = offline.data?.has_subscription
@@ -110,6 +145,7 @@ export function RulesPage() {
                     <th scope="col">{t("rules.type")}</th>
                     <th scope="col">{t("rules.payload")}</th>
                     <th scope="col">{t("rules.target")}</th>
+                    <th scope="col">{t("rules.hits")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -186,6 +222,9 @@ export function RulesPage() {
                       </td>
                       <td>{rule.payload}</td>
                       <td>{rule.proxy}</td>
+                      <td className="rules-hits">
+                        {hits.get(ruleKey(rule)) ?? 0}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -200,6 +239,78 @@ export function RulesPage() {
           )}
         </section>
       )}
+
+      <ProvidersPanel connected={isConnected} />
     </WorkspacePage>
+  );
+}
+
+/**
+ * Rule and proxy providers the active profile pulls in.
+ *
+ * Read-only by design: the provider's URL and refresh timer belong to the
+ * profile author, and Mihomo fetches them on its own network stack. Showing
+ * them here answers "where did these nodes and rules come from" without
+ * pretending FlowProxy manages the fetch.
+ */
+function ProvidersPanel({ connected }: { connected: boolean }) {
+  const { t } = useTranslation();
+  const providers = useBridgeResource(getProviders, connected);
+  const list = providers.data ?? [];
+
+  if (!connected || list.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="workspace-panel providers-panel">
+      <div className="workspace-panel-heading">
+        <div>
+          <span className="workspace-kicker">{t("rules.providersKicker")}</span>
+          <h2>{t("rules.providersHeading")}</h2>
+        </div>
+        <div className="workspace-panel-actions">
+          <span className="workspace-count">
+            {t("rules.providersCount", { count: list.length })}
+          </span>
+          <RefreshButton
+            isLoading={providers.isLoading}
+            onClick={() => void providers.reload()}
+            label={t("rules.refresh")}
+          />
+        </div>
+      </div>
+      <p className="workspace-hint">{t("rules.providersHint")}</p>
+      <div className="workspace-table-wrap">
+        <table className="workspace-table">
+          <thead>
+            <tr>
+              <th scope="col">{t("rules.providerName")}</th>
+              <th scope="col">{t("rules.providerKind")}</th>
+              <th scope="col">{t("rules.providerVehicle")}</th>
+              <th scope="col">{t("rules.providerEntries")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {list.map((provider) => (
+              <tr key={`${provider.kind}-${provider.name}`}>
+                <td>{provider.name}</td>
+                <td>
+                  <span className="workspace-code">
+                    {provider.kind === "proxy"
+                      ? t("rules.providerKindProxy")
+                      : t("rules.providerKindRule")}
+                  </span>
+                </td>
+                <td>{provider.vehicle_type ?? "—"}</td>
+                <td>
+                  {provider.proxy_count ?? provider.entry_count ?? "—"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }

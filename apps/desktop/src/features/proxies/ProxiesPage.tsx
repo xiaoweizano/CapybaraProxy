@@ -1,4 +1,5 @@
 import {
+  ChevronDown,
   CircleCheck,
   CircleDashed,
   Gauge,
@@ -18,6 +19,13 @@ import {
   type ProxyNode,
   type RoutingMode,
 } from "../../platform/runtime";
+import {
+  readStoredCollapsed,
+  readStoredSort,
+  writeStoredCollapsed,
+  writeStoredSort,
+  type NodeSort,
+} from "../../shared/proxyView";
 import {
   ResourceFeedback,
   RuntimeDisconnected,
@@ -41,8 +49,6 @@ const modeOptions: Array<{
     hintKey: "proxies.modeDirectHint",
   },
 ];
-
-type NodeSort = "default" | "delay" | "name";
 
 /** Keeps groups and nodes matching the filter; drops groups left empty. */
 function filterGroups<T extends { name: string; nodes: ProxyNode[] }>(
@@ -107,7 +113,14 @@ export function ProxiesPage() {
   const [pendingMode, setPendingMode] = useState<RoutingMode | null>(null);
   const [pendingAll, setPendingAll] = useState(false);
   const [query, setQuery] = useState("");
-  const [sort, setSort] = useState<NodeSort>("default");
+  // Page-local view state: it must survive a page switch and a relaunch, but
+  // the core has no use for it, so it stays in localStorage.
+  const [sort, setSortState] = useState<NodeSort>(() =>
+    readStoredSort(window.localStorage),
+  );
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() =>
+    readStoredCollapsed(window.localStorage),
+  );
   const [notice, setNotice] = useState<string | null>(null);
   const deferredQuery = useDeferredValue(query);
   const [testedDelays, setTestedDelays] = useState<Record<string, number | null>>(
@@ -165,6 +178,24 @@ export function ProxiesPage() {
     } finally {
       setPendingGroup(null);
     }
+  };
+
+  const setSort = (next: NodeSort) => {
+    setSortState(next);
+    writeStoredSort(window.localStorage, next);
+  };
+
+  const toggleGroup = (name: string) => {
+    setCollapsedGroups((current) => {
+      const next = new Set(current);
+      if (next.has(name)) {
+        next.delete(name);
+      } else {
+        next.add(name);
+      }
+      writeStoredCollapsed(window.localStorage, next);
+      return next;
+    });
   };
 
   const changeMode = async (mode: RoutingMode) => {
@@ -404,10 +435,41 @@ export function ProxiesPage() {
                       ? t("proxies.testingGroup")
                       : t("proxies.testGroupDelay", { name: group.name })}
                   </button>
+                  <button
+                    className="workspace-icon-button proxy-group-toggle"
+                    type="button"
+                    aria-expanded={!collapsedGroups.has(group.name)}
+                    aria-controls={`group-nodes-${group.name}`}
+                    aria-label={
+                      collapsedGroups.has(group.name)
+                        ? t("proxies.expandGroup", { name: group.name })
+                        : t("proxies.collapseGroup", { name: group.name })
+                    }
+                    title={
+                      collapsedGroups.has(group.name)
+                        ? t("proxies.expandGroup", { name: group.name })
+                        : t("proxies.collapseGroup", { name: group.name })
+                    }
+                    onClick={() => toggleGroup(group.name)}
+                  >
+                    <ChevronDown
+                      className={
+                        collapsedGroups.has(group.name)
+                          ? "proxy-group-toggle-icon is-collapsed"
+                          : "proxy-group-toggle-icon"
+                      }
+                      aria-hidden="true"
+                      size={15}
+                    />
+                  </button>
                 </div>
               </div>
 
-              <div className="proxy-node-list">
+              <div
+                className="proxy-node-list"
+                id={`group-nodes-${group.name}`}
+                hidden={collapsedGroups.has(group.name)}
+              >
                 {sortNodes(group.nodes, sort, testedDelays).map((node) => {
                   const selected = node.name === group.selected;
                   const delay = testedDelays[node.name] ?? node.delay_ms;

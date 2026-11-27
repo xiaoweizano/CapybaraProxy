@@ -1,8 +1,8 @@
 use crate::validate_loopback_endpoint;
 use flowproxy_contracts::{
     ConnectionPage, ConnectionSummary, CorePreferences, DelayProbeSettings, DelaySample,
-    GroupDelayResult, LogLevel, ProxyGroup, ProxyNode, RoutingMode, RuleItem, RuntimeError,
-    RuntimeErrorCode, MAX_DELAY_TIMEOUT_MS, MIN_DELAY_TIMEOUT_MS,
+    GroupDelayResult, LogLevel, ProviderInfo, ProxyGroup, ProxyNode, RoutingMode, RuleItem,
+    RuntimeError, RuntimeErrorCode, MAX_DELAY_TIMEOUT_MS, MIN_DELAY_TIMEOUT_MS,
 };
 use serde_json::{json, Value};
 use std::io::{Read, Write};
@@ -514,6 +514,57 @@ pub(crate) fn close_connection(
 pub(crate) fn close_all_connections(client: &LoopbackApiClient) -> Result<(), RuntimeError> {
     client.request_json("DELETE", "/connections", None)?;
     Ok(())
+}
+
+/// Reads the providers the active profile declares.
+///
+/// Mihomo answers `/providers/proxies` and `/providers/rules` with a map of
+/// provider name to metadata. Only display fields are taken: the URL and the
+/// refresh timer stay with Mihomo, which owns them at runtime.
+pub(crate) fn read_providers(
+    client: &LoopbackApiClient,
+) -> Result<Vec<ProviderInfo>, RuntimeError> {
+    let mut providers = Vec::new();
+    for (path, kind) in [
+        ("/providers/proxies", "proxy"),
+        ("/providers/rules", "rule"),
+    ] {
+        let payload = client.get_json(path)?;
+        let Some(map) = payload.get("providers").and_then(Value::as_object) else {
+            continue;
+        };
+        for (name, data) in map {
+            let proxy_count = data
+                .get("proxies")
+                .and_then(Value::as_array)
+                .and_then(|proxies| u32::try_from(proxies.len()).ok());
+            let entry_count = data
+                .get("ruleCount")
+                .and_then(Value::as_u64)
+                .and_then(|count| u32::try_from(count).ok())
+                .or_else(|| {
+                    data.get("proxies")
+                        .and_then(Value::as_array)
+                        .and_then(|proxies| u32::try_from(proxies.len()).ok())
+                });
+            providers.push(ProviderInfo {
+                name: name.clone(),
+                kind: kind.to_owned(),
+                vehicle_type: data
+                    .get("vehicleType")
+                    .and_then(Value::as_str)
+                    .map(str::to_owned),
+                entry_count,
+                proxy_count,
+            });
+        }
+    }
+    providers.sort_by(|left, right| {
+        left.kind
+            .cmp(&right.kind)
+            .then_with(|| left.name.cmp(&right.name))
+    });
+    Ok(providers)
 }
 
 pub(crate) fn select_proxy(

@@ -22,6 +22,7 @@ describe("settings sections", () => {
     );
     expect(ids).not.toContain("tray");
     expect(ids).not.toContain("advanced");
+    expect(ids).not.toContain("dns");
     expect(ids).not.toContain("substore");
   });
 
@@ -36,6 +37,7 @@ describe("settings sections", () => {
       "core",
       "tray",
       "advanced",
+      "dns",
       "substore",
     ]);
   });
@@ -54,7 +56,8 @@ describe("settings sections", () => {
   });
 
   it("can look up a group that the current mode hides", () => {
-    expect(settingsSection("substore").index).toBe("09");
+    expect(settingsSection("dns").index).toBe("09");
+    expect(settingsSection("substore").index).toBe("10");
     expect(settingsSection("appearance").index).toBe("01");
   });
 });

@@ -5,9 +5,9 @@ pub use redaction::redact_sensitive_text;
 
 use flowproxy_contracts::{
     ConnectionPage, CoreInfo, CorePreferences, DelayProbeSettings, GroupDelayResult, LogLevel,
-    ProfileInfo, ProxyGroup, RoutingMode, RuleItem, RuntimeBackend, RuntimeError, RuntimeErrorCode,
-    RuntimeLogEntry, RuntimeLogLevel, RuntimeSnapshot, RuntimeState, StartupPreferences,
-    SubscriptionSnapshot, SubscriptionUsage, TelemetrySnapshot,
+    ProfileInfo, ProviderInfo, ProxyGroup, RoutingMode, RuleItem, RuntimeBackend, RuntimeError,
+    RuntimeErrorCode, RuntimeLogEntry, RuntimeLogLevel, RuntimeSnapshot, RuntimeState,
+    StartupPreferences, SubscriptionSnapshot, SubscriptionUsage, TelemetrySnapshot,
 };
 use flowproxy_mihomo_manager::MihomoAdapter;
 use log_buffer::LogBuffer;
@@ -420,6 +420,11 @@ where
 
     pub fn rules(&self) -> Result<Vec<RuleItem>, RuntimeFailure> {
         self.adapter_data("rules", A::rules)
+    }
+
+    /// Providers the active profile declares, as reported by the core.
+    pub fn providers(&self) -> Result<Vec<ProviderInfo>, RuntimeFailure> {
+        self.adapter_data("providers", A::providers)
     }
 
     /// Returns the stored profile metadata.

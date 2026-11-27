@@ -1075,3 +1075,27 @@
     grid-row: auto;
   }
 }
+
+.hero-daily {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+  color: var(--text-faint);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+
+.hero-daily > span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.hero-daily strong {
+  color: var(--text-secondary);
+  font-family: var(--font-display);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}

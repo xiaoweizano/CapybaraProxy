@@ -15,6 +15,7 @@ export type SettingsSectionId =
   | "core"
   | "tray"
   | "advanced"
+  | "dns"
   | "substore";
 
 export type SettingsSectionDefinition = {
@@ -87,8 +88,15 @@ export const SETTINGS_SECTIONS: SettingsSectionDefinition[] = [
     minimumMode: "relaxed",
   },
   {
-    id: "substore",
+    id: "dns",
     index: "09",
+    titleKey: "settings.dns",
+    kickerKey: "settings.dnsKicker",
+    minimumMode: "relaxed",
+  },
+  {
+    id: "substore",
+    index: "10",
     titleKey: "settings.substore",
     kickerKey: "settings.substoreKicker",
     minimumMode: "relaxed",

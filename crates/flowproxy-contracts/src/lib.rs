@@ -398,6 +398,10 @@ pub struct SubscriptionSnapshot {
     /// them inserted before the subscription's catch-all rule.
     #[serde(default)]
     pub override_rules: Vec<String>,
+    /// The operator's override document, if any. Exposed so the DNS form can
+    /// show the block currently in effect instead of a blank slate.
+    #[serde(default)]
+    pub override_yaml: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -414,6 +418,27 @@ pub struct RuleItem {
     pub rule_type: String,
     pub payload: String,
     pub proxy: String,
+}
+
+/// A rule or proxy provider the active profile declares.
+///
+/// Read-only: the provider's URL and refresh timer are the provider author's,
+/// and FlowProxy deliberately does not proxy, cache or validate them. The UI
+/// shows the name, type and node count so an operator can see what the profile
+/// pulls in.
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+pub struct ProviderInfo {
+    pub name: String,
+    /// `proxy` or `rule`.
+    pub kind: String,
+    #[serde(default)]
+    pub vehicle_type: Option<String>,
+    /// Entries the provider currently contributes, when known.
+    #[serde(default)]
+    pub entry_count: Option<u32>,
+    /// Number of proxies this provider reports. Proxy providers only.
+    #[serde(default)]
+    pub proxy_count: Option<u32>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

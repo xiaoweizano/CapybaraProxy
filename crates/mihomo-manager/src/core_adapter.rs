@@ -9,8 +9,9 @@ use crate::subscription_store::{StoredSubscription, SubscriptionInput, Subscript
 use crate::MihomoAdapter;
 use flowproxy_contracts::{
     ConnectionPage, CoreInfo, CorePreferences, DelayProbeSettings, GroupDelayResult, LogLevel,
-    ProfileInfo, ProxyGroup, RoutingMode, RuleItem, RuntimeBackend, RuntimeError, RuntimeErrorCode,
-    RuntimeState, StartupPreferences, SubscriptionSnapshot, SubscriptionUsage, TelemetrySnapshot,
+    ProfileInfo, ProviderInfo, ProxyGroup, RoutingMode, RuleItem, RuntimeBackend, RuntimeError,
+    RuntimeErrorCode, RuntimeState, StartupPreferences, SubscriptionSnapshot, SubscriptionUsage,
+    TelemetrySnapshot,
 };
 use std::collections::VecDeque;
 use std::io::{BufRead, BufReader, Read};
@@ -605,6 +606,11 @@ impl MihomoAdapter for MihomoCoreAdapter {
         parse_rules(&payload)
     }
 
+    fn providers(&mut self) -> Result<Vec<ProviderInfo>, RuntimeError> {
+        self.ensure_healthy()?;
+        crate::control_api::read_providers(self.client()?)
+    }
+
     fn profiles(&mut self) -> Result<Vec<ProfileInfo>, RuntimeError> {
         self.subscription_profiles()
     }
@@ -690,6 +696,7 @@ impl MihomoAdapter for MihomoCoreAdapter {
             id: Some(subscription.id),
             active: true,
             override_rules: subscription.override_rules,
+            override_yaml: subscription.override_yaml,
         })
     }
 

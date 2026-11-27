@@ -11,7 +11,7 @@ mod system_proxy;
 
 use flowproxy_contracts::{
     ConnectionPage, CoreInfo, CorePreferences, DelayProbeSettings, GroupDelayResult, LogLevel,
-    ProfileInfo, ProxyGroup, RoutingMode, RuleItem, RuntimeError, RuntimeErrorCode,
+    ProfileInfo, ProviderInfo, ProxyGroup, RoutingMode, RuleItem, RuntimeError, RuntimeErrorCode,
     StartupPreferences, SubscriptionSnapshot, SubscriptionUsage, TelemetrySnapshot,
 };
 
@@ -156,6 +156,11 @@ pub trait MihomoAdapter: Send {
 
     fn rules(&mut self) -> Result<Vec<RuleItem>, RuntimeError> {
         Err(unsupported_adapter_data("rules"))
+    }
+
+    /// Providers the active profile declares. Read-only by design.
+    fn providers(&mut self) -> Result<Vec<ProviderInfo>, RuntimeError> {
+        Err(unsupported_adapter_data("providers"))
     }
 
     fn profiles(&mut self) -> Result<Vec<ProfileInfo>, RuntimeError> {
@@ -319,6 +324,10 @@ where
 
     fn rules(&mut self) -> Result<Vec<RuleItem>, RuntimeError> {
         self.as_mut().rules()
+    }
+
+    fn providers(&mut self) -> Result<Vec<ProviderInfo>, RuntimeError> {
+        self.as_mut().providers()
     }
 
     fn profiles(&mut self) -> Result<Vec<ProfileInfo>, RuntimeError> {

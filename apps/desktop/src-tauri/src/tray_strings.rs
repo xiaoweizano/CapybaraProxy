@@ -17,6 +17,11 @@ pub(crate) struct TrayStrings {
     pub node: &'static str,
     /// Label shown when no node is selected.
     pub no_node: &'static str,
+    /// Label of the "open log folder" entry.
+    pub open_logs: &'static str,
+    pub mode_rule: &'static str,
+    pub mode_global: &'static str,
+    pub mode_direct: &'static str,
 }
 
 /// Returns the localized tray strings for `language`.
@@ -29,6 +34,10 @@ pub(crate) fn tray_strings(language: Language) -> TrayStrings {
             status: "Status",
             node: "Node",
             no_node: "No node selected",
+            open_logs: "Open log folder",
+            mode_rule: "Mode: Rule",
+            mode_global: "Mode: Global",
+            mode_direct: "Mode: Direct",
         },
         Language::SimplifiedChinese => TrayStrings {
             show: "显示 FlowProxy",
@@ -37,6 +46,10 @@ pub(crate) fn tray_strings(language: Language) -> TrayStrings {
             status: "状态",
             node: "节点",
             no_node: "未选择节点",
+            open_logs: "打开日志目录",
+            mode_rule: "模式：规则",
+            mode_global: "模式：全局",
+            mode_direct: "模式：直连",
         },
     }
 }
