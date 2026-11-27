@@ -28,18 +28,3 @@ export function readStoredLanguage(storage: Storage): LanguageId {
 export function writeStoredLanguage(storage: Storage, language: LanguageId): void {
   storage.setItem(STORAGE_KEY, language);
 }
-
-/**
- * Best guess for the first launch. Only used to seed the preview cache; the
- * native settings store stays authoritative once it responds.
- */
-export function detectSystemLanguage(): LanguageId {
-  const candidates =
-    typeof navigator === "undefined"
-      ? []
-      : [...(navigator.languages ?? []), navigator.language];
-
-  return candidates.some((tag) => tag?.toLowerCase().startsWith("zh"))
-    ? "simplified_chinese"
-    : DEFAULT_LANGUAGE;
-}

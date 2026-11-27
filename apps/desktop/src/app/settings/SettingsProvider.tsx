@@ -39,7 +39,6 @@ import {
 } from "../theme/theme";
 import {
   DEFAULT_LANGUAGE,
-  detectSystemLanguage,
   isLanguage,
   readStoredLanguage,
   writeStoredLanguage,
@@ -118,9 +117,10 @@ function fromNativeSettings(settings: DesktopSettings): AppPreferences {
   return {
     theme: settings.theme,
     closeBehavior: settings.close_behavior,
-    // A `settings.json` written before the field existed has no language;
-    // follow the system locale instead of forcing English on a fresh upgrade.
-    language: settings.language ?? detectSystemLanguage(),
+    // A `settings.json` written before the field existed has no language.
+    // English is the product default, so an upgrade lands on English rather
+    // than guessing from the OS locale.
+    language: settings.language ?? DEFAULT_LANGUAGE,
     uiScale: normalizeUiScale(settings.ui_scale),
     coreLogLevel: settings.log_level ?? "warning",
     ipv6: settings.ipv6 ?? false,
