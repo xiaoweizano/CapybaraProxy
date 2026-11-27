@@ -28,6 +28,7 @@ fn windows_proxy_backend_reads_present_values_with_their_wire_types() {
         ProxySettings {
             enabled: Some(false),
             server: Some("192.168.1.2:7890".to_owned()),
+            overrides: None,
         }
     );
 }

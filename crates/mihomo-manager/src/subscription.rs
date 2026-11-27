@@ -11,6 +11,7 @@
 //! dependency. Line-level rewriting keeps the operator's file recognisable and
 //! makes the injection rules easy to audit.
 
+use crate::subscription_store::sanitize_rules;
 use flowproxy_contracts::{RuntimeError, RuntimeErrorCode, StartupPreferences};
 use std::fmt::Write as _;
 
@@ -108,10 +109,29 @@ pub fn prepare_profile_with(
     proxy_port: u16,
     preferences: StartupPreferences,
 ) -> Result<PreparedSubscription, RuntimeError> {
+    prepare_profile_full(yaml, proxy_port, preferences, &[], None)
+}
+
+/// Same as [`prepare_profile_with`], plus the operator's overrides.
+///
+/// Custom rules are inserted before the document's final catch-all rule
+/// (`MATCH`), so they win over the provider's rules without turning the
+/// operator's entries into dead code behind a `MATCH,Proxy` line. When the
+/// document has no catch-all they are appended. Override YAML replaces whole
+/// top-level blocks by key.
+pub fn prepare_profile_full(
+    yaml: &str,
+    proxy_port: u16,
+    preferences: StartupPreferences,
+    override_rules: &[String],
+    override_yaml: Option<&str>,
+) -> Result<PreparedSubscription, RuntimeError> {
     preflight(yaml)?;
     if proxy_port == 0 {
         return Err(invalid("The Mihomo proxy port must be non-zero."));
     }
+
+    let overrides = parse_override_blocks(override_yaml);
 
     let mut output = String::with_capacity(yaml.len() + 256);
     output.push_str(FLOWPROXY_HEADER);
@@ -119,7 +139,7 @@ pub fn prepare_profile_with(
     output.push_str("allow-lan: false\n");
     output.push_str("bind-address: 127.0.0.1\n");
 
-    let overrides: Vec<(&str, String)> = if preferences.is_default() {
+    let preferences_overrides: Vec<(&str, String)> = if preferences.is_default() {
         Vec::new()
     } else {
         vec![
@@ -132,8 +152,8 @@ pub fn prepare_profile_with(
             ("tcp-concurrent", preferences.tcp_concurrent.to_string()),
         ]
     };
-    let overridden_keys: Vec<&str> = overrides.iter().map(|(key, _)| *key).collect();
-    for (key, value) in &overrides {
+    let overridden_keys: Vec<&str> = preferences_overrides.iter().map(|(key, _)| *key).collect();
+    for (key, value) in &preferences_overrides {
         writeln!(output, "{key}: {value}").expect("writing to a String cannot fail");
     }
 
@@ -143,6 +163,12 @@ pub fn prepare_profile_with(
     let mut section: Option<&str> = None;
     // Indentation of the section's own list items, learned from the first one.
     let mut section_item_indent: Option<usize> = None;
+    let mut pending_rules_inserted = false;
+    let mut current_section_owned = false;
+    let mut emitted_overrides: std::collections::BTreeSet<String> =
+        std::collections::BTreeSet::new();
+
+    let rules = sanitize_rules(override_rules)?;
 
     for line in yaml.lines() {
         if skipping_continuation {
@@ -150,6 +176,25 @@ pub fn prepare_profile_with(
                 continue;
             }
             skipping_continuation = false;
+        }
+
+        // An override block replaces the document's own, in place, including
+        // its indented body. Checked before the controlled/pinned branches so
+        // an override never has to know which keys FlowProxy owns.
+        if let Some(key) = override_block_key(&overrides, line) {
+            if !emitted_overrides.contains(key) {
+                let replacement = overrides.get(key).expect("key came from the map");
+                output.push_str(replacement);
+                if !replacement.ends_with('\n') {
+                    output.push('\n');
+                }
+                emitted_overrides.insert((*key).to_owned());
+            }
+            skipping_continuation = true;
+            section = None;
+            section_item_indent = None;
+            current_section_owned = true;
+            continue;
         }
 
         if let Some((key, rest)) = split_top_level_key(line) {
@@ -162,11 +207,26 @@ pub fn prepare_profile_with(
                 }
                 continue;
             }
+
             section = Some(key);
             section_item_indent = None;
+            current_section_owned = false;
         } else if line.starts_with("---") {
             section = None;
             section_item_indent = None;
+            current_section_owned = false;
+        }
+
+        // Insert the operator's rules just before the catch-all rule.
+        if !current_section_owned
+            && !pending_rules_inserted
+            && !rules.is_empty()
+            && is_catch_all_rule(line)
+        {
+            for rule in &rules {
+                writeln!(output, "  - {rule}").expect("writing to a String cannot fail");
+            }
+            pending_rules_inserted = true;
         }
 
         if let Some(indent) = list_item_indent(line) {
@@ -194,11 +254,90 @@ pub fn prepare_profile_with(
         output.push('\n');
     }
 
+    // No catch-all: the operator's rules still belong in the table, at the end.
+    if !pending_rules_inserted && !rules.is_empty() && !current_section_owned {
+        for rule in &rules {
+            writeln!(output, "  - {rule}").expect("writing to a String cannot fail");
+        }
+    }
+
+    // Blocks the document never mentioned are appended whole, so an override
+    // can also introduce a section the provider did not send.
+    for (key, block) in &overrides {
+        if emitted_overrides.iter().any(|emitted| emitted == key) {
+            continue;
+        }
+        output.push_str(block);
+        if !block.ends_with('\n') {
+            output.push('\n');
+        }
+    }
+
     Ok(PreparedSubscription {
         profile: output,
         proxy_count,
         proxy_group_count,
     })
+}
+
+/// True for a rule line whose type is `MATCH`.
+fn is_catch_all_rule(line: &str) -> bool {
+    let trimmed = line.trim_start();
+    let Some(item) = trimmed.strip_prefix("- ") else {
+        return false;
+    };
+    item.trim_start()
+        .get(..5)
+        .is_some_and(|prefix| prefix.eq_ignore_ascii_case("MATCH"))
+        && item.trim_start()[5..].starts_with(',')
+}
+
+/// Returns the override key that `line` starts, if any.
+///
+/// A match is a column-zero key that has a block in `overrides`; the line may
+/// either be the bare `key:` header or an inline `key: value` entry.
+fn override_block_key<'a>(
+    overrides: &'a std::collections::BTreeMap<&'a str, String>,
+    line: &str,
+) -> Option<&'a str> {
+    let key = split_top_level_key(line)?.0;
+    overrides.get_key_value(key).map(|(key, _)| *key)
+}
+
+/// Splits an override document into whole top-level blocks keyed by name.
+///
+/// Comments and blank lines above a block are dropped: an override only makes
+/// sense as complete keys. A block runs until the next column-zero key. Keys
+/// FlowProxy controls are dropped together with their body, because the safety
+/// policy has to win over anything the operator pastes.
+fn parse_override_blocks(override_yaml: Option<&str>) -> std::collections::BTreeMap<&str, String> {
+    let Some(yaml) = override_yaml else {
+        return std::collections::BTreeMap::new();
+    };
+
+    let mut blocks: Vec<(&str, String)> = Vec::new();
+    // True while skipping the body of a blocked key.
+    let mut skipping = false;
+    for line in yaml.lines() {
+        if let Some((key, _)) = split_top_level_key(line) {
+            skipping = CONTROLLED_TOP_LEVEL_KEYS.contains(&key)
+                || key == "rules"
+                || key == "mixed-port"
+                || key == "secret";
+            if !skipping {
+                blocks.push((key, String::new()));
+            }
+        }
+        if skipping {
+            continue;
+        }
+        if let Some((_, block)) = blocks.last_mut() {
+            block.push_str(line);
+            block.push('\n');
+        }
+    }
+
+    blocks.into_iter().collect()
 }
 
 fn invalid(message: impl Into<String>) -> RuntimeError {
@@ -436,5 +575,137 @@ proxies:
         let prepared = prepare_profile(yaml, 1000).expect("profile should prepare");
         assert!(prepared.profile.contains("# mixed-port: 1234"));
         assert!(prepared.profile.contains("mixed-port: 1000"));
+    }
+
+    const WITH_CATCH_ALL: &str = "\
+proxies:
+  - name: A
+    type: ss
+rules:
+  - GEOIP,CN,DIRECT
+  - MATCH,Proxy
+";
+
+    #[test]
+    fn override_rules_land_before_the_catch_all_rule() {
+        use super::prepare_profile_full;
+        use flowproxy_contracts::StartupPreferences;
+
+        let rules = vec![
+            "DOMAIN-SUFFIX,corp.example,DIRECT".to_owned(),
+            "IP-CIDR,10.0.0.0/8,DIRECT".to_owned(),
+        ];
+        let prepared = prepare_profile_full(
+            WITH_CATCH_ALL,
+            1000,
+            StartupPreferences::default(),
+            &rules,
+            None,
+        )
+        .expect("profile should prepare");
+
+        let profile = &prepared.profile;
+        let custom = profile
+            .find("DOMAIN-SUFFIX,corp.example,DIRECT")
+            .expect("custom rule");
+        let geo = profile.find("GEOIP,CN,DIRECT").expect("provider rule");
+        let catch_all = profile.find("MATCH,Proxy").expect("catch-all");
+        // Provider rules keep their authority, the operator's rules still run
+        // before the blanket route.
+        assert!(geo < custom);
+        assert!(custom < catch_all);
+        assert!(profile.contains("IP-CIDR,10.0.0.0/8,DIRECT"));
+    }
+
+    #[test]
+    fn override_rules_without_a_catch_all_are_appended() {
+        use super::prepare_profile_full;
+        use flowproxy_contracts::StartupPreferences;
+
+        let yaml = "\
+proxies:
+  - name: A
+    type: ss
+rules:
+  - GEOIP,CN,DIRECT
+";
+        let prepared = prepare_profile_full(
+            yaml,
+            1000,
+            StartupPreferences::default(),
+            &["DOMAIN,example.com,Proxy".to_owned()],
+            None,
+        )
+        .expect("profile should prepare");
+
+        let profile = &prepared.profile;
+        let geo = profile.find("GEOIP,CN,DIRECT").expect("provider rule");
+        let custom = profile
+            .find("DOMAIN,example.com,Proxy")
+            .expect("custom rule");
+        assert!(geo < custom);
+    }
+
+    #[test]
+    fn override_yaml_replaces_a_whole_block_and_ignores_controlled_keys() {
+        use super::prepare_profile_full;
+        use flowproxy_contracts::StartupPreferences;
+
+        let yaml = "\
+proxies:
+  - name: A
+    type: ss
+dns:
+  enable: false
+  nameserver:
+    - 1.1.1.1
+rules:
+  - MATCH,Proxy
+";
+        let override_yaml = "\
+dns:
+  enable: true
+  nameserver:
+    - 8.8.8.8
+mixed-port: 9999
+secret: sneaky
+";
+        let prepared = prepare_profile_full(
+            yaml,
+            1000,
+            StartupPreferences::default(),
+            &[],
+            Some(override_yaml),
+        )
+        .expect("profile should prepare");
+        let profile = &prepared.profile;
+
+        assert!(profile.contains("8.8.8.8"));
+        assert!(!profile.contains("1.1.1.1"));
+        // The dns key appears exactly once: replaced, not appended.
+        assert_eq!(profile.matches("\ndns:").count(), 1);
+        // The safety policy still wins over the override document.
+        assert!(profile.contains("mixed-port: 1000"));
+        assert!(!profile.contains("mixed-port: 9999"));
+        assert!(!profile.contains("sneaky"));
+    }
+
+    #[test]
+    fn override_yaml_can_introduce_a_block_the_provider_never_sent() {
+        use super::prepare_profile_full;
+        use flowproxy_contracts::StartupPreferences;
+
+        let prepared = prepare_profile_full(
+            WITH_CATCH_ALL,
+            1000,
+            StartupPreferences::default(),
+            &[],
+            Some("tun:\n  enable: false\n  stack: system\n"),
+        )
+        .expect("profile should prepare");
+
+        assert!(prepared
+            .profile
+            .contains("tun:\n  enable: false\n  stack: system"));
     }
 }

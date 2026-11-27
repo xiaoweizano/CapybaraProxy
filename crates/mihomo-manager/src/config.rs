@@ -20,6 +20,12 @@ impl ConfigStore {
         &self.path
     }
 
+    /// Working directory the core runs in, which is also where the
+    /// subscription library lives.
+    pub fn working_directory(&self) -> Option<&Path> {
+        self.path.parent()
+    }
+
     /// Path of the imported subscription document kept next to the active
     /// configuration. It holds the operator's original YAML.
     pub fn subscription_path(&self) -> Option<PathBuf> {

@@ -1253,3 +1253,19 @@
   background: rgba(var(--success-rgb), 0.07);
   color: var(--success);
 }
+
+.latency-history-panel .workspace-table-wrap {
+  max-height: 320px;
+}
+
+.overrides-panel .subscription-form {
+  margin-bottom: 4px;
+}
+
+.overrides-panel .settings-inline-hint {
+  margin-top: 6px;
+}
+
+.profile-card > .workspace-action-button {
+  justify-self: end;
+}

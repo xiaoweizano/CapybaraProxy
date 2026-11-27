@@ -95,6 +95,8 @@ const DEFAULT_PREFERENCES: AppPreferences = {
   updateSubscriptionOnLaunch: false,
   autoConnect: false,
   subscriptionUserAgent: null,
+  proxyBypass: "",
+  restartAfterSubscriptionUpdate: false,
   settingsMode: "standard",
   silentStart: false,
   motion: DEFAULT_MOTION,
@@ -127,6 +129,9 @@ function fromNativeSettings(settings: DesktopSettings): AppPreferences {
     updateSubscriptionOnLaunch: settings.update_subscription_on_launch ?? false,
     autoConnect: settings.auto_connect ?? false,
     subscriptionUserAgent: settings.subscription_user_agent ?? null,
+    proxyBypass: settings.proxy_bypass ?? "",
+    restartAfterSubscriptionUpdate:
+      settings.restart_after_subscription_update ?? false,
     settingsMode: settings.settings_mode ?? "standard",
     silentStart: settings.silent_start ?? false,
     motion: settings.motion ?? DEFAULT_MOTION,
@@ -160,6 +165,8 @@ function toNativeSettings(settings: AppPreferences): DesktopSettings {
     update_subscription_on_launch: settings.updateSubscriptionOnLaunch,
     auto_connect: settings.autoConnect,
     subscription_user_agent: settings.subscriptionUserAgent,
+    proxy_bypass: settings.proxyBypass.trim() === "" ? null : settings.proxyBypass,
+    restart_after_subscription_update: settings.restartAfterSubscriptionUpdate,
     settings_mode: settings.settingsMode,
     silent_start: settings.silentStart,
     motion: settings.motion,
@@ -459,6 +466,18 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     [enqueueUpdate],
   );
 
+  const updateProxyBypass = useCallback(
+    (bypass: string): Promise<SettingsUpdateResult> =>
+      enqueueUpdate({ proxyBypass: bypass.trim() }),
+    [enqueueUpdate],
+  );
+
+  const updateRestartAfterSubscriptionUpdate = useCallback(
+    (restartAfterSubscriptionUpdate: boolean): Promise<SettingsUpdateResult> =>
+      enqueueUpdate({ restartAfterSubscriptionUpdate }),
+    [enqueueUpdate],
+  );
+
   const updateSubscriptionUserAgent = useCallback(
     (userAgent: string): Promise<SettingsUpdateResult> => {
       const trimmed = userAgent.trim();
@@ -565,6 +584,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       updateUpdateSubscriptionOnLaunch,
       updateAutoConnect,
       updateSubscriptionUserAgent,
+      updateProxyBypass,
+      updateRestartAfterSubscriptionUpdate,
       updateSettingsMode,
       updateSilentStart,
       updateMotion,
@@ -594,6 +615,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       updateUpdateSubscriptionOnLaunch,
       updateAutoConnect,
       updateSubscriptionUserAgent,
+      updateProxyBypass,
+      updateRestartAfterSubscriptionUpdate,
       updateSettingsMode,
       updateSilentStart,
       updateMotion,

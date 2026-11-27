@@ -34,6 +34,10 @@ export type AppPreferences = {
   /** User-Agent used when downloading subscriptions; `null` keeps the
    * Clash identifier providers expect. */
   subscriptionUserAgent: string | null;
+  /** Bypass list applied to the system proxy; empty keeps the OS list. */
+  proxyBypass: string;
+  /** Restart the core after an automatic subscription refresh. */
+  restartAfterSubscriptionUpdate: boolean;
   /** How many settings groups the Settings page shows. */
   settingsMode: SettingsMode;
   /** Start with the main window hidden so only the tray icon appears. */
@@ -96,6 +100,10 @@ export type AppSettingsContextValue = {
   updateAutoConnect: (enabled: boolean) => Promise<SettingsUpdateResult>;
   updateSubscriptionUserAgent: (
     userAgent: string,
+  ) => Promise<SettingsUpdateResult>;
+  updateProxyBypass: (bypass: string) => Promise<SettingsUpdateResult>;
+  updateRestartAfterSubscriptionUpdate: (
+    enabled: boolean,
   ) => Promise<SettingsUpdateResult>;
   updateSettingsMode: (mode: SettingsMode) => Promise<SettingsUpdateResult>;
   updateSilentStart: (enabled: boolean) => Promise<SettingsUpdateResult>;

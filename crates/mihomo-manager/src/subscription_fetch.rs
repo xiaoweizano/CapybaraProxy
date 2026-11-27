@@ -394,7 +394,10 @@ mod tests {
     fn user_agent_falls_back_when_the_override_is_unusable() {
         assert_eq!(normalize_user_agent(None), DEFAULT_USER_AGENT);
         assert_eq!(normalize_user_agent(Some("   ")), DEFAULT_USER_AGENT);
-        assert_eq!(normalize_user_agent(Some("clash\r\nX: 1")), DEFAULT_USER_AGENT);
+        assert_eq!(
+            normalize_user_agent(Some("clash\r\nX: 1")),
+            DEFAULT_USER_AGENT
+        );
         assert_eq!(
             normalize_user_agent(Some(" ClashParty/1.0 ")),
             "ClashParty/1.0"

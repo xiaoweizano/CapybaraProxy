@@ -5,6 +5,7 @@ use crate::control_api::{
     read_core_preferences, select_proxy, test_delay, test_group_delay, update_core_preferences,
     LoopbackApiClient,
 };
+use crate::subscription_store::{StoredSubscription, SubscriptionInput, SubscriptionStore};
 use crate::MihomoAdapter;
 use flowproxy_contracts::{
     ConnectionPage, CoreInfo, CorePreferences, DelayProbeSettings, GroupDelayResult, LogLevel,
@@ -28,6 +29,7 @@ const PROFILE_VALIDATION_TIMEOUT: Duration = Duration::from_secs(10);
 pub struct MihomoCoreAdapter {
     binary: VerifiedMihomoBinary,
     config_store: ConfigStore,
+    subscriptions: SubscriptionStore,
     child: Option<Child>,
     log_pump: Option<LogPump>,
     client: Option<LoopbackApiClient>,
@@ -44,6 +46,8 @@ pub struct MihomoCoreAdapter {
     /// Usage numbers from the provider, captured while downloading the
     /// document that is being imported.
     pending_subscription_usage: Option<SubscriptionUsage>,
+    /// Subscription an import should replace instead of creating a new entry.
+    pending_subscription_target: Option<String>,
 }
 
 struct TelemetrySample {
@@ -67,9 +71,12 @@ impl MihomoCoreAdapter {
     }
 
     pub fn new(binary: VerifiedMihomoBinary, config_store: ConfigStore) -> Self {
+        let subscriptions =
+            SubscriptionStore::new(working_directory_of(&config_store).unwrap_or_default());
         Self {
             binary,
             config_store,
+            subscriptions,
             child: None,
             log_pump: None,
             client: None,
@@ -80,7 +87,90 @@ impl MihomoCoreAdapter {
             delay_probe: DelayProbeSettings::default(),
             pending_subscription_url: None,
             pending_subscription_usage: None,
+            pending_subscription_target: None,
         }
+    }
+
+    /// Makes the subscription library match the pre-library layout.
+    ///
+    /// Upgrading installations kept `config.subscription.yaml` and its JSON
+    /// next to the config; the library adopts the document once and removes
+    /// the legacy pair so a downgrade cannot resurrect it.
+    fn adopt_legacy_subscription(&mut self) -> Result<(), RuntimeError> {
+        let Some(legacy_document) = self.config_store.read_subscription()? else {
+            return Ok(());
+        };
+        let metadata = read_subscription_metadata(&self.config_store);
+        let adopted = self.subscriptions.adopt_legacy(SubscriptionInput {
+            name: metadata
+                .as_ref()
+                .map(|metadata| metadata.name.as_str())
+                .unwrap_or("Imported subscription"),
+            document: &legacy_document,
+            source_url: metadata
+                .as_ref()
+                .and_then(|metadata| metadata.source_url.clone()),
+            usage: metadata
+                .as_ref()
+                .and_then(|metadata| metadata.usage.clone()),
+            proxy_count: metadata.as_ref().map(|metadata| metadata.proxy_count as u32),
+            updated_at_ms: metadata
+                .as_ref()
+                .map(|metadata| metadata.imported_at_ms)
+                .unwrap_or_else(now_ms),
+        })?;
+        if adopted {
+            let _ = self.config_store.remove_subscription();
+            let _ = remove_subscription_metadata(&self.config_store);
+        }
+        Ok(())
+    }
+
+    /// The subscription the core launches with, after ensuring legacy files
+    /// have been adopted.
+    fn active_subscription(&mut self) -> Result<Option<StoredSubscription>, RuntimeError> {
+        self.adopt_legacy_subscription()?;
+        self.subscriptions.active()
+    }
+
+    fn subscription_profiles(&mut self) -> Result<Vec<ProfileInfo>, RuntimeError> {
+        self.adopt_legacy_subscription()?;
+        let updated_at_ms = self
+            .config_store
+            .path()
+            .metadata()
+            .ok()
+            .and_then(|metadata| metadata.modified().ok())
+            .and_then(system_time_ms);
+        let active_id = self.subscriptions.active_id();
+
+        let mut profiles = self
+            .subscriptions
+            .list()?
+            .into_iter()
+            .map(|subscription| ProfileInfo {
+                id: subscription.id.clone(),
+                name: subscription.name,
+                active: active_id.as_deref() == Some(subscription.id.as_str()),
+                updated_at_ms: (subscription.updated_at_ms > 0)
+                    .then_some(subscription.updated_at_ms)
+                    .or(updated_at_ms),
+                source: Some("subscription".to_owned()),
+                proxy_count: subscription.proxy_count,
+            })
+            .collect::<Vec<_>>();
+
+        if profiles.is_empty() {
+            profiles.push(ProfileInfo {
+                id: "flowproxy-direct".to_owned(),
+                name: "FlowProxy Direct".to_owned(),
+                active: true,
+                updated_at_ms,
+                source: None,
+                proxy_count: Some(0),
+            });
+        }
+        Ok(profiles)
     }
 
     pub fn binary_digest(&self) -> &str {
@@ -132,12 +222,14 @@ impl MihomoCoreAdapter {
         let working_directory = working_directory_of(&self.config_store)?;
         deploy_bundled_geodata(&working_directory);
 
-        let profile = match self.config_store.read_subscription()? {
+        let profile = match self.active_subscription()? {
             Some(subscription) => {
-                crate::subscription::prepare_profile_with(
-                    &subscription,
+                crate::subscription::prepare_profile_full(
+                    &subscription.document,
                     proxy_port,
                     self.startup_preferences,
+                    &subscription.override_rules,
+                    subscription.override_yaml.as_deref(),
                 )?
                 .profile
             }
@@ -454,6 +546,10 @@ impl MihomoAdapter for MihomoCoreAdapter {
         self.pending_subscription_usage = usage;
     }
 
+    fn set_pending_subscription_target(&mut self, id: Option<String>) {
+        self.pending_subscription_target = id;
+    }
+
     fn select_proxy(&mut self, group: &str, proxy: &str) -> Result<(), RuntimeError> {
         self.ensure_healthy()?;
         select_proxy(self.client()?, group, proxy)
@@ -508,41 +604,11 @@ impl MihomoAdapter for MihomoCoreAdapter {
     }
 
     fn profiles(&mut self) -> Result<Vec<ProfileInfo>, RuntimeError> {
-        let updated_at_ms = self
-            .config_store
-            .path()
-            .metadata()
-            .ok()
-            .and_then(|metadata| metadata.modified().ok())
-            .and_then(system_time_ms);
-
-        let Some(subscription) = self.config_store.read_subscription()? else {
-            return Ok(vec![ProfileInfo {
-                id: "flowproxy-direct".to_owned(),
-                name: "FlowProxy Direct".to_owned(),
-                active: true,
-                updated_at_ms,
-                source: None,
-                proxy_count: Some(0),
-            }]);
-        };
-
-        let proxy_count = crate::subscription::prepare_profile(&subscription, 1)
-            .map(|prepared| prepared.proxy_count as u32)
-            .ok();
-
-        Ok(vec![ProfileInfo {
-            id: "flowproxy-subscription".to_owned(),
-            name: subscription_name(&self.config_store)
-                .unwrap_or_else(|| "Imported subscription".to_owned()),
-            active: true,
-            updated_at_ms,
-            source: Some("subscription".to_owned()),
-            proxy_count,
-        }])
+        self.subscription_profiles()
     }
 
     fn import_subscription(&mut self, name: &str, yaml: &str) -> Result<(), RuntimeError> {
+        self.adopt_legacy_subscription()?;
         let prepared = crate::subscription::prepare_profile(yaml, 1)?;
         let binary_path = self.binary.path().to_path_buf();
         let working_directory = working_directory_of(&self.config_store)?;
@@ -553,43 +619,75 @@ impl MihomoAdapter for MihomoCoreAdapter {
         // for the port it reserves, so storing the prepared copy would nest the
         // header on every restart.
         validate_prepared_subscription(&binary_path, &working_directory, &prepared.profile)?;
-        self.config_store.write_subscription(yaml, |_| Ok(()))?;
 
-        let metadata = SubscriptionMetadata {
-            name: sanitize_subscription_name(name),
-            imported_at_ms: now_ms(),
-            proxy_count: prepared.proxy_count,
-            source_url: self.pending_subscription_url.take(),
-            update_interval_minutes: None,
-            // A pasted document has no header to read, so an older import's
-            // numbers must not survive it.
-            usage: self.pending_subscription_usage.take(),
+        // A pasted document has no header to read, so an older import's
+        // numbers must not survive it.
+        let usage = self.pending_subscription_usage.take();
+        let source_url = self.pending_subscription_url.take();
+        let target = self.pending_subscription_target.take();
+        let input = SubscriptionInput {
+            name,
+            document: yaml,
+            source_url,
+            usage,
+            proxy_count: Some(prepared.proxy_count as u32),
+            updated_at_ms: now_ms(),
         };
-        write_subscription_metadata(&self.config_store, &metadata)?;
-        Ok(())
+
+        // Refreshing an existing subscription keeps its id and its override
+        // rules and YAML; the name comes from the caller.
+        if let Some(id) = target.filter(|id| self.subscriptions.read(id).ok().flatten().is_some()) {
+            return self.subscriptions.update(&id, input);
+        }
+        self.subscriptions.create(input).map(|_| ())
     }
 
     fn clear_subscription(&mut self) -> Result<(), RuntimeError> {
-        self.config_store.remove_subscription()?;
-        let _ = remove_subscription_metadata(&self.config_store);
-        Ok(())
+        self.adopt_legacy_subscription()?;
+        match self.subscriptions.active_id() {
+            Some(id) => self.subscriptions.remove(&id),
+            None => Ok(()),
+        }
+    }
+
+    fn remove_subscription(&mut self, id: &str) -> Result<(), RuntimeError> {
+        self.subscriptions.remove(id)
+    }
+
+    fn activate_subscription(&mut self, id: &str) -> Result<(), RuntimeError> {
+        self.subscriptions.set_active(id)
+    }
+
+    fn set_subscription_rules(&mut self, id: &str, rules: &[String]) -> Result<(), RuntimeError> {
+        self.subscriptions.set_rules(id, rules)
+    }
+
+    fn set_subscription_override_yaml(
+        &mut self,
+        id: &str,
+        yaml: Option<&str>,
+    ) -> Result<(), RuntimeError> {
+        self.subscriptions.set_override_yaml(id, yaml)
     }
 
     fn subscription_snapshot(&mut self) -> Result<SubscriptionSnapshot, RuntimeError> {
-        let Some(subscription) = self.config_store.read_subscription()? else {
+        let active = self.active_subscription()?;
+        let Some(subscription) = active else {
             return Ok(SubscriptionSnapshot::default());
         };
 
-        let parsed = crate::subscription_preview::preview(&subscription);
-        let metadata = read_subscription_metadata(&self.config_store);
+        let parsed = crate::subscription_preview::preview(&subscription.document);
         Ok(SubscriptionSnapshot {
             groups: parsed.groups,
             rules: parsed.rules,
             has_subscription: true,
-            source_url: metadata.as_ref().and_then(|m| m.source_url.clone()),
-            updated_at_ms: metadata.as_ref().map(|m| m.imported_at_ms),
-            name: metadata.as_ref().map(|m| m.name.clone()),
-            usage: metadata.as_ref().and_then(|m| m.usage.clone()),
+            source_url: subscription.source_url,
+            updated_at_ms: (subscription.updated_at_ms > 0).then_some(subscription.updated_at_ms),
+            name: Some(subscription.name),
+            usage: subscription.usage,
+            id: Some(subscription.id),
+            active: true,
+            override_rules: subscription.override_rules,
         })
     }
 
@@ -599,7 +697,11 @@ impl MihomoAdapter for MihomoCoreAdapter {
     }
 
     fn subscription_source_url(&mut self) -> Option<String> {
-        read_subscription_metadata(&self.config_store).and_then(|metadata| metadata.source_url)
+        self.subscriptions
+            .active()
+            .ok()
+            .flatten()
+            .and_then(|subscription| subscription.source_url)
     }
 }
 
@@ -1065,8 +1167,10 @@ fn working_directory_of(config_store: &ConfigStore) -> Result<PathBuf, RuntimeEr
         })
 }
 
-/// Metadata kept beside the imported subscription. Stored as JSON so that a
-/// future schema change can be detected instead of silently mis-parsed.
+/// Metadata of the legacy single-subscription layout.
+///
+/// Only read once, so an upgrading installation keeps its name, source URL and
+/// usage numbers when the document is adopted into the subscription library.
 #[derive(serde::Serialize, serde::Deserialize)]
 struct SubscriptionMetadata {
     name: String,
@@ -1086,36 +1190,12 @@ struct SubscriptionMetadata {
 }
 
 const SUBSCRIPTION_METADATA_SUFFIX: &str = ".subscription.json";
-const MAX_SUBSCRIPTION_NAME_CHARS: usize = 120;
 
 fn subscription_metadata_path(config_store: &ConfigStore) -> Option<PathBuf> {
     let subscription_path = config_store.subscription_path()?;
     let file_name = subscription_path.file_name()?.to_str()?;
     let stem = file_name.strip_suffix(".yaml")?;
     Some(subscription_path.with_file_name(format!("{stem}{SUBSCRIPTION_METADATA_SUFFIX}")))
-}
-
-fn write_subscription_metadata(
-    config_store: &ConfigStore,
-    metadata: &SubscriptionMetadata,
-) -> Result<(), RuntimeError> {
-    let Some(path) = subscription_metadata_path(config_store) else {
-        return Ok(());
-    };
-    let encoded = serde_json::to_vec_pretty(metadata).map_err(|error| {
-        RuntimeError::new(
-            RuntimeErrorCode::Internal,
-            format!("The subscription metadata could not be encoded: {error}"),
-            false,
-        )
-    })?;
-    std::fs::write(&path, encoded).map_err(|error| {
-        RuntimeError::new(
-            RuntimeErrorCode::SettingsIo,
-            format!("The subscription metadata could not be written: {error}"),
-            true,
-        )
-    })
 }
 
 fn remove_subscription_metadata(config_store: &ConfigStore) -> std::io::Result<()> {
@@ -1129,30 +1209,10 @@ fn remove_subscription_metadata(config_store: &ConfigStore) -> std::io::Result<(
     }
 }
 
-fn subscription_name(config_store: &ConfigStore) -> Option<String> {
-    read_subscription_metadata(config_store)
-        .map(|metadata| metadata.name)
-        .filter(|name| !name.trim().is_empty())
-}
-
 fn read_subscription_metadata(config_store: &ConfigStore) -> Option<SubscriptionMetadata> {
     let path = subscription_metadata_path(config_store)?;
     let raw = std::fs::read_to_string(path).ok()?;
     serde_json::from_str(&raw).ok()
-}
-
-fn sanitize_subscription_name(name: &str) -> String {
-    let trimmed: String = name
-        .trim()
-        .chars()
-        .filter(|character| !character.is_control())
-        .take(MAX_SUBSCRIPTION_NAME_CHARS)
-        .collect();
-    if trimmed.is_empty() {
-        "Imported subscription".to_owned()
-    } else {
-        trimmed
-    }
 }
 
 fn api_error(message: impl Into<String>) -> RuntimeError {

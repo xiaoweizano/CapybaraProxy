@@ -2,6 +2,7 @@ import {
   CircleCheck,
   CircleDashed,
   Gauge,
+  History,
   Radio,
   Search,
   Server,
@@ -12,6 +13,7 @@ import { useTranslation } from "react-i18next";
 import { useRuntime } from "../../app/runtime/runtimeContext";
 import { useBridgeResource } from "../../app/runtime/useBridgeResource";
 import {
+  getDelayHistory,
   getSubscriptionSnapshot,
   type ProxyNode,
   type RoutingMode,
@@ -301,6 +303,8 @@ export function ProxiesPage() {
         </p>
       ) : null}
 
+      <LatencyHistoryCard />
+
       {!isConnected ? (
         offlineGroups.length > 0 ? (
           <div className="proxy-groups">
@@ -472,5 +476,95 @@ export function ProxiesPage() {
         </div>
       )}
     </WorkspacePage>
+  );
+}
+
+/**
+ * The measurements the app recorded while the page was open.
+ *
+ * Kept in the native side so it survives a re-render and a page switch; the
+ * core itself has no latency history. Newest first, bounded at the write site.
+ */
+function LatencyHistoryCard() {
+  const { t } = useTranslation();
+  const history = useBridgeResource(getDelayHistory, true);
+  const entries = [...(history.data?.entries ?? [])].reverse().slice(0, 40);
+  const now = history.data?.now_ms ?? 0;
+
+  const when = (timestamp: number): string => {
+    if (now <= 0 || timestamp <= 0) {
+      return "—";
+    }
+    const minutes = Math.max(0, Math.floor((now - timestamp) / 60_000));
+    if (minutes < 1) {
+      return t("proxies.historyJustNow");
+    }
+    if (minutes < 120) {
+      return t("proxies.historyMinutesAgo", { count: minutes });
+    }
+    return t("proxies.historyHoursAgo", { count: Math.floor(minutes / 60) });
+  };
+
+  return (
+    <section className="workspace-panel latency-history-panel">
+      <div className="workspace-panel-heading">
+        <div>
+          <span className="workspace-kicker">{t("proxies.historyKicker")}</span>
+          <h2>{t("proxies.historyHeading")}</h2>
+        </div>
+        <div className="workspace-panel-actions">
+          <span className="workspace-count">
+            {entries.length}
+          </span>
+          <button
+            className="workspace-icon-button"
+            type="button"
+            aria-label={t("proxies.historyClearLocal")}
+            title={t("proxies.historyClearLocal")}
+            disabled={history.isLoading}
+            onClick={() => void history.reload()}
+          >
+            <History aria-hidden="true" size={15} />
+          </button>
+        </div>
+      </div>
+      {entries.length === 0 ? (
+        <p className="workspace-hint">{t("proxies.historyEmpty")}</p>
+      ) : (
+        <div className="workspace-table-wrap">
+          <table className="workspace-table">
+            <thead>
+              <tr>
+                <th scope="col">{t("proxies.historyNode")}</th>
+                <th scope="col">{t("proxies.historyDelay")}</th>
+                <th scope="col">{t("proxies.historyWhen")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {entries.map((entry) => (
+                <tr key={`${entry.proxy}-${entry.timestamp_ms}`}>
+                  <td>{entry.proxy}</td>
+                  <td>
+                    <span
+                      className="proxy-delay"
+                      data-quality={
+                        entry.delay_ms < 100
+                          ? "good"
+                          : entry.delay_ms < 200
+                            ? "medium"
+                            : "poor"
+                      }
+                    >
+                      {entry.delay_ms} ms
+                    </span>
+                  </td>
+                  <td>{when(entry.timestamp_ms)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
   );
 }

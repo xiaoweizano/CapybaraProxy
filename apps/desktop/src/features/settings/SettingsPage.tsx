@@ -4,6 +4,7 @@ import {
   Database,
   Languages,
   RadioTower,
+  RefreshCw,
   ScrollText,
   ShieldCheck,
   SlidersHorizontal,
@@ -143,6 +144,7 @@ export function SettingsPage() {
     updateSubscriptionUpdateHours,
     updateUpdateSubscriptionOnLaunch,
     updateAutoConnect,
+    updateRestartAfterSubscriptionUpdate,
     updateSettingsMode,
     updateSilentStart,
     updateMotion,
@@ -424,6 +426,7 @@ export function SettingsPage() {
               </span>
             </div>
           </div>
+          <ProxyBypassField controlsDisabled={controlsDisabled} />
         </SettingsSection>
       ) : null}
 
@@ -465,6 +468,18 @@ export function SettingsPage() {
           </div>
           <p className="settings-inline-hint">{t("settings.autoUpdateHint")}</p>
           <AutoUpdateCustom controlsDisabled={controlsDisabled} />
+          <div className="workspace-option-list">
+            <SettingsSwitchRow
+              icon={<RefreshCw aria-hidden="true" size={16} />}
+              title={t("profiles.restartAfterUpdate")}
+              caption={t("profiles.restartAfterUpdateCaption")}
+              checked={settings.restartAfterSubscriptionUpdate}
+              disabled={controlsDisabled}
+              onChange={(checked) =>
+                void updateRestartAfterSubscriptionUpdate(checked)
+              }
+            />
+          </div>
           <SubscriptionUserAgent controlsDisabled={controlsDisabled} />
         </SettingsSection>
       ) : null}
@@ -632,6 +647,46 @@ function AutoUpdateCustom({ controlsDisabled }: { controlsDisabled: boolean }) {
           : t("settings.autoUpdateCustomHint")}
       </p>
     </div>
+  );
+}
+
+/** The bypass list written to the system proxy while FlowProxy owns it. */
+function ProxyBypassField({ controlsDisabled }: { controlsDisabled: boolean }) {
+  const { t } = useTranslation();
+  const { settings, updateProxyBypass } = useAppSettings();
+  const [draft, setDraft] = useState(settings.proxyBypass);
+
+  const commit = () => {
+    if (draft.trim() === settings.proxyBypass.trim()) {
+      return;
+    }
+    void updateProxyBypass(draft);
+  };
+
+  return (
+    <>
+      <SettingsSubheading
+        kicker={t("profiles.proxyBypassCaption")}
+        title={t("profiles.proxyBypass")}
+        icon={<ShieldCheck aria-hidden="true" size={16} />}
+      />
+      <div className="delay-probe">
+        <label className="subscription-field subscription-field-wide">
+          <span>{t("profiles.proxyBypass")}</span>
+          <input
+            type="text"
+            value={draft}
+            spellCheck={false}
+            autoComplete="off"
+            placeholder={t("profiles.proxyBypassPlaceholder")}
+            disabled={controlsDisabled}
+            onChange={(event) => setDraft(event.target.value)}
+            onBlur={commit}
+          />
+        </label>
+      </div>
+      <p className="settings-inline-hint">{t("profiles.proxyBypassHint")}</p>
+    </>
   );
 }
 

@@ -174,6 +174,25 @@ export type SubscriptionSnapshot = {
   name?: string | null;
   /** Usage and expiry captured at the last import. */
   usage?: SubscriptionUsage | null;
+  /** Identifier of the active subscription. */
+  id?: string | null;
+  /** Always true for the snapshot: it describes the active entry. */
+  active?: boolean;
+  /** Custom rules the operator added on top of the subscription's own. */
+  override_rules?: string[];
+};
+
+/** One latency measurement recorded by the app. */
+export type DelayHistoryEntry = {
+  proxy: string;
+  delay_ms: number;
+  timestamp_ms: number;
+};
+
+/** Latency history, oldest first, plus the server clock at read time. */
+export type DelayHistory = {
+  entries: DelayHistoryEntry[];
+  now_ms: number;
 };
 
 /** An entry listed by an external Sub-Store backend. */
@@ -459,11 +478,16 @@ async function executeRuntimeCommand<T>(
     | "get_connections"
     | "close_connection"
     | "close_all_connections"
+    | "get_delay_history"
     | "get_rules"
     | "get_profiles"
     | "get_subscription_snapshot"
     | "import_subscription"
     | "clear_subscription"
+    | "remove_subscription"
+    | "activate_subscription"
+    | "set_subscription_rules"
+    | "set_subscription_override_yaml"
     | "refresh_subscription"
     | "list_substore_subscriptions"
     | "import_substore_subscription"
@@ -636,7 +660,30 @@ function isSubscriptionSnapshot(value: unknown): value is SubscriptionSnapshot {
       isString(value.name)) &&
     (value.usage === undefined ||
       value.usage === null ||
-      isSubscriptionUsage(value.usage))
+      isSubscriptionUsage(value.usage)) &&
+    (value.id === undefined || value.id === null || isString(value.id)) &&
+    (value.active === undefined || typeof value.active === "boolean") &&
+    (value.override_rules === undefined ||
+      (Array.isArray(value.override_rules) &&
+        value.override_rules.every(isString)))
+  );
+}
+
+function isDelayHistoryEntry(value: unknown): value is DelayHistoryEntry {
+  return (
+    isRecord(value) &&
+    isString(value.proxy) &&
+    isNonNegativeInteger(value.delay_ms) &&
+    Number.isInteger(value.timestamp_ms)
+  );
+}
+
+function isDelayHistory(value: unknown): value is DelayHistory {
+  return (
+    isRecord(value) &&
+    Array.isArray(value.entries) &&
+    value.entries.every(isDelayHistoryEntry) &&
+    Number.isInteger(value.now_ms)
   );
 }
 
@@ -674,6 +721,47 @@ export function clearSubscription(): Promise<
   RuntimeBridgeResult<ProfileInfo[]>
 > {
   return executeRuntimeCommand("clear_subscription", isProfileList);
+}
+
+/** Removes one subscription from the library. */
+export function removeSubscription(
+  id: string,
+): Promise<RuntimeBridgeResult<ProfileInfo[]>> {
+  return executeRuntimeCommand("remove_subscription", isProfileList, { id });
+}
+
+/** Selects the subscription the next start launches with. */
+export function activateSubscription(
+  id: string,
+): Promise<RuntimeBridgeResult<ProfileInfo[]>> {
+  return executeRuntimeCommand("activate_subscription", isProfileList, { id });
+}
+
+/** Replaces the operator's custom rules for one subscription. */
+export function setSubscriptionRules(
+  id: string,
+  rules: string[],
+): Promise<RuntimeBridgeResult<ProfileInfo[]>> {
+  return executeRuntimeCommand("set_subscription_rules", isProfileList, {
+    id,
+    rules,
+  });
+}
+
+/** Replaces the operator's override YAML for one subscription. */
+export function setSubscriptionOverrideYaml(
+  id: string,
+  yaml: string | null,
+): Promise<RuntimeBridgeResult<ProfileInfo[]>> {
+  return executeRuntimeCommand("set_subscription_override_yaml", isProfileList, {
+    id,
+    yaml,
+  });
+}
+
+/** Reads the latency measurements the app recorded for the history view. */
+export function getDelayHistory(): Promise<RuntimeBridgeResult<DelayHistory>> {
+  return executeRuntimeCommand("get_delay_history", isDelayHistory);
 }
 
 /// Re-downloads the stored subscription from its recorded source URL.

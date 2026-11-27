@@ -3,6 +3,7 @@ import {
   FileStack,
   Link2,
   RefreshCw,
+  SlidersHorizontal,
   Timer,
   Trash2,
   Upload,
@@ -12,12 +13,15 @@ import { useTranslation } from "react-i18next";
 import { useRuntime } from "../../app/runtime/runtimeContext";
 import { useBridgeResource } from "../../app/runtime/useBridgeResource";
 import {
-  clearSubscription,
+  activateSubscription,
   getProfiles,
   getSubscriptionSnapshot,
   importSubscription,
   importSubscriptionFromUrl,
   refreshSubscription,
+  removeSubscription,
+  setSubscriptionOverrideYaml,
+  setSubscriptionRules,
   subscribeSubscriptionUpdated,
   type ProfileInfo,
   type RuntimeError,
@@ -140,6 +144,12 @@ export function ProfilesPage() {
   const hasSubscription = (profiles.data ?? []).some(
     (profile): boolean => profile.source === "subscription",
   );
+  const subscriptionProfiles = (profiles.data ?? []).filter(
+    (profile): boolean => profile.source === "subscription",
+  );
+  const activeProfile =
+    subscriptionProfiles.find((profile) => profile.active) ?? null;
+  const [pendingProfile, setPendingProfile] = useState<string | null>(null);
   const coreRunning = snapshot?.state === "connected";
   const refreshable =
     stored.data?.has_subscription === true &&
@@ -245,16 +255,13 @@ export function ProfilesPage() {
     }
   }
 
-  async function removeSubscription(): Promise<void> {
+  /** Removes one subscription, leaving the others untouched. */
+  async function removeOne(profile: ProfileInfo): Promise<void> {
     setActionError(null);
     setNotice(null);
-    setPending(true);
+    setPendingProfile(profile.id);
     try {
-      const result = await clearSubscription();
-      if (result.status === "error") {
-        setActionError(result.error);
-        return;
-      }
+      const result = await removeSubscription(profile.id);
       if (result.status === "unavailable") {
         setActionError({
           code: "internal",
@@ -263,11 +270,44 @@ export function ProfilesPage() {
         });
         return;
       }
-      await profiles.reload();
-      await stored.reload();
+      if (result.status === "error") {
+        setActionError(result.error);
+        return;
+      }
+      await Promise.all([profiles.reload(), stored.reload()]);
       setNotice(t("profiles.noticeRemoved"));
     } finally {
-      setPending(false);
+      setPendingProfile(null);
+    }
+  }
+
+  /** Makes another stored subscription the one the core launches with. */
+  async function activateOne(profile: ProfileInfo): Promise<void> {
+    setActionError(null);
+    setNotice(null);
+    setPendingProfile(profile.id);
+    try {
+      const result = await activateSubscription(profile.id);
+      if (result.status === "unavailable") {
+        setActionError({
+          code: "internal",
+          message: t("profiles.errorBridge"),
+          retryable: true,
+        });
+        return;
+      }
+      if (result.status === "error") {
+        setActionError(result.error);
+        return;
+      }
+      await Promise.all([profiles.reload(), stored.reload()]);
+      setNotice(
+        coreRunning
+          ? t("profiles.noticeRefreshedRunning")
+          : t("profiles.noticeRefreshedStopped"),
+      );
+    } finally {
+      setPendingProfile(null);
     }
   }
 
@@ -420,14 +460,32 @@ export function ProfilesPage() {
                 key={profile.id}
                 profile={profile}
                 removable={hasSubscription && profile.source === "subscription"}
-                disabled={pending}
-                onRemove={() => void removeSubscription()}
+                disabled={pending || pendingProfile !== null}
+                onRemove={() => void removeOne(profile)}
+                onActivate={
+                  profile.source === "subscription" && !profile.active
+                    ? () => void activateOne(profile)
+                    : undefined
+                }
               />
             ))}
           </div>
         )}
         <SubscriptionUsagePanel />
       </section>
+
+      {activeProfile ? (
+        <OverridesPanel
+          key={activeProfile.id}
+          profile={activeProfile}
+          disabled={pending}
+          onSaved={() => {
+            void profiles.reload();
+            void stored.reload();
+            setNotice(t("profiles.overridesSaved"));
+          }}
+        />
+      ) : null}
 
       <section className="workspace-panel">
         <div className="workspace-panel-heading subscription-heading">
@@ -459,9 +517,9 @@ export function ProfilesPage() {
           </div>
         </div>
         <p className="workspace-hint">{t("profiles.subscriptionHint")}</p>
-        {hasSubscription ? (
+        {subscriptionProfiles.length > 0 ? (
           <p className="workspace-hint subscription-replace-hint">
-            {t("profiles.replacesCurrent")}
+            {t("profiles.addsAnother")}
           </p>
         ) : null}
 
@@ -544,16 +602,143 @@ export function ProfilesPage() {
   );
 }
 
+/**
+ * Editor for the operator's overrides on the active subscription.
+ *
+ * Rules are stored one per line and inserted before the subscription's own
+ * catch-all; the YAML box replaces whole top-level blocks. Both survive a
+ * refresh, which is the point of keeping them beside the document rather than
+ * inside it.
+ */
+function OverridesPanel({
+  profile,
+  disabled,
+  onSaved,
+}: {
+  profile: ProfileInfo;
+  disabled: boolean;
+  onSaved: () => void;
+}) {
+  const { t } = useTranslation();
+  const stored = useBridgeResource(getSubscriptionSnapshot, true);
+  const [rules, setRules] = useState(
+    () => (stored.data?.override_rules ?? []).join("\n"),
+  );
+  const [yaml, setYaml] = useState("");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const save = async () => {
+    setPending(true);
+    setError(null);
+    try {
+      const ruleList = rules
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line !== "");
+      const rulesResult = await setSubscriptionRules(profile.id, ruleList);
+      if (rulesResult.status !== "ok") {
+        setError(
+          rulesResult.status === "error"
+            ? rulesResult.error.message
+            : t("profiles.errorBridge"),
+        );
+        return;
+      }
+      const yamlResult = await setSubscriptionOverrideYaml(
+        profile.id,
+        yaml.trim() === "" ? null : yaml,
+      );
+      if (yamlResult.status !== "ok") {
+        setError(
+          yamlResult.status === "error"
+            ? yamlResult.error.message
+            : t("profiles.errorBridge"),
+        );
+        return;
+      }
+      onSaved();
+    } finally {
+      setPending(false);
+    }
+  };
+
+  return (
+    <section className="workspace-panel overrides-panel">
+      <div className="workspace-panel-heading">
+        <div>
+          <span className="workspace-kicker">{t("profiles.overrides")}</span>
+          <h2>{t("profiles.overrides")}</h2>
+        </div>
+        <span className="workspace-icon-button" aria-hidden="true">
+          <SlidersHorizontal size={15} />
+        </span>
+      </div>
+      <p className="workspace-hint">{t("profiles.overridesHint")}</p>
+
+      <div className="subscription-form overrides-form">
+        <label className="subscription-field subscription-field-wide">
+          <span>{t("profiles.overrideRules")}</span>
+          <textarea
+            rows={4}
+            value={rules}
+            spellCheck={false}
+            placeholder={t("profiles.overrideRulesPlaceholder")}
+            disabled={disabled || pending}
+            onChange={(event) => setRules(event.target.value)}
+          />
+        </label>
+        <label className="subscription-field subscription-field-wide">
+          <span>{t("profiles.overrideYaml")}</span>
+          <textarea
+            rows={5}
+            value={yaml}
+            spellCheck={false}
+            placeholder={t("profiles.overrideYamlPlaceholder")}
+            disabled={disabled || pending}
+            onChange={(event) => setYaml(event.target.value)}
+          />
+        </label>
+      </div>
+      <p className="settings-inline-hint">{t("profiles.overrideRulesHint")}</p>
+      <p className="settings-inline-hint">{t("profiles.overrideYamlHint")}</p>
+
+      {error ? (
+        <ResourceFeedback
+          error={{ code: "subscription_invalid", message: error, retryable: false }}
+          unavailable={false}
+        />
+      ) : null}
+
+      <div className="subscription-actions">
+        <span className="subscription-actions-note">
+          {t("profiles.overridesHint2")}
+        </span>
+        <button
+          type="button"
+          className="workspace-primary-button"
+          disabled={disabled || pending}
+          onClick={() => void save()}
+        >
+          {pending ? t("profiles.savingOverrides") : t("profiles.saveOverrides")}
+        </button>
+      </div>
+    </section>
+  );
+}
+
 function ProfileCard({
   profile,
   removable,
   disabled,
   onRemove,
+  onActivate,
 }: {
   profile: ProfileInfo;
   removable: boolean;
   disabled: boolean;
   onRemove: () => void;
+  onActivate?: () => void;
 }) {
   const { t, i18n } = useTranslation();
   const dateFormatter = new Intl.DateTimeFormat(i18n.language, {
@@ -585,12 +770,22 @@ function ProfileCard({
           {t("profiles.active")}
         </span>
       ) : null}
+      {onActivate ? (
+        <button
+          type="button"
+          className="workspace-action-button"
+          disabled={disabled}
+          onClick={onActivate}
+        >
+          {t("profiles.activate")}
+        </button>
+      ) : null}
       {removable ? (
         <button
           type="button"
           className="workspace-icon-button"
-          aria-label={t("profiles.remove")}
-          title={t("profiles.remove")}
+          aria-label={t("profiles.removeOne", { name: profile.name })}
+          title={t("profiles.removeOne", { name: profile.name })}
           disabled={disabled}
           onClick={onRemove}
         >

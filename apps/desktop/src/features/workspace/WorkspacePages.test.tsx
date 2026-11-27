@@ -9,14 +9,17 @@ import {
 } from "../../app/runtime/runtimeContext";
 import { SettingsProvider } from "../../app/settings/SettingsProvider";
 import {
-  clearSubscription,
   closeAllConnections,
   closeConnection,
   getConnections,
   getProfiles,
   getRules,
   importSubscription,
+  activateSubscription,
   importSubscriptionFromUrl,
+  getDelayHistory,
+  getSubscriptionSnapshot,
+  removeSubscription,
   type ConnectionPage,
   type ConnectionSummary,
   type ProfileInfo,
@@ -34,7 +37,9 @@ vi.mock("../../platform/runtime", async (importOriginal) => {
     await importOriginal<typeof import("../../platform/runtime")>();
   return {
     ...actual,
-    clearSubscription: vi.fn(),
+    activateSubscription: vi.fn(),
+    getDelayHistory: vi.fn(),
+    removeSubscription: vi.fn(),
     closeAllConnections: vi.fn(),
     closeConnection: vi.fn(),
     getConnections: vi.fn(),
@@ -48,7 +53,6 @@ vi.mock("../../platform/runtime", async (importOriginal) => {
   };
 });
 
-const clearSubscriptionMock = vi.mocked(clearSubscription);
 const importSubscriptionMock = vi.mocked(importSubscription);
 const importSubscriptionFromUrlMock = vi.mocked(importSubscriptionFromUrl);
 const getConnectionsMock = vi.mocked(getConnections);
@@ -56,6 +60,10 @@ const getProfilesMock = vi.mocked(getProfiles);
 const getRulesMock = vi.mocked(getRules);
 const closeConnectionMock = vi.mocked(closeConnection);
 const closeAllConnectionsMock = vi.mocked(closeAllConnections);
+const removeSubscriptionMock = vi.mocked(removeSubscription);
+const activateSubscriptionMock = vi.mocked(activateSubscription);
+const getSubscriptionSnapshotMock = vi.mocked(getSubscriptionSnapshot);
+const getDelayHistoryMock = vi.mocked(getDelayHistory);
 
 const connectedSnapshot: RuntimeSnapshot = {
   backend: "mihomo",
@@ -210,6 +218,18 @@ describe("real data workspace pages", () => {
     closeAllConnectionsMock.mockReset().mockResolvedValue({
       status: "ok",
       data: null,
+    });
+    removeSubscriptionMock.mockReset().mockResolvedValue({
+      status: "ok",
+      data: [],
+    });
+    activateSubscriptionMock.mockReset().mockResolvedValue({
+      status: "ok",
+      data: [],
+    });
+    getDelayHistoryMock.mockReset().mockResolvedValue({
+      status: "ok",
+      data: { entries: [], now_ms: 1_760_000_000_000 },
     });
   });
 
@@ -398,7 +418,9 @@ describe("real data workspace pages", () => {
       screen.getByRole("button", { name: "Import subscription" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("Importing a subscription replaces the current one."),
+      screen.getByText(
+        "Importing adds a new subscription and makes it active; the others stay available below.",
+      ),
     ).toBeInTheDocument();
   });
 
@@ -439,7 +461,7 @@ describe("real data workspace pages", () => {
       status: "ok",
       data: [importedProfile],
     });
-    clearSubscriptionMock.mockResolvedValueOnce({
+    removeSubscriptionMock.mockResolvedValueOnce({
       status: "ok",
       data: [connectedProfile],
     });
@@ -452,15 +474,48 @@ describe("real data workspace pages", () => {
     await screen.findByText("Imported subscription");
 
     await user.click(
-      screen.getByRole("button", { name: "Remove subscription" }),
+      screen.getByRole("button", { name: "Remove Imported subscription" }),
     );
 
     await waitFor(() => {
-      expect(clearSubscriptionMock).toHaveBeenCalledTimes(1);
+      expect(removeSubscriptionMock).toHaveBeenCalledWith(
+        "flowproxy-subscription",
+      );
     });
     expect(
       await screen.findByText(/direct profile is active again/),
     ).toBeInTheDocument();
+  });
+
+  it("lists every stored subscription and switches the active one", async () => {
+    const user = userEvent.setup();
+    getProfilesMock.mockResolvedValue({
+      status: "ok",
+      data: [
+        { ...importedProfile, id: "sub-primary", name: "Primary", active: true },
+        { ...importedProfile, id: "sub-backup", name: "Backup", active: false },
+      ],
+    });
+    getSubscriptionSnapshotMock.mockResolvedValue({
+      status: "ok",
+      data: {
+        groups: [],
+        rules: [],
+        has_subscription: true,
+        id: "sub-primary",
+        name: "Primary",
+        override_rules: [],
+      },
+    });
+
+    renderWithRuntime(<ProfilesPage />);
+
+    expect(await screen.findByText("Primary")).toBeInTheDocument();
+    expect(screen.getByText("Backup")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Use this subscription" }));
+
+    expect(activateSubscriptionMock).toHaveBeenCalledWith("sub-backup");
   });
 
   it("shows bounded Runtime logs from the shared provider", () => {

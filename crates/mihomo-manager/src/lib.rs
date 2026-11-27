@@ -6,6 +6,7 @@ pub mod subscription;
 pub mod subscription_convert;
 pub mod subscription_fetch;
 pub mod subscription_preview;
+pub mod subscription_store;
 mod system_proxy;
 
 use flowproxy_contracts::{
@@ -135,6 +136,10 @@ pub trait MihomoAdapter: Send {
     /// A pasted document passes `None` so stale numbers cannot survive it.
     fn set_pending_subscription_usage(&mut self, _usage: Option<SubscriptionUsage>) {}
 
+    /// Names the stored subscription the next import should replace. `None`
+    /// creates a new entry, which is what a first import does.
+    fn set_pending_subscription_target(&mut self, _id: Option<String>) {}
+
     fn connections(&mut self) -> Result<ConnectionPage, RuntimeError> {
         Err(unsupported_adapter_data("active connections"))
     }
@@ -168,6 +173,30 @@ pub trait MihomoAdapter: Send {
     /// Removes the imported subscription and returns to the direct profile.
     fn clear_subscription(&mut self) -> Result<(), RuntimeError> {
         Err(unsupported_adapter_data("subscription removal"))
+    }
+
+    /// Removes one subscription by id, whether or not it is active.
+    fn remove_subscription(&mut self, _id: &str) -> Result<(), RuntimeError> {
+        Err(unsupported_adapter_data("subscription removal"))
+    }
+
+    /// Makes a stored subscription the one the next start uses.
+    fn activate_subscription(&mut self, _id: &str) -> Result<(), RuntimeError> {
+        Err(unsupported_adapter_data("subscription activation"))
+    }
+
+    /// Replaces the operator's custom rules for one subscription.
+    fn set_subscription_rules(&mut self, _id: &str, _rules: &[String]) -> Result<(), RuntimeError> {
+        Err(unsupported_adapter_data("subscription overrides"))
+    }
+
+    /// Replaces the operator's override YAML for one subscription.
+    fn set_subscription_override_yaml(
+        &mut self,
+        _id: &str,
+        _yaml: Option<&str>,
+    ) -> Result<(), RuntimeError> {
+        Err(unsupported_adapter_data("subscription overrides"))
     }
 
     /// Read-only summary of the stored subscription for the offline UI.
@@ -222,6 +251,10 @@ where
 
     fn set_pending_subscription_usage(&mut self, usage: Option<SubscriptionUsage>) {
         self.as_mut().set_pending_subscription_usage(usage)
+    }
+
+    fn set_pending_subscription_target(&mut self, id: Option<String>) {
+        self.as_mut().set_pending_subscription_target(id)
     }
 
     fn health(&mut self) -> Result<(), RuntimeError> {
@@ -298,6 +331,26 @@ where
 
     fn clear_subscription(&mut self) -> Result<(), RuntimeError> {
         self.as_mut().clear_subscription()
+    }
+
+    fn remove_subscription(&mut self, id: &str) -> Result<(), RuntimeError> {
+        self.as_mut().remove_subscription(id)
+    }
+
+    fn activate_subscription(&mut self, id: &str) -> Result<(), RuntimeError> {
+        self.as_mut().activate_subscription(id)
+    }
+
+    fn set_subscription_rules(&mut self, id: &str, rules: &[String]) -> Result<(), RuntimeError> {
+        self.as_mut().set_subscription_rules(id, rules)
+    }
+
+    fn set_subscription_override_yaml(
+        &mut self,
+        id: &str,
+        yaml: Option<&str>,
+    ) -> Result<(), RuntimeError> {
+        self.as_mut().set_subscription_override_yaml(id, yaml)
     }
 
     fn subscription_snapshot(&mut self) -> Result<SubscriptionSnapshot, RuntimeError> {

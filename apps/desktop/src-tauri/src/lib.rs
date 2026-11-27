@@ -7,10 +7,10 @@ mod tray_strings;
 mod tray_summary;
 
 use flowproxy_contracts::{
-    CommandResult, ConnectionPage, CoreInfo, CorePreferences, DelayProbeSettings, GroupDelayResult,
-    LogLevel, ProfileInfo, ProxyGroup, RoutingMode, RuleItem, RuntimeBackend, RuntimeError,
-    RuntimeErrorCode, RuntimeLogEntry, RuntimeSnapshot, StartupPreferences, SubscriptionSnapshot,
-    TelemetrySnapshot,
+    CommandResult, ConnectionPage, CoreInfo, CorePreferences, DelayHistory, DelayHistoryEntry,
+    DelayProbeSettings, GroupDelayResult, LogLevel, ProfileInfo, ProxyGroup, RoutingMode, RuleItem,
+    RuntimeBackend, RuntimeError, RuntimeErrorCode, RuntimeLogEntry, RuntimeSnapshot, RuntimeState,
+    StartupPreferences, SubscriptionSnapshot, TelemetrySnapshot,
 };
 use flowproxy_mihomo_manager::{MihomoAdapter, MihomoCoreAdapter, UnavailableMihomoAdapter};
 use flowproxy_runtime::{RuntimeChange, RuntimeFailure, RuntimeManager};
@@ -18,6 +18,7 @@ use logging::LogFileStore;
 use settings::{
     CloseBehavior, DesktopSettings, SettingsStore, SettingsStoreError, TraySpeedDisplay,
 };
+use std::collections::VecDeque;
 use std::fmt::Display;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -50,6 +51,18 @@ const MAX_DELAY_TIMEOUT_MS: u32 = 10_000;
 /// Upper bound for subscription documents pasted or downloaded into the app.
 const MAX_SUBSCRIPTION_YAML_BYTES: usize = 8 * 1024 * 1024;
 
+/// How many latency measurements are kept for the history view.
+const MAX_DELAY_HISTORY_ENTRIES: usize = 2_000;
+
+/// Wall-clock time in epoch milliseconds.
+fn now_ms() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .ok()
+        .and_then(|duration| i64::try_from(duration.as_millis()).ok())
+        .unwrap_or(0)
+}
+
 type DesktopAdapter = Box<dyn MihomoAdapter>;
 type DesktopIntegration = SystemIntegration<RuntimeManager<DesktopAdapter>, NativePlatform>;
 
@@ -62,6 +75,9 @@ struct AppState {
     logs: Arc<LogFileStore>,
     /// Summary last rendered into the tray, used to skip redundant rebuilds.
     tray_summary: Mutex<Option<TraySummary>>,
+    /// Recent latency measurements, oldest first. Bounded so a long session
+    /// cannot grow it without limit.
+    delay_history: Mutex<VecDeque<DelayHistoryEntry>>,
 }
 
 impl AppState {
@@ -81,6 +97,35 @@ impl AppState {
             exit_gate: ExitGate::default(),
             logs,
             tray_summary: Mutex::new(None),
+            delay_history: Mutex::new(VecDeque::new()),
+        }
+    }
+
+    /// Appends one measurement, dropping the oldest entries past the cap.
+    fn record_delay(&self, proxy: &str, delay_ms: u32) {
+        let entry = DelayHistoryEntry {
+            proxy: proxy.to_owned(),
+            delay_ms,
+            timestamp_ms: now_ms(),
+        };
+        let mut history = self
+            .delay_history
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        history.push_back(entry);
+        while history.len() > MAX_DELAY_HISTORY_ENTRIES {
+            history.pop_front();
+        }
+    }
+
+    fn delay_history(&self) -> DelayHistory {
+        let history = self
+            .delay_history
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        DelayHistory {
+            entries: history.iter().cloned().collect(),
+            now_ms: now_ms(),
         }
     }
 
@@ -117,6 +162,15 @@ impl AppState {
             .apply_delay_probe(delay_probe_settings(&settings));
         self.logs
             .configure(settings.log_to_file, settings.log_retention_days);
+        // The bypass list is part of the system proxy, not the profile; apply
+        // it right away so the UI reflects what the OS now holds. A backend
+        // failure is reported through the integration status, not the save.
+        if let Err(failure) = self
+            .system_integration
+            .set_proxy_bypass(settings.proxy_bypass.clone())
+        {
+            log_native_error("applying the proxy bypass list", &failure.error);
+        }
         Ok(settings)
     }
 
@@ -824,12 +878,16 @@ fn test_proxy_delay(
     {
         return CommandResult::failure(error);
     }
-    run_data_command(
+    let result = run_data_command(
         &app,
         state
             .runtime
             .test_proxy_delay(&proxy, bounded_delay_timeout(timeout_ms)),
-    )
+    );
+    if let CommandResult::Success(delay) = &result {
+        state.record_delay(&proxy, *delay);
+    }
+    result
 }
 
 #[tauri::command]
@@ -846,12 +904,24 @@ fn test_group_delay(
     ) {
         return CommandResult::failure(error);
     }
-    run_data_command(
+    let result = run_data_command(
         &app,
         state
             .runtime
             .test_group_delay(&group, bounded_delay_timeout(timeout_ms)),
-    )
+    );
+    if let CommandResult::Success(samples) = &result {
+        for sample in &samples.delays {
+            state.record_delay(&sample.proxy, sample.delay_ms);
+        }
+    }
+    result
+}
+
+/// Returns the latency history recorded so far.
+#[tauri::command]
+fn get_delay_history(state: State<'_, AppState>) -> CommandResult<DelayHistory> {
+    CommandResult::success(state.delay_history())
 }
 
 #[tauri::command]
@@ -897,10 +967,7 @@ fn close_connection(
 }
 
 #[tauri::command]
-fn close_all_connections(
-    app: tauri::AppHandle,
-    state: State<'_, AppState>,
-) -> CommandResult<()> {
+fn close_all_connections(app: tauri::AppHandle, state: State<'_, AppState>) -> CommandResult<()> {
     run_data_command(&app, state.runtime.close_all_connections())
 }
 
@@ -937,7 +1004,11 @@ fn import_subscription(
     name: String,
     yaml: Option<String>,
     url: Option<String>,
+    target: Option<String>,
 ) -> CommandResult<Vec<ProfileInfo>> {
+    // A target means "replace that entry"; a fresh import clears it so an
+    // earlier refresh target cannot leak into an unrelated import.
+    state.runtime.set_pending_subscription_target(target);
     let document = match (yaml, url) {
         (Some(yaml), _) if !yaml.trim().is_empty() => {
             // A pasted document has no download and therefore no usage header;
@@ -1021,13 +1092,14 @@ fn refresh_subscription(
     };
 
     let user_agent = state.settings().subscription_user_agent;
-    let (document, usage) = match flowproxy_mihomo_manager::subscription_fetch::fetch_with_user_agent(
-        &url,
-        user_agent.as_deref(),
-    ) {
-        Ok(result) => result,
-        Err(error) => return CommandResult::failure(error),
-    };
+    let (document, usage) =
+        match flowproxy_mihomo_manager::subscription_fetch::fetch_with_user_agent(
+            &url,
+            user_agent.as_deref(),
+        ) {
+            Ok(result) => result,
+            Err(error) => return CommandResult::failure(error),
+        };
 
     if document.len() > MAX_SUBSCRIPTION_YAML_BYTES {
         return CommandResult::failure(RuntimeError::new(
@@ -1040,14 +1112,20 @@ fn refresh_subscription(
         ));
     }
 
-    // Reuse the stored name so the profile keeps its identity across refreshes.
-    let name = state
+    // Reuse the active entry's id and name so a refresh updates it in place
+    // instead of adding a duplicate subscription.
+    let active = state
         .runtime
-        .profiles()
+        .subscription_snapshot()
         .ok()
-        .and_then(|profiles| profiles.into_iter().next())
-        .map(|profile| profile.name)
-        .unwrap_or_else(|| "Imported subscription".to_owned());
+        .map(|snapshot| (snapshot.id, snapshot.name));
+    let (active_id, name) = match active {
+        Some((id, name)) => (
+            id,
+            name.unwrap_or_else(|| "Imported subscription".to_owned()),
+        ),
+        None => (None, "Imported subscription".to_owned()),
+    };
     if let Err(error) = validate_identifier(
         "subscription name",
         &name,
@@ -1059,6 +1137,7 @@ fn refresh_subscription(
     // The import path stores the source URL again; keep it so a second refresh
     // still knows where the document came from.
     state.runtime.set_pending_subscription_url(Some(url));
+    state.runtime.set_pending_subscription_target(active_id);
     state
         .runtime
         .set_pending_subscription_usage((!usage.is_empty()).then_some(usage));
@@ -1081,6 +1160,79 @@ fn clear_subscription(
     }
 
     CommandResult::success(state.runtime.profiles().unwrap_or_default())
+}
+
+/// Removes one subscription from the library by id.
+#[tauri::command]
+fn remove_subscription(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    id: String,
+) -> CommandResult<Vec<ProfileInfo>> {
+    if let Err(failure) = state.runtime.remove_subscription(&id) {
+        emit_runtime_change(&app, &failure.change);
+        return CommandResult::failure(failure.error);
+    }
+    publish_subscription_update(&app, None);
+    CommandResult::success(state.runtime.profiles().unwrap_or_default())
+}
+
+/// Makes a stored subscription the one the next start launches with.
+#[tauri::command]
+fn activate_subscription(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    id: String,
+) -> CommandResult<Vec<ProfileInfo>> {
+    if let Err(failure) = state.runtime.activate_subscription(&id) {
+        emit_runtime_change(&app, &failure.change);
+        return CommandResult::failure(failure.error);
+    }
+    publish_subscription_update(&app, None);
+    CommandResult::success(state.runtime.profiles().unwrap_or_default())
+}
+
+/// Replaces the operator's custom rules for one subscription, then re-checks
+/// the assembled profile so a bad rule fails here rather than at the next start.
+#[tauri::command]
+fn set_subscription_rules(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    id: String,
+    rules: Vec<String>,
+) -> CommandResult<Vec<ProfileInfo>> {
+    if let Err(failure) = state.runtime.set_subscription_rules(&id, &rules) {
+        emit_runtime_change(&app, &failure.change);
+        return CommandResult::failure(failure.error);
+    }
+    publish_subscription_update(&app, None);
+    CommandResult::success(state.runtime.profiles().unwrap_or_default())
+}
+
+/// Replaces the operator's override YAML for one subscription.
+#[tauri::command]
+fn set_subscription_override_yaml(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    id: String,
+    yaml: Option<String>,
+) -> CommandResult<Vec<ProfileInfo>> {
+    if let Err(failure) = state
+        .runtime
+        .set_subscription_override_yaml(&id, yaml.as_deref())
+    {
+        emit_runtime_change(&app, &failure.change);
+        return CommandResult::failure(failure.error);
+    }
+    publish_subscription_update(&app, None);
+    CommandResult::success(state.runtime.profiles().unwrap_or_default())
+}
+
+/// Tells every window the subscription library changed.
+fn publish_subscription_update(app: &tauri::AppHandle, name: Option<&str>) {
+    if let Err(error) = app.emit(SUBSCRIPTION_UPDATED_EVENT, name) {
+        log_native_error("publishing the subscription update", error);
+    }
 }
 
 #[tauri::command]
@@ -1284,16 +1436,17 @@ fn spawn_auto_connect(app: tauri::AppHandle) {
 fn refresh_stored_subscription(app: &tauri::AppHandle, state: &AppState) -> Option<String> {
     let url = state.runtime.subscription_source_url()?;
     let user_agent = state.settings().subscription_user_agent;
-    let (document, usage) = match flowproxy_mihomo_manager::subscription_fetch::fetch_with_user_agent(
-        &url,
-        user_agent.as_deref(),
-    ) {
-        Ok(result) => result,
-        Err(error) => {
-            log_native_error("downloading the stored subscription", error);
-            return None;
-        }
-    };
+    let (document, usage) =
+        match flowproxy_mihomo_manager::subscription_fetch::fetch_with_user_agent(
+            &url,
+            user_agent.as_deref(),
+        ) {
+            Ok(result) => result,
+            Err(error) => {
+                log_native_error("downloading the stored subscription", error);
+                return None;
+            }
+        };
     if document.len() > MAX_SUBSCRIPTION_YAML_BYTES {
         log_native_error(
             "refreshing the stored subscription",
@@ -1302,15 +1455,21 @@ fn refresh_stored_subscription(app: &tauri::AppHandle, state: &AppState) -> Opti
         return None;
     }
 
-    let name = state
+    let active = state
         .runtime
-        .profiles()
+        .subscription_snapshot()
         .ok()
-        .and_then(|profiles| profiles.into_iter().next())
-        .map(|profile| profile.name)
-        .unwrap_or_else(|| "Imported subscription".to_owned());
+        .map(|snapshot| (snapshot.id, snapshot.name));
+    let (active_id, name) = match active {
+        Some((id, name)) => (
+            id,
+            name.unwrap_or_else(|| "Imported subscription".to_owned()),
+        ),
+        None => (None, "Imported subscription".to_owned()),
+    };
 
     state.runtime.set_pending_subscription_url(Some(url));
+    state.runtime.set_pending_subscription_target(active_id);
     state
         .runtime
         .set_pending_subscription_usage((!usage.is_empty()).then_some(usage));
@@ -1318,8 +1477,12 @@ fn refresh_stored_subscription(app: &tauri::AppHandle, state: &AppState) -> Opti
         Ok(()) => {
             // The webview re-reads profiles and the offline snapshot when this
             // event arrives, so an automatic refresh shows up without a click.
-            if let Err(error) = app.emit(SUBSCRIPTION_UPDATED_EVENT, &name) {
-                log_native_error("publishing the subscription update", error);
+            publish_subscription_update(app, Some(&name));
+            // The new nodes only take effect once the core reads them, which
+            // happens on the next start. Restarting here is what the operator
+            // asked for by enabling the setting; a stopped core stays stopped.
+            if state.settings().restart_after_subscription_update {
+                restart_after_refresh(app, state);
             }
             Some(name)
         }
@@ -1328,6 +1491,31 @@ fn refresh_stored_subscription(app: &tauri::AppHandle, state: &AppState) -> Opti
             // replace the working one; the next tick retries.
             log_native_error("refreshing the subscription automatically", &failure.error);
             None
+        }
+    }
+}
+
+/// Restarts a running core so a freshly refreshed subscription takes effect.
+///
+/// Goes through the system integration so the system proxy is restored and
+/// re-applied around the restart, exactly like the manual Restart button. A
+/// stopped or failed core is left alone: an automatic refresh must not start a
+/// core the operator shut down.
+fn restart_after_refresh(app: &tauri::AppHandle, state: &AppState) {
+    let snapshot = state.runtime.snapshot();
+    if !matches!(
+        snapshot.state,
+        RuntimeState::Connected | RuntimeState::RunningDisconnected
+    ) {
+        return;
+    }
+    match state.system_integration.restart_runtime() {
+        Ok(change) => emit_runtime_change(app, &change),
+        Err(failure) => {
+            if let Some(change) = failure.runtime_change {
+                emit_runtime_change(app, &change);
+            }
+            log_native_error("restarting after a subscription refresh", &failure.error);
         }
     }
 }
@@ -1390,13 +1578,14 @@ fn import_substore_subscription(
         return CommandResult::failure(error);
     }
     let user_agent = state.settings().subscription_user_agent;
-    let (document, usage) = match flowproxy_mihomo_manager::subscription_fetch::fetch_with_user_agent(
-        &url,
-        user_agent.as_deref(),
-    ) {
-        Ok(result) => result,
-        Err(error) => return CommandResult::failure(error),
-    };
+    let (document, usage) =
+        match flowproxy_mihomo_manager::subscription_fetch::fetch_with_user_agent(
+            &url,
+            user_agent.as_deref(),
+        ) {
+            Ok(result) => result,
+            Err(error) => return CommandResult::failure(error),
+        };
     if document.len() > MAX_SUBSCRIPTION_YAML_BYTES {
         return CommandResult::failure(RuntimeError::new(
             RuntimeErrorCode::SubscriptionInvalid,
@@ -1420,9 +1609,7 @@ fn import_substore_subscription(
     let profiles = state.runtime.profiles().unwrap_or_default();
     // The subscription page refreshes its list on this event, which is also
     // where the user lands after importing from Settings.
-    if let Err(error) = app.emit(SUBSCRIPTION_UPDATED_EVENT, &name) {
-        log_native_error("publishing the Sub-Store import", error);
-    }
+    publish_subscription_update(&app, Some(&name));
     CommandResult::success(profiles)
 }
 
@@ -1467,6 +1654,7 @@ pub fn run() {
             select_proxy,
             test_proxy_delay,
             test_group_delay,
+            get_delay_history,
             get_core_preferences,
             set_core_preferences,
             get_connections,
@@ -1477,6 +1665,10 @@ pub fn run() {
             get_subscription_snapshot,
             import_subscription,
             clear_subscription,
+            remove_subscription,
+            activate_subscription,
+            set_subscription_rules,
+            set_subscription_override_yaml,
             refresh_subscription,
             get_runtime_logs,
             get_settings,
@@ -1518,6 +1710,11 @@ pub fn run() {
             ));
             if let Err(error) = system_integration.recover_on_startup() {
                 log_native_error("recovering the system proxy on startup", error);
+            }
+            if let Err(failure) =
+                system_integration.set_proxy_bypass(loaded_settings.settings.proxy_bypass.clone())
+            {
+                log_native_error("applying the saved proxy bypass list", &failure.error);
             }
             let log_directory = app
                 .path()

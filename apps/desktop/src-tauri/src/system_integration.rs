@@ -131,7 +131,7 @@ pub trait PlatformControl: Send {
     fn capabilities(&mut self) -> PlatformCapabilities;
     fn recover_proxy(&mut self) -> Result<ProxyRecovery, PlatformError>;
     fn proxy_snapshot(&mut self) -> Result<SystemProxySnapshot, PlatformError>;
-    fn enable_proxy(&mut self, endpoint: &str) -> Result<(), PlatformError>;
+    fn enable_proxy(&mut self, endpoint: &str, bypass: Option<&str>) -> Result<(), PlatformError>;
     fn startup_status(&mut self, executable: &Path) -> Result<StartupState, PlatformError>;
     fn enable_startup(&mut self, executable: &Path) -> Result<StartupActionOutcome, PlatformError>;
     fn disable_startup(&mut self, executable: &Path)
@@ -144,6 +144,10 @@ pub struct SystemIntegration<R, P> {
     executable: PathBuf,
     lifecycle: Mutex<()>,
     pending_proxy_enable: Mutex<bool>,
+    /// Bypass list applied with every system-proxy enable. Stored here rather
+    /// than passed on each call so the re-enable after a restart uses the same
+    /// list the operator configured.
+    proxy_bypass: Mutex<Option<String>>,
     last_error: Mutex<Option<RuntimeError>>,
 }
 
@@ -159,6 +163,7 @@ where
             executable,
             lifecycle: Mutex::new(()),
             pending_proxy_enable: Mutex::new(false),
+            proxy_bypass: Mutex::new(None),
             last_error: Mutex::new(None),
         }
     }
@@ -283,9 +288,10 @@ where
                 }
             }
 
+            let bypass = self.proxy_bypass();
             let result = {
                 let mut platform = self.lock_platform();
-                platform.enable_proxy(&endpoint)
+                platform.enable_proxy(&endpoint, bypass.as_deref())
             };
             if let Err(error) = result {
                 return Err(self.platform_failure("enable the system proxy", &error));
@@ -436,9 +442,10 @@ where
                 return Some(error);
             }
         };
+        let bypass = self.proxy_bypass();
         let result = {
             let mut platform = self.lock_platform();
-            platform.enable_proxy(&endpoint)
+            platform.enable_proxy(&endpoint, bypass.as_deref())
         };
         match result {
             Ok(()) => {
@@ -496,6 +503,65 @@ where
         self.lifecycle
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
+    /// Replaces the bypass list applied with the next enable, and re-applies
+    /// it to an already managed proxy so the change takes effect immediately.
+    pub fn set_proxy_bypass(
+        &self,
+        bypass: Option<String>,
+    ) -> Result<SystemIntegrationStatus, IntegrationFailure> {
+        let bypass = bypass
+            .map(|value| value.trim().to_owned())
+            .filter(|value| !value.is_empty());
+        {
+            let mut current = self
+                .proxy_bypass
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            *current = bypass.clone();
+        }
+
+        let managed = {
+            let mut platform = self.lock_platform();
+            platform
+                .proxy_snapshot()
+                .map(|snapshot| snapshot.managed && snapshot.active)
+                .map_err(|error| self.platform_failure("read the system proxy", &error))?
+        };
+
+        if managed {
+            let endpoint = self
+                .runtime
+                .controlled_proxy_endpoint()
+                .map_err(IntegrationFailure::runtime)?;
+            // Rewriting the bypass list requires a fresh enable: the registry
+            // value is written as a whole.
+            {
+                let mut platform = self.lock_platform();
+                platform
+                    .recover_proxy()
+                    .map_err(|error| self.platform_failure("refresh the system proxy", &error))?;
+            }
+            let result = {
+                let mut platform = self.lock_platform();
+                platform.enable_proxy(&endpoint, bypass.as_deref())
+            };
+            if let Err(error) = result {
+                return Err(self.platform_failure("apply the system proxy bypass list", &error));
+            }
+        }
+
+        self.clear_last_error();
+        self.status().map_err(IntegrationFailure::platform)
+    }
+
+    /// The configured bypass list, if the operator set one.
+    pub fn proxy_bypass(&self) -> Option<String> {
+        self.proxy_bypass
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clone()
     }
 
     fn lock_pending(&self) -> MutexGuard<'_, bool> {
@@ -564,8 +630,12 @@ mod windows_platform {
             self.proxy.snapshot()
         }
 
-        fn enable_proxy(&mut self, endpoint: &str) -> Result<(), PlatformError> {
-            self.proxy.enable(endpoint)
+        fn enable_proxy(
+            &mut self,
+            endpoint: &str,
+            bypass: Option<&str>,
+        ) -> Result<(), PlatformError> {
+            self.proxy.enable_with_overrides(endpoint, bypass)
         }
 
         fn startup_status(&mut self, executable: &Path) -> Result<StartupState, PlatformError> {
@@ -636,7 +706,11 @@ mod unsupported_platform {
             Err(unsupported())
         }
 
-        fn enable_proxy(&mut self, _endpoint: &str) -> Result<(), PlatformError> {
+        fn enable_proxy(
+            &mut self,
+            _endpoint: &str,
+            _bypass: Option<&str>,
+        ) -> Result<(), PlatformError> {
             Err(unsupported())
         }
 
@@ -916,7 +990,11 @@ mod tests {
             Ok(self.proxy.clone())
         }
 
-        fn enable_proxy(&mut self, endpoint: &str) -> Result<(), PlatformError> {
+        fn enable_proxy(
+            &mut self,
+            endpoint: &str,
+            _bypass: Option<&str>,
+        ) -> Result<(), PlatformError> {
             self.record("platform.enable");
             self.proxy = SystemProxySnapshot {
                 managed: true,

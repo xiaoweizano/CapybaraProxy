@@ -31,6 +31,10 @@ export type DesktopSettings = {
   auto_connect?: boolean;
   /** User-Agent for subscription downloads; `null`/absent keeps the default. */
   subscription_user_agent?: string | null;
+  /** Bypass list written to the system proxy; empty keeps the OS list. */
+  proxy_bypass?: string | null;
+  /** Restart the core after an automatic subscription refresh. */
+  restart_after_subscription_update?: boolean;
   /** How many settings groups the Settings page shows. */
   settings_mode?: SettingsMode;
   /** Start with the main window hidden so only the tray icon appears. */
@@ -100,6 +104,11 @@ function isDesktopSettings(value: unknown): value is DesktopSettings {
     (value.subscription_user_agent === undefined ||
       value.subscription_user_agent === null ||
       typeof value.subscription_user_agent === "string") &&
+    (value.proxy_bypass === undefined ||
+      value.proxy_bypass === null ||
+      typeof value.proxy_bypass === "string") &&
+    (value.restart_after_subscription_update === undefined ||
+      typeof value.restart_after_subscription_update === "boolean") &&
     (value.settings_mode === undefined ||
       value.settings_mode === "simple" ||
       value.settings_mode === "standard" ||

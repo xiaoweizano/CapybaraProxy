@@ -489,6 +489,38 @@ where
         self.adapter_mutation("subscription removal", A::clear_subscription)
     }
 
+    /// Removes one subscription by id.
+    pub fn remove_subscription(&self, id: &str) -> Result<(), RuntimeFailure> {
+        self.adapter_mutation("subscription removal", |adapter| {
+            adapter.remove_subscription(id)
+        })
+    }
+
+    /// Selects the subscription the next start launches with.
+    pub fn activate_subscription(&self, id: &str) -> Result<(), RuntimeFailure> {
+        self.adapter_mutation("subscription activation", |adapter| {
+            adapter.activate_subscription(id)
+        })
+    }
+
+    /// Replaces the operator's custom rules for one subscription.
+    pub fn set_subscription_rules(&self, id: &str, rules: &[String]) -> Result<(), RuntimeFailure> {
+        self.adapter_mutation("subscription overrides", |adapter| {
+            adapter.set_subscription_rules(id, rules)
+        })
+    }
+
+    /// Replaces the operator's override YAML for one subscription.
+    pub fn set_subscription_override_yaml(
+        &self,
+        id: &str,
+        yaml: Option<&str>,
+    ) -> Result<(), RuntimeFailure> {
+        self.adapter_mutation("subscription overrides", |adapter| {
+            adapter.set_subscription_override_yaml(id, yaml)
+        })
+    }
+
     /// Sets the values the adapter writes into the next generated profile.
     ///
     /// This does not touch the running core: the preferences take effect the
@@ -514,6 +546,13 @@ where
     pub fn set_pending_subscription_usage(&self, usage: Option<SubscriptionUsage>) {
         let _operation = self.lock_operation();
         self.lock_adapter().set_pending_subscription_usage(usage);
+    }
+
+    /// Names the stored subscription the next import replaces instead of
+    /// creating a new entry. `None` imports as a new subscription.
+    pub fn set_pending_subscription_target(&self, id: Option<String>) {
+        let _operation = self.lock_operation();
+        self.lock_adapter().set_pending_subscription_target(id);
     }
 
     /// Returns the URL the stored subscription was imported from.
@@ -1341,6 +1380,11 @@ mod tests {
         }
 
         fn clear_subscription(&mut self) -> Result<(), RuntimeError> {
+            self.imported_subscription = None;
+            Ok(())
+        }
+
+        fn remove_subscription(&mut self, _id: &str) -> Result<(), RuntimeError> {
             self.imported_subscription = None;
             Ok(())
         }

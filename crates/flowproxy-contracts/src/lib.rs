@@ -275,6 +275,30 @@ pub struct DelaySample {
     pub delay_ms: u32,
 }
 
+/// One latency measurement kept for the history view.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct DelayHistoryEntry {
+    pub proxy: String,
+    pub delay_ms: u32,
+    /// Matches [`TelemetrySnapshot::timestamp_ms`] and [`DelayHistory::now_ms`].
+    pub timestamp_ms: i64,
+}
+
+/// Recent latency measurements, oldest first.
+///
+/// The core does not keep latency history, so the app records the values the
+/// operator measured. It is bounded at the write site and never grows with the
+/// length of a session.
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+pub struct DelayHistory {
+    #[serde(default)]
+    pub entries: Vec<DelayHistoryEntry>,
+    /// Server clock at the time of the read, so the UI can render "2 min ago"
+    /// without comparing against a clock the webview may have skewed.
+    #[serde(default)]
+    pub now_ms: i64,
+}
+
 /// Result of probing every node in a proxy group.
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub struct GroupDelayResult {
@@ -362,6 +386,18 @@ pub struct SubscriptionSnapshot {
     /// Usage and expiry from the provider, captured at the last import.
     #[serde(default)]
     pub usage: Option<SubscriptionUsage>,
+    /// Identifier of the stored subscription, so assembly operations can name
+    /// it. `None` while no subscription is stored.
+    #[serde(default)]
+    pub id: Option<String>,
+    /// Whether this subscription is the one the core launches with.
+    #[serde(default)]
+    pub active: bool,
+    /// Rules the operator added on top of the subscription's own list. Stored
+    /// separately so a refresh never silently drops them; the core receives
+    /// them inserted before the subscription's catch-all rule.
+    #[serde(default)]
+    pub override_rules: Vec<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

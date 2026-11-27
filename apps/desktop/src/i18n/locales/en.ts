@@ -140,6 +140,16 @@ export const en = {
     testAllGroups: "Test every group",
     testingAllGroups: "Testing all groups…",
     testedGroups: "Measured {{count}} nodes across all groups.",
+    historyKicker: "Recorded measurements",
+    historyHeading: "Latency history",
+    historyEmpty: "No measurement has been recorded yet.",
+    historyClearLocal: "Clear",
+    historyNode: "Node",
+    historyDelay: "Delay",
+    historyWhen: "Measured",
+    historyJustNow: "just now",
+    historyMinutesAgo: "{{count}} min ago",
+    historyHoursAgo: "{{count}} h ago",
   },
   rules: {
     eyebrow: "Routing",
@@ -203,6 +213,8 @@ export const en = {
     subscriptionHint:
       "FlowProxy keeps the control endpoint, API secret and proxy port under its own policy. Everything else in the subscription is used unchanged. Subscription URLs may be downloaded through the system proxy.",
     replacesCurrent: "Importing a subscription replaces the current one.",
+    addsAnother:
+      "Importing adds a new subscription and makes it active; the others stay available below.",
     tabUrl: "From a URL",
     tabYaml: "Paste YAML",
     name: "Name",
@@ -251,6 +263,34 @@ export const en = {
       "This provider did not report usage or expiry with the subscription.",
     autoApplyNotice:
       "Subscription updated. Restart the Runtime to load the new nodes.",
+    libraryKicker: "Library",
+    libraryHeading: "Stored subscriptions",
+    activate: "Use this subscription",
+    activating: "Switching…",
+    removeOne: "Remove {{name}}",
+    overrides: "Overrides",
+    overridesHint:
+      "Applied on top of the subscription every time it is launched. They survive a refresh.",
+    overrideRules: "Custom rules",
+    overrideRulesPlaceholder: "DOMAIN-SUFFIX,example.com,Proxy",
+    overrideRulesHint:
+      "One rule per line. Rules run before the subscription's catch-all rule.",
+    overrideYaml: "Override YAML",
+    overrideYamlPlaceholder: "dns:\n  enable: true",
+    overrideYamlHint:
+      "Whole top-level blocks replace the subscription's own. Control keys (ports, secret, allow-lan) and rules are ignored here.",
+    saveOverrides: "Save overrides",
+    savingOverrides: "Saving…",
+    overridesSaved: "Overrides saved.",
+    overridesHint2: "The new rules take effect the next time the core starts.",
+    restartAfterUpdate: "Restart after update",
+    restartAfterUpdateCaption:
+      "Restart the running core when an automatic subscription update lands",
+    proxyBypass: "System proxy bypass",
+    proxyBypassCaption: "Hosts that skip the proxy",
+    proxyBypassPlaceholder: "localhost;127.*;10.*;*.internal",
+    proxyBypassHint:
+      "Separated by semicolons. Leave empty to keep the list Windows already has.",
   },
   logs: {
     eyebrow: "Runtime events",
@@ -348,6 +388,7 @@ export const en = {
     subscriptionUserAgentHint:
       "Leave empty to send the built-in Clash identifier, which is what most providers use to choose the profile format.",
     subscriptionUserAgentPlaceholder: "clash.meta/… (FlowProxy)",
+    library: "Multiple subscriptions",
     logs: "Logs",
     logsKicker: "Retention",
     logToFile: "Write logs to disk",

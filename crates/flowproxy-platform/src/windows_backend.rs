@@ -24,6 +24,7 @@ pub const WINDOWS_INTERNET_SETTINGS_KEY: &str =
     r"HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings";
 pub const WINDOWS_PROXY_ENABLE_VALUE: &str = "ProxyEnable";
 pub const WINDOWS_PROXY_SERVER_VALUE: &str = "ProxyServer";
+pub const WINDOWS_PROXY_OVERRIDE_VALUE: &str = "ProxyOverride";
 pub const WINDOWS_RUN_KEY: &str = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run";
 pub const WINDOWS_STARTUP_VALUE_NAME: &str = "FlowProxy";
 
@@ -455,7 +456,12 @@ where
             .read_dword(WINDOWS_PROXY_ENABLE_VALUE)?
             .map(|value| value != 0);
         let server = self.read_string(WINDOWS_PROXY_SERVER_VALUE)?;
-        Ok(ProxySettings { enabled, server })
+        let overrides = self.read_string(WINDOWS_PROXY_OVERRIDE_VALUE)?;
+        Ok(ProxySettings {
+            enabled,
+            server,
+            overrides,
+        })
     }
 
     fn write_enabled(&mut self, value: Option<bool>) -> Result<(), PlatformError> {
@@ -481,6 +487,19 @@ where
             None => self
                 .registry
                 .delete_value(WINDOWS_INTERNET_SETTINGS_KEY, WINDOWS_PROXY_SERVER_VALUE),
+        }
+    }
+
+    fn write_overrides(&mut self, value: Option<&str>) -> Result<(), PlatformError> {
+        match value {
+            Some(value) => self.registry.write_string(
+                WINDOWS_INTERNET_SETTINGS_KEY,
+                WINDOWS_PROXY_OVERRIDE_VALUE,
+                value,
+            ),
+            None => self
+                .registry
+                .delete_value(WINDOWS_INTERNET_SETTINGS_KEY, WINDOWS_PROXY_OVERRIDE_VALUE),
         }
     }
 

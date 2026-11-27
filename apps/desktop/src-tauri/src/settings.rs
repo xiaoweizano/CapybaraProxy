@@ -135,6 +135,14 @@ pub(crate) struct DesktopSettings {
     /// built-in Clash identifier, which is what providers expect.
     #[serde(default)]
     pub subscription_user_agent: Option<String>,
+    /// Bypass list written to the system proxy while FlowProxy owns it.
+    /// Empty keeps the list Windows already has.
+    #[serde(default)]
+    pub proxy_bypass: Option<String>,
+    /// Restart the core automatically after an automatic subscription refresh,
+    /// so the new nodes take effect without a manual restart.
+    #[serde(default)]
+    pub restart_after_subscription_update: bool,
     /// How many settings groups the Settings page shows.
     #[serde(default)]
     pub settings_mode: SettingsMode,
@@ -309,10 +317,18 @@ impl DesktopSettings {
             .subscription_user_agent
             .map(|value| value.trim().to_owned())
             .filter(|value| {
-                !value.is_empty()
-                    && value.len() <= 512
-                    && !value.chars().any(char::is_control)
+                !value.is_empty() && value.len() <= 512 && !value.chars().any(char::is_control)
             });
+        // A bypass list is a set of entries; blank ones are dropped here so the
+        // UI never has to guess what was saved.
+        self.proxy_bypass = self.proxy_bypass.map(|value| {
+            value
+                .split([';', ','])
+                .map(str::trim)
+                .filter(|entry| !entry.is_empty() && entry.len() <= 255)
+                .collect::<Vec<_>>()
+                .join(";")
+        });
         self.window_width = self.window_width.map(|width| width.clamp(820, 7680));
         self.window_height = self.window_height.map(|height| height.clamp(680, 4320));
         if self.window_width.is_none() || self.window_height.is_none() {
@@ -339,6 +355,8 @@ impl Default for DesktopSettings {
             update_subscription_on_launch: false,
             auto_connect: false,
             subscription_user_agent: None,
+            proxy_bypass: None,
+            restart_after_subscription_update: false,
             settings_mode: SettingsMode::default(),
             silent_start: false,
             motion: MotionPreference::default(),
@@ -596,6 +614,8 @@ mod tests {
             update_subscription_on_launch: true,
             auto_connect: true,
             subscription_user_agent: Some("ClashParty/1.0".to_owned()),
+            proxy_bypass: Some("localhost;*.internal".to_owned()),
+            restart_after_subscription_update: true,
             settings_mode: SettingsMode::Relaxed,
             silent_start: true,
             motion: MotionPreference::Reduced,

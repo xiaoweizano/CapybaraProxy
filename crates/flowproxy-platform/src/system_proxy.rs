@@ -39,12 +39,21 @@ impl std::error::Error for PlatformError {}
 pub struct ProxySettings {
     pub enabled: Option<bool>,
     pub server: Option<String>,
+    /// Windows' semicolon-separated bypass list (`ProxyOverride`). Backed up and
+    /// restored with the rest of the settings, so a managed proxy never leaves
+    /// the operator with a different bypass list than the one they had.
+    #[serde(default)]
+    pub overrides: Option<String>,
 }
 
 pub trait ProxyBackend {
     fn read(&mut self) -> Result<ProxySettings, PlatformError>;
     fn write_enabled(&mut self, value: Option<bool>) -> Result<(), PlatformError>;
     fn write_server(&mut self, value: Option<&str>) -> Result<(), PlatformError>;
+    /// Replaces the bypass list. Backends without one keep the no-op default.
+    fn write_overrides(&mut self, _value: Option<&str>) -> Result<(), PlatformError> {
+        Ok(())
+    }
     fn refresh(&mut self) -> Result<(), PlatformError>;
 }
 
@@ -79,6 +88,18 @@ where
     }
 
     pub fn enable(&mut self, endpoint: &str) -> Result<(), PlatformError> {
+        self.enable_with_overrides(endpoint, None)
+    }
+
+    /// Same as [`enable`], but also writes `overrides` as the bypass list.
+    ///
+    /// The previous list is journalled, so disabling FlowProxy's proxy puts the
+    /// operator's own list back.
+    pub fn enable_with_overrides(
+        &mut self,
+        endpoint: &str,
+        overrides: Option<&str>,
+    ) -> Result<(), PlatformError> {
         validate_managed_endpoint(endpoint)?;
 
         if self.journal_path.exists() {
@@ -96,11 +117,15 @@ where
         };
         write_journal(&self.journal_path, &journal)?;
 
-        let apply_result = self
+        let mut apply_result = self
             .backend
             .write_server(Some(endpoint))
-            .and_then(|_| self.backend.write_enabled(Some(true)))
-            .and_then(|_| self.backend.refresh());
+            .and_then(|_| self.backend.write_enabled(Some(true)));
+        if let Some(overrides) = normalized_overrides(overrides) {
+            apply_result =
+                apply_result.and_then(|_| self.backend.write_overrides(Some(&overrides)));
+        }
+        let apply_result = apply_result.and_then(|_| self.backend.refresh());
 
         if let Err(error) = apply_result {
             return match self.restore(&original) {
@@ -172,6 +197,7 @@ where
         self.backend
             .write_server(settings.server.as_deref())
             .and_then(|_| self.backend.write_enabled(settings.enabled))
+            .and_then(|_| self.backend.write_overrides(settings.overrides.as_deref()))
             .and_then(|_| self.backend.refresh())
     }
 
@@ -253,6 +279,18 @@ fn invalid_endpoint() -> PlatformError {
 
 fn matches_managed(settings: &ProxySettings, managed_server: &str) -> bool {
     settings.enabled == Some(true) && settings.server.as_deref() == Some(managed_server)
+}
+
+/// Trims a bypass list and drops empty entries. An empty result means "no
+/// custom list", not "an empty list", so a blank field never clears the
+/// operator's own entries by accident.
+fn normalized_overrides(overrides: Option<&str>) -> Option<String> {
+    let entries: Vec<&str> = overrides?
+        .split([';', ','])
+        .map(str::trim)
+        .filter(|entry| !entry.is_empty())
+        .collect();
+    (!entries.is_empty()).then(|| entries.join(";"))
 }
 
 fn write_journal(path: &Path, journal: &ProxyJournal) -> Result<(), PlatformError> {
@@ -364,6 +402,7 @@ mod tests {
                     settings: ProxySettings {
                         enabled,
                         server: server.map(str::to_owned),
+                        overrides: None,
                     },
                     ..BackendState::default()
                 })),
@@ -391,6 +430,10 @@ mod tests {
             state.settings.enabled = Some(enabled);
             state.settings.server = Some(server.to_owned());
         }
+
+        fn set_overrides(&self, overrides: Option<&str>) {
+            self.state.borrow_mut().settings.overrides = overrides.map(str::to_owned);
+        }
     }
 
     impl ProxyBackend for FakeProxyBackend {
@@ -414,6 +457,11 @@ mod tests {
                 });
             }
             state.settings.server = value.map(str::to_owned);
+            Ok(())
+        }
+
+        fn write_overrides(&mut self, value: Option<&str>) -> Result<(), PlatformError> {
+            self.state.borrow_mut().settings.overrides = value.map(str::to_owned);
             Ok(())
         }
 
@@ -442,6 +490,7 @@ mod tests {
             ProxySettings {
                 enabled: Some(true),
                 server: Some(MANAGED_SERVER.to_owned()),
+                overrides: None,
             }
         );
         assert_eq!(backend.refresh_count(), 1);
@@ -449,6 +498,50 @@ mod tests {
         assert!(journal.contains(ORIGINAL_SERVER));
         assert!(journal.contains(MANAGED_SERVER));
         assert!(journal.contains("\"enabled\": false"));
+    }
+
+    #[test]
+    fn managed_proxy_writes_the_bypass_list_and_restores_the_original_one() {
+        let directory = tempfile::tempdir().expect("temporary journal directory");
+        let backend = FakeProxyBackend::new(Some(false), Some(ORIGINAL_SERVER));
+        backend.set_overrides(Some("localhost;<local>"));
+        let mut manager = SystemProxyManager::new(journal_path(&directory), backend.clone());
+
+        manager
+            .enable_with_overrides(MANAGED_SERVER, Some("localhost; 10.* ;; *.internal"))
+            .expect("enable managed proxy");
+
+        // Blank entries are dropped and the list is normalised to `;`.
+        assert_eq!(
+            backend.settings().overrides.as_deref(),
+            Some("localhost;10.*;*.internal")
+        );
+        let journal = fs::read_to_string(journal_path(&directory)).expect("read proxy journal");
+        assert!(journal.contains("localhost;<local>"));
+
+        manager.disable().expect("release managed proxy");
+
+        assert_eq!(
+            backend.settings().overrides.as_deref(),
+            Some("localhost;<local>")
+        );
+    }
+
+    #[test]
+    fn an_empty_bypass_list_leaves_the_operators_own_list_alone() {
+        let directory = tempfile::tempdir().expect("temporary journal directory");
+        let backend = FakeProxyBackend::new(Some(false), Some(ORIGINAL_SERVER));
+        backend.set_overrides(Some("localhost;<local>"));
+        let mut manager = SystemProxyManager::new(journal_path(&directory), backend.clone());
+
+        manager
+            .enable_with_overrides(MANAGED_SERVER, Some("  ;  "))
+            .expect("enable managed proxy");
+
+        assert_eq!(
+            backend.settings().overrides.as_deref(),
+            Some("localhost;<local>")
+        );
     }
 
     #[test]
@@ -468,6 +561,7 @@ mod tests {
             ProxySettings {
                 enabled: Some(false),
                 server: Some(ORIGINAL_SERVER.to_owned()),
+                overrides: None,
             }
         );
         assert!(!journal_path(&directory).exists());
@@ -491,6 +585,7 @@ mod tests {
             ProxySettings {
                 enabled: Some(true),
                 server: Some("10.0.0.2:8080".to_owned()),
+                overrides: None,
             }
         );
         assert!(!journal_path(&directory).exists());
@@ -512,6 +607,7 @@ mod tests {
             ProxySettings {
                 enabled: Some(true),
                 server: Some(ORIGINAL_SERVER.to_owned()),
+                overrides: None,
             }
         );
     }
@@ -533,6 +629,7 @@ mod tests {
             ProxySettings {
                 enabled: Some(true),
                 server: Some(MANAGED_SERVER.to_owned()),
+                overrides: None,
             }
         );
     }
@@ -554,6 +651,7 @@ mod tests {
             ProxySettings {
                 enabled: Some(false),
                 server: Some(ORIGINAL_SERVER.to_owned()),
+                overrides: None,
             }
         );
         assert!(!journal_path(&directory).exists());
@@ -587,6 +685,7 @@ mod tests {
             ProxySettings {
                 enabled: Some(true),
                 server: Some(MANAGED_SERVER.to_owned()),
+                overrides: None,
             }
         );
     }
