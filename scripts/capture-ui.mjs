@@ -246,7 +246,7 @@ async function captureScreenshot(client, screenshot) {
 
   const selector =
     screenshot.route === "/settings"
-      ? ".settings-grid, .settings-panel-wide"
+      ? ".settings-section, .settings-section-nav"
       : screenshot.route === "/"
         ? ".connection-hero, .overview-middle-grid, .overview-bottom-grid"
         : ".workspace-page, .workspace-panel";

@@ -32,6 +32,12 @@
   content: "";
 }
 
+/* A badge that reports a backend or configuration, not a live reading. */
+.workspace-live-badge[data-tone="neutral"]::before {
+  background: var(--accent-cyan);
+  box-shadow: 0 0 8px rgba(var(--accent-cyan-rgb), 0.5);
+}
+
 .workspace-panel {
   min-width: 0;
   padding: 18px;
@@ -804,77 +810,6 @@
   margin-bottom: 13px;
 }
 
-.proxy-mode-options {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 10px;
-}
-
-.proxy-mode-option {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  min-height: 56px;
-  padding: 10px 13px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-primary);
-  text-align: left;
-  cursor: pointer;
-}
-
-.proxy-mode-option:hover:not(:disabled) {
-  background: rgba(var(--accent-rgb), 0.05);
-}
-
-.proxy-mode-option[aria-pressed="true"] {
-  border-color: rgba(var(--accent-rgb), 0.32);
-  background: rgba(var(--accent-rgb), 0.08);
-}
-
-.proxy-mode-option:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-.proxy-mode-option strong {
-  display: block;
-  font-size: 0.9375rem;
-  font-variation-settings: "wght" 600;
-}
-
-.proxy-mode-option small {
-  display: block;
-  margin-top: 2px;
-  color: var(--text-secondary);
-  font-size: 0.75rem;
-}
-
-.proxy-mode-radio,
-.behavior-radio {
-  display: grid;
-  width: 15px;
-  height: 15px;
-  flex: 0 0 auto;
-  place-items: center;
-  border: 1px solid var(--border-strong);
-  border-radius: 50%;
-}
-
-.proxy-mode-option[aria-pressed="true"] .proxy-mode-radio,
-.behavior-option[aria-pressed="true"] .behavior-radio {
-  border-color: var(--accent-cyan);
-}
-
-.proxy-mode-radio > span,
-.behavior-radio > span {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--accent-cyan);
-}
-
 .proxy-group-test {
   gap: 6px;
   min-width: 0;
@@ -959,4 +894,225 @@
   border-color: rgba(var(--accent-rgb), 0.34);
   background: rgba(var(--accent-rgb), 0.1);
   color: var(--accent-cyan);
+}
+
+/* ---------------------------------------------------------------------------
+   Shared setting primitives
+   ---------------------------------------------------------------------------
+   Settings is not the only page with preferences, so the controls it needs
+   live here next to the panels they sit in. Keeping one implementation is what
+   stops the pages from drifting apart again.
+   --------------------------------------------------------------------------- */
+
+/* Numbered badge on the right of a panel heading (Settings uses 01–0n). */
+.workspace-panel-index {
+  color: var(--text-faint);
+  font-family: var(--font-display);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+/* Vertical list of mutually exclusive choices. */
+.workspace-option-list {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+/* Grid of mutually exclusive choices; wraps to one column when narrow. */
+.workspace-option-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.workspace-option {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-height: 56px;
+  padding: 10px 13px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.workspace-option:hover:not(:disabled) {
+  background: rgba(var(--accent-rgb), 0.05);
+}
+
+.workspace-option[aria-pressed="true"] {
+  border-color: rgba(var(--accent-rgb), 0.32);
+  background: rgba(var(--accent-rgb), 0.08);
+}
+
+.workspace-option:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.workspace-option strong {
+  display: block;
+  font-size: 0.9375rem;
+  font-variation-settings: "wght" 600;
+}
+
+.workspace-option small {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+
+.workspace-option > span:last-child {
+  min-width: 0;
+}
+
+.workspace-radio {
+  display: grid;
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+}
+
+.workspace-option[aria-pressed="true"] .workspace-radio {
+  border-color: var(--accent);
+}
+
+.workspace-radio > span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+/* A row of a settings list: icon, copy, trailing control. */
+.workspace-setting-row {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 11px;
+  min-height: 56px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.workspace-setting-row > span {
+  min-width: 0;
+}
+
+.workspace-setting-icon {
+  display: grid;
+  width: 31px;
+  height: 31px;
+  place-items: center;
+  border-radius: 9px;
+  background: rgba(var(--accent-rgb), 0.08);
+  color: var(--accent-cyan);
+}
+
+:root[data-theme="warm_flow"] .workspace-setting-icon {
+  color: #267dc4;
+}
+
+.workspace-setting-row strong {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 0.9375rem;
+  font-variation-settings: "wght" 650;
+}
+
+.workspace-setting-row small {
+  display: block;
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+}
+
+.workspace-setting-detail {
+  display: block;
+  margin-top: 3px;
+  color: var(--text-faint);
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
+/* Switch */
+.workspace-switch {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--input-bg);
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.workspace-switch > span {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--text-faint);
+  transition:
+    background 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.workspace-switch[aria-checked="true"] {
+  border-color: rgba(var(--accent-rgb), 0.42);
+  background: rgba(var(--accent-rgb), 0.2);
+}
+
+.workspace-switch[aria-checked="true"] > span {
+  background: var(--accent);
+  box-shadow: 0 0 9px rgba(var(--accent-rgb), 0.5);
+  transform: translateX(16px);
+}
+
+.workspace-switch:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+/* Small state pill used next to a settings row. */
+.workspace-status-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-faint);
+  font-size: 0.75rem;
+  font-weight: 750;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.workspace-status-pill[data-state="blocked"] {
+  border-color: rgba(255, 181, 71, 0.24);
+  background: rgba(255, 181, 71, 0.07);
+  color: var(--warning);
+}
+
+.workspace-status-pill[data-state="available"] {
+  border-color: rgba(var(--success-rgb), 0.26);
+  background: rgba(var(--success-rgb), 0.07);
+  color: var(--success);
 }

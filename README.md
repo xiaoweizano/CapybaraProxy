@@ -61,8 +61,17 @@
 2. 启动后进入 **Profiles** 页面，粘贴订阅 YAML 或填写订阅 URL，点击 **Import subscription**。
 3. 回到 **Overview**，点击 hero 区域下方的 **Connect**。
 4. 状态变为 `Connected` 后，Proxies 页面会列出订阅里的真实节点。
-5. 需要走系统代理时，在 **Settings → Integration** 打开 **System proxy**。
+5. 需要走系统代理时，在 **Settings → System integration** 打开 **System proxy**。
 6. 界面语言在 **Settings → Appearance → Language** 切换（中文 / English），选择会持久化；旧版 `settings.json` 没有该字段时按系统语言初始化。
+
+Settings 页面按 `配置模式`（简易 / 标准 / 宽松）显示不同数量的分组，全部为单列全宽卡片，顶部有分组导航。除主题、语言与系统集成外，还包括：
+
+- **窗口与启动**：关闭按钮行为（隐藏到托盘 / 退出）、静默启动、开机启动。
+- **订阅**：启动时更新、自动更新间隔；也可在此对接外部 Sub-Store 服务后一键导入（宽松模式）。
+- **日志**：Runtime 事件写入按天滚动的日志文件，可设置保留天数、打开目录、清空文件。
+- **核心与高级内核**：日志级别、IPv6、统一延迟、并发 TCP、固定混合端口、延迟测试地址与超时。
+- **托盘**：菜单与提示中显示状态与当前节点，托盘图标可绘制实时上下行速率（图标数字 / 仅提示 / 不显示）。
+- **动画效果**：完整 / 减少。
 
 订阅能力的完整边界见 `docs/development/subscription-scope.md`。
 

@@ -49,6 +49,33 @@ pub fn validate_url(url: &str) -> Result<(), RuntimeError> {
 /// Errors never contain the URL. Operators get a stable message and can check
 /// the address themselves.
 pub fn fetch(url: &str) -> Result<String, RuntimeError> {
+    let (response, _) = send_request(url)?;
+    read_subscription_body(response)
+}
+
+/// Fetches a document that is *not* a subscription, such as a Sub-Store API
+/// response.
+///
+/// Shares the transport policy with [`fetch`] — scheme check, system-proxy
+/// hint, short direct retry, redirect rules, header support — but leaves the
+/// body untouched: no Clash normalisation, no `proxies:` requirement.
+pub fn fetch_text(
+    url: &str,
+    headers: &[(&str, &str)],
+    max_bytes: usize,
+) -> Result<String, RuntimeError> {
+    let (response, _) = send_request_with(url, headers)?;
+    read_body(response, max_bytes)
+}
+
+fn send_request(url: &str) -> Result<(reqwest::blocking::Response, bool), RuntimeError> {
+    send_request_with(url, &[])
+}
+
+fn send_request_with(
+    url: &str,
+    headers: &[(&str, &str)],
+) -> Result<(reqwest::blocking::Response, bool), RuntimeError> {
     validate_url(url)?;
 
     // Subscription hosts are usually only reachable through the proxy client
@@ -58,24 +85,30 @@ pub fn fetch(url: &str) -> Result<String, RuntimeError> {
     let proxy = system_proxy::proxy_url_for(url);
     let client = build_client(proxy.as_deref())?;
 
-    let mut response = match client.get(url).send() {
+    let mut request = client.get(url);
+    for (name, value) in headers {
+        request = request.header(*name, *value);
+    }
+
+    let response = match request.send() {
         Ok(response) => response,
         Err(error) if proxy.is_some() && is_transport_error(&error) => {
             // A proxy client can exit without clearing the system proxy. One
             // short direct attempt keeps the import working in that case.
-            build_direct_client()?
-                .get(url)
-                .send()
-                .map_err(|error| {
-                    invalid(format!(
-                        "The subscription could not be downloaded: {} (tried the system proxy and a direct connection)",
-                        describe_request_error(&error)
-                    ))
-                })?
+            let mut retry = build_direct_client()?.get(url);
+            for (name, value) in headers {
+                retry = retry.header(*name, *value);
+            }
+            retry.send().map_err(|error| {
+                invalid(format!(
+                    "The download failed: {} (tried the system proxy and a direct connection)",
+                    describe_request_error(&error)
+                ))
+            })?
         }
         Err(error) => {
             return Err(invalid(format!(
-                "The subscription could not be downloaded: {}",
+                "The download failed: {}",
                 describe_request_error(&error)
             )))
         }
@@ -83,17 +116,31 @@ pub fn fetch(url: &str) -> Result<String, RuntimeError> {
 
     if !response.status().is_success() {
         return Err(invalid(format!(
-            "The subscription server returned HTTP {}.",
+            "The server returned HTTP {}.",
             response.status().as_u16()
         )));
     }
 
+    Ok((response, proxy.is_some()))
+}
+
+fn read_subscription_body(response: reqwest::blocking::Response) -> Result<String, RuntimeError> {
+    let text = read_body(response, MAX_SUBSCRIPTION_BYTES)?;
+    // Providers answer a non-Clash client with a base64 share-link list. The
+    // conversion only rewrites text that is not already a Clash document, so a
+    // normal profile passes through untouched.
+    let text = subscription_convert::normalize(&text);
+    preflight(&text)?;
+    Ok(text)
+}
+
+fn read_body(
+    mut response: reqwest::blocking::Response,
+    max_bytes: usize,
+) -> Result<String, RuntimeError> {
     if let Some(length) = response.content_length() {
-        if length > MAX_SUBSCRIPTION_BYTES as u64 {
-            return Err(invalid(format!(
-                "The subscription is larger than the {} MiB limit.",
-                MAX_SUBSCRIPTION_BYTES / (1024 * 1024)
-            )));
+        if length > max_bytes as u64 {
+            return Err(too_large(max_bytes));
         }
     }
 
@@ -102,30 +149,27 @@ pub fn fetch(url: &str) -> Result<String, RuntimeError> {
     loop {
         let read = response.read(&mut buffer).map_err(|error| {
             invalid(format!(
-                "The subscription download failed while reading: {}",
+                "The download failed while reading: {}",
                 redact(&error.to_string())
             ))
         })?;
         if read == 0 {
             break;
         }
-        if body.len() + read > MAX_SUBSCRIPTION_BYTES {
-            return Err(invalid(format!(
-                "The subscription is larger than the {} MiB limit.",
-                MAX_SUBSCRIPTION_BYTES / (1024 * 1024)
-            )));
+        if body.len() + read > max_bytes {
+            return Err(too_large(max_bytes));
         }
         body.extend_from_slice(&buffer[..read]);
     }
 
-    let text = String::from_utf8(body)
-        .map_err(|_| invalid("The subscription is not valid UTF-8 text."))?;
-    // Providers answer a non-Clash client with a base64 share-link list. The
-    // conversion only rewrites text that is not already a Clash document, so a
-    // normal profile passes through untouched.
-    let text = subscription_convert::normalize(&text);
-    preflight(&text)?;
-    Ok(text)
+    String::from_utf8(body).map_err(|_| invalid("The response is not valid UTF-8 text."))
+}
+
+fn too_large(max_bytes: usize) -> RuntimeError {
+    invalid(format!(
+        "The response is larger than the {} MiB limit.",
+        max_bytes / (1024 * 1024)
+    ))
 }
 
 fn build_client(proxy: Option<&str>) -> Result<reqwest::blocking::Client, RuntimeError> {

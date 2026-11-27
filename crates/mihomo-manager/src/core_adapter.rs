@@ -117,7 +117,11 @@ impl MihomoCoreAdapter {
     }
 
     fn start_core_with_profile(&mut self) -> Result<(), RuntimeError> {
-        let (api_port, proxy_port) = reserve_loopback_ports()?;
+        let preferred_proxy_port = match self.startup_preferences.proxy_port {
+            0 => None,
+            port => Some(port),
+        };
+        let (api_port, proxy_port) = reserve_loopback_ports(preferred_proxy_port)?;
         let secret = random_hex(32)?;
         let binary_path = self.binary.path().to_path_buf();
         let working_directory = working_directory_of(&self.config_store)?;
@@ -863,7 +867,12 @@ fn join_output_reader(
         })
 }
 
-fn reserve_loopback_ports() -> Result<(u16, u16), RuntimeError> {
+/// Reserves the API and proxy loopback ports.
+///
+/// When the operator pinned a mixed-port the proxy port is bound exactly;
+/// a port that is already taken is an error rather than a silent fallback,
+/// because the system proxy keeps pointing at the configured number.
+fn reserve_loopback_ports(preferred_proxy_port: Option<u16>) -> Result<(u16, u16), RuntimeError> {
     let first = TcpListener::bind(("127.0.0.1", 0)).map_err(|error| {
         RuntimeError::new(
             RuntimeErrorCode::ApiUnavailable,
@@ -881,13 +890,21 @@ fn reserve_loopback_ports() -> Result<(u16, u16), RuntimeError> {
             )
         })?
         .port();
-    let second = TcpListener::bind(("127.0.0.1", 0)).map_err(|error| {
-        RuntimeError::new(
-            RuntimeErrorCode::ApiUnavailable,
-            format!("A second loopback port could not be reserved: {error}"),
-            true,
-        )
-    })?;
+    let second =
+        TcpListener::bind(("127.0.0.1", preferred_proxy_port.unwrap_or(0))).map_err(|error| {
+            match preferred_proxy_port {
+                Some(port) => RuntimeError::new(
+                    RuntimeErrorCode::ApiUnavailable,
+                    format!("The configured mixed-port {port} is not available: {error}"),
+                    true,
+                ),
+                None => RuntimeError::new(
+                    RuntimeErrorCode::ApiUnavailable,
+                    format!("A second loopback port could not be reserved: {error}"),
+                    true,
+                ),
+            }
+        })?;
     let second_port = second
         .local_addr()
         .map_err(|error| {
@@ -900,6 +917,13 @@ fn reserve_loopback_ports() -> Result<(u16, u16), RuntimeError> {
         .port();
     drop(second);
     drop(first);
+    if first_port == second_port {
+        return Err(RuntimeError::new(
+            RuntimeErrorCode::ApiUnavailable,
+            "The API and mixed-port loopback ports must differ.",
+            true,
+        ));
+    }
     Ok((first_port, second_port))
 }
 
@@ -1135,6 +1159,7 @@ mod tests {
     use crate::MihomoAdapter;
     use flowproxy_contracts::RuntimeErrorCode;
     use std::io::Cursor;
+    use std::net::TcpListener;
     use std::path::PathBuf;
     use std::process::{Command, Stdio};
     use std::sync::atomic::{AtomicBool, Ordering};
@@ -1189,10 +1214,27 @@ mod tests {
 
     #[test]
     fn reserved_loopback_ports_are_distinct_and_non_zero() {
-        let (api, proxy) = reserve_loopback_ports().expect("reserve loopback ports");
+        let (api, proxy) = reserve_loopback_ports(None).expect("reserve loopback ports");
         assert!(api > 0);
         assert!(proxy > 0);
         assert_ne!(api, proxy);
+    }
+
+    #[test]
+    fn a_pinned_proxy_port_is_used_verbatim_and_a_busy_port_is_reported() {
+        let probe = TcpListener::bind(("127.0.0.1", 0)).expect("bind a probe port");
+        let pinned = probe.local_addr().expect("probe address").port();
+        drop(probe);
+
+        let (api, proxy) =
+            reserve_loopback_ports(Some(pinned)).expect("reserving a free pinned port");
+        assert_eq!(proxy, pinned);
+        assert_ne!(api, proxy);
+
+        let held = TcpListener::bind(("127.0.0.1", 0)).expect("hold a port");
+        let busy = held.local_addr().expect("held address").port();
+        let error = reserve_loopback_ports(Some(busy)).expect_err("a busy port must fail");
+        assert!(error.message.contains(&busy.to_string()));
     }
 
     #[test]

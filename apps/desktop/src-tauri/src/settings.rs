@@ -47,6 +47,43 @@ pub(crate) enum CoreLogLevel {
     Debug,
 }
 
+/// How many settings groups the Settings page shows.
+///
+/// This only decides which groups are visible; the interface density is
+/// controlled separately by `ui_scale`.
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum SettingsMode {
+    /// Appearance, window and network integration only.
+    Simple,
+    #[default]
+    Standard,
+    /// Every group, including tray, advanced core and Sub-Store.
+    Relaxed,
+}
+
+/// What the tray icon does with the live transfer rate.
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum TraySpeedDisplay {
+    /// Redraw the icon with the current upload/download rates.
+    #[default]
+    Icon,
+    /// Keep the static icon and only mention the rates in the tooltip.
+    Tooltip,
+    /// Do not show the rates at all.
+    Off,
+}
+
+/// Whether interface animations play at full speed or are reduced.
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum MotionPreference {
+    #[default]
+    Full,
+    Reduced,
+}
+
 impl CoreLogLevel {
     #[allow(dead_code)] // Kept for settings fixtures and future profile writers.
     pub(crate) fn as_wire_value(self) -> &'static str {
@@ -88,6 +125,45 @@ pub(crate) struct DesktopSettings {
     /// Automatic subscription refresh interval in hours. `0` disables it.
     #[serde(default)]
     pub subscription_update_hours: u32,
+    /// Refresh the stored subscription once, right after launch.
+    #[serde(default)]
+    pub update_subscription_on_launch: bool,
+    /// How many settings groups the Settings page shows.
+    #[serde(default)]
+    pub settings_mode: SettingsMode,
+    /// Start with the main window hidden so only the tray icon appears.
+    #[serde(default)]
+    pub silent_start: bool,
+    /// Interface animation preference.
+    #[serde(default)]
+    pub motion: MotionPreference,
+    /// Show the connection state and current node in the tray menu/tooltip.
+    #[serde(default = "default_tray_show_info")]
+    pub tray_show_info: bool,
+    /// What the tray icon does with the live transfer rate.
+    #[serde(default)]
+    pub tray_speed_display: TraySpeedDisplay,
+    /// Mirror Runtime events into a rotating log file.
+    #[serde(default = "default_log_to_file")]
+    pub log_to_file: bool,
+    /// How many days of log files are kept, in days.
+    #[serde(default = "default_log_retention_days")]
+    pub log_retention_days: u32,
+    /// Merge latency measurements before displaying them.
+    #[serde(default = "default_unified_delay")]
+    pub unified_delay: bool,
+    /// Allow opening several connections to the same host in parallel.
+    #[serde(default = "default_tcp_concurrent")]
+    pub tcp_concurrent: bool,
+    /// Fixed mixed-port for the core. `None` picks a free port on every start.
+    #[serde(default)]
+    pub fixed_proxy_port: Option<u16>,
+    /// Base URL of an external Sub-Store backend.
+    #[serde(default)]
+    pub substore_url: String,
+    /// Token sent to the Sub-Store backend as `x-api-token`.
+    #[serde(default)]
+    pub substore_token: String,
     /// Remembered window size for the next launch, in physical pixels. `None`
     /// means the window has never been resized by the operator.
     #[serde(default)]
@@ -100,10 +176,34 @@ pub(crate) const MIN_UI_SCALE: u32 = 85;
 pub(crate) const MAX_UI_SCALE: u32 = 140;
 pub(crate) const MIN_DELAY_TIMEOUT_MS: u32 = 1_000;
 pub(crate) const MAX_DELAY_TIMEOUT_MS: u32 = 10_000;
+pub(crate) const MIN_PROXY_PORT: u16 = 1024;
+pub(crate) const MIN_LOG_RETENTION_DAYS: u32 = 1;
+pub(crate) const MAX_LOG_RETENTION_DAYS: u32 = 90;
+pub(crate) const DEFAULT_LOG_RETENTION_DAYS: u32 = 7;
 pub(crate) const DEFAULT_DELAY_PROBE_URL: &str = "http://www.gstatic.com/generate_204";
 
 fn default_ui_scale() -> u32 {
     100
+}
+
+fn default_tray_show_info() -> bool {
+    true
+}
+
+fn default_log_to_file() -> bool {
+    true
+}
+
+fn default_log_retention_days() -> u32 {
+    DEFAULT_LOG_RETENTION_DAYS
+}
+
+fn default_unified_delay() -> bool {
+    true
+}
+
+fn default_tcp_concurrent() -> bool {
+    true
 }
 
 fn default_delay_probe_url() -> String {
@@ -126,6 +226,37 @@ fn is_valid_probe_url(value: &str) -> bool {
         && !trimmed.chars().any(char::is_control)
 }
 
+/// Accepts a base URL without a path, query or fragment.
+///
+/// The address is joined with a fixed API path, so a trailing path would
+/// silently point at the wrong endpoint.
+fn is_valid_base_url(value: &str) -> bool {
+    let trimmed = value.trim();
+    if !(trimmed.starts_with("http://") || trimmed.starts_with("https://"))
+        || trimmed.len() > 2048
+        || trimmed.chars().any(char::is_control)
+    {
+        return false;
+    }
+
+    let Some((_, rest)) = trimmed.split_once("://") else {
+        return false;
+    };
+    let authority = rest.split('/').next().unwrap_or_default();
+    if authority.is_empty() || authority.contains('@') {
+        return false;
+    }
+    let path = &rest[authority.len()..];
+    let path = path.split(['?', '#']).next().unwrap_or_default();
+    path.trim_matches('/').is_empty()
+}
+
+/// Same rule as [`is_valid_base_url`]; kept as its own name so the call sites
+/// read naturally.
+pub(crate) fn is_valid_substore_url(value: &str) -> bool {
+    is_valid_base_url(value)
+}
+
 impl DesktopSettings {
     /// Returns the settings with every value forced into its valid range.
     ///
@@ -141,6 +272,31 @@ impl DesktopSettings {
         self.subscription_update_hours = self.subscription_update_hours.min(24 * 7);
         if !is_valid_probe_url(&self.delay_probe_url) {
             self.delay_probe_url = DEFAULT_DELAY_PROBE_URL.to_owned();
+        }
+        self.log_retention_days = self
+            .log_retention_days
+            .clamp(MIN_LOG_RETENTION_DAYS, MAX_LOG_RETENTION_DAYS);
+        // A hand-edited file could ask for a privileged port; refuse everything
+        // the operator could not have picked in the UI instead of failing the
+        // core start later.
+        if self
+            .fixed_proxy_port
+            .is_some_and(|port| port < MIN_PROXY_PORT)
+        {
+            self.fixed_proxy_port = None;
+        }
+        self.substore_url = self.substore_url.trim().to_owned();
+        if !self.substore_url.is_empty() && !is_valid_substore_url(&self.substore_url) {
+            self.substore_url.clear();
+        }
+        self.substore_token = self.substore_token.trim().to_owned();
+        if self.substore_token.chars().any(char::is_control) {
+            self.substore_token.clear();
+        }
+        // The token is only sent over the configured address; keeping it next to
+        // an empty URL would leak it into `settings.json` for no purpose.
+        if self.substore_url.is_empty() {
+            self.substore_token.clear();
         }
         self.window_width = self.window_width.map(|width| width.clamp(820, 7680));
         self.window_height = self.window_height.map(|height| height.clamp(680, 4320));
@@ -165,6 +321,19 @@ impl Default for DesktopSettings {
             delay_probe_url: default_delay_probe_url(),
             delay_timeout_ms: default_delay_timeout_ms(),
             subscription_update_hours: 0,
+            update_subscription_on_launch: false,
+            settings_mode: SettingsMode::default(),
+            silent_start: false,
+            motion: MotionPreference::default(),
+            tray_show_info: default_tray_show_info(),
+            tray_speed_display: TraySpeedDisplay::default(),
+            log_to_file: default_log_to_file(),
+            log_retention_days: default_log_retention_days(),
+            unified_delay: default_unified_delay(),
+            tcp_concurrent: default_tcp_concurrent(),
+            fixed_proxy_port: None,
+            substore_url: String::new(),
+            substore_token: String::new(),
             window_width: None,
             window_height: None,
         }
@@ -347,8 +516,8 @@ impl Drop for TemporaryFileGuard {
 #[cfg(test)]
 mod tests {
     use super::{
-        CloseBehavior, CoreLogLevel, DesktopSettings, Language, SettingsStore, Theme,
-        SETTINGS_FILE_NAME, SETTINGS_VERSION,
+        CloseBehavior, CoreLogLevel, DesktopSettings, Language, MotionPreference, SettingsMode,
+        SettingsStore, Theme, TraySpeedDisplay, SETTINGS_FILE_NAME, SETTINGS_VERSION,
     };
     use std::fs;
     use tempfile::TempDir;
@@ -407,6 +576,19 @@ mod tests {
             delay_probe_url: "https://cp.cloudflare.com/generate_204".to_owned(),
             delay_timeout_ms: 3_000,
             subscription_update_hours: 12,
+            update_subscription_on_launch: true,
+            settings_mode: SettingsMode::Relaxed,
+            silent_start: true,
+            motion: MotionPreference::Reduced,
+            tray_show_info: false,
+            tray_speed_display: TraySpeedDisplay::Tooltip,
+            log_to_file: false,
+            log_retention_days: 14,
+            unified_delay: false,
+            tcp_concurrent: false,
+            fixed_proxy_port: Some(7890),
+            substore_url: "https://substore.example.com".to_owned(),
+            substore_token: "token-value".to_owned(),
             window_width: Some(1280),
             window_height: Some(820),
         };
@@ -504,5 +686,61 @@ mod tests {
 
         assert!(error.to_string().contains("unsupported"));
         assert!(!directory.path().join(SETTINGS_FILE_NAME).exists());
+    }
+
+    #[test]
+    fn settings_written_before_the_new_preferences_exist_still_load() {
+        let (directory, store) = temporary_store();
+        fs::write(
+            directory.path().join(SETTINGS_FILE_NAME),
+            r#"{"version":1,"theme":"cyber_flow","close_behavior":"hide_to_tray","subscription_update_hours":6}"#,
+        )
+        .expect("write settings without the new fields");
+
+        let loaded = store.load();
+
+        assert_eq!(loaded.warning, None);
+        assert_eq!(loaded.settings.subscription_update_hours, 6);
+        assert_eq!(loaded.settings.settings_mode, SettingsMode::Standard);
+        assert!(!loaded.settings.silent_start);
+        assert!(loaded.settings.tray_show_info);
+        assert_eq!(loaded.settings.tray_speed_display, TraySpeedDisplay::Icon);
+        assert!(loaded.settings.log_to_file);
+        assert_eq!(loaded.settings.log_retention_days, 7);
+        assert!(loaded.settings.unified_delay);
+        assert!(loaded.settings.tcp_concurrent);
+        assert_eq!(loaded.settings.fixed_proxy_port, None);
+        assert!(loaded.settings.substore_url.is_empty());
+    }
+
+    #[test]
+    fn normalization_rejects_privileged_ports_and_unsafe_substore_values() {
+        let normalized = DesktopSettings {
+            fixed_proxy_port: Some(80),
+            substore_url: "https://example.com/prefix".to_owned(),
+            substore_token: "should-be-cleared".to_owned(),
+            log_retention_days: 0,
+            ..DesktopSettings::default()
+        }
+        .normalized();
+
+        assert_eq!(normalized.fixed_proxy_port, None);
+        assert!(normalized.substore_url.is_empty());
+        assert!(normalized.substore_token.is_empty());
+        assert_eq!(normalized.log_retention_days, 1);
+
+        let kept = DesktopSettings {
+            fixed_proxy_port: Some(7890),
+            substore_url: "  https://substore.example.com  ".to_owned(),
+            substore_token: " token ".to_owned(),
+            log_retention_days: 500,
+            ..DesktopSettings::default()
+        }
+        .normalized();
+
+        assert_eq!(kept.fixed_proxy_port, Some(7890));
+        assert_eq!(kept.substore_url, "https://substore.example.com");
+        assert_eq!(kept.substore_token, "token");
+        assert_eq!(kept.log_retention_days, super::MAX_LOG_RETENTION_DAYS);
     }
 }

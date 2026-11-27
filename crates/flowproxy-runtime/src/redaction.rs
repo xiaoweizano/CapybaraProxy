@@ -21,7 +21,7 @@ fn secret_assignment_pattern() -> &'static Regex {
     })
 }
 
-pub(crate) fn redact_sensitive_text(input: &str) -> String {
+pub fn redact_sensitive_text(input: &str) -> String {
     let without_userinfo = url_userinfo_pattern().replace_all(input, "${scheme}://[REDACTED]@");
 
     secret_assignment_pattern()

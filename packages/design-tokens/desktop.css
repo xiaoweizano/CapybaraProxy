@@ -36,6 +36,8 @@
   --danger: #ff5e7d;
   --border: rgba(132, 159, 255, 0.15);
   --border-strong: rgba(144, 176, 255, 0.28);
+  /* Divider inside a card; quieter than `--border` so nested groups stay flat. */
+  --border-subtle: rgba(132, 159, 255, 0.1);
   --shadow-card: 0 18px 48px rgba(0, 4, 24, 0.34);
   --shadow-soft: 0 10px 30px rgba(0, 4, 24, 0.2);
   --nav-active: rgba(42, 104, 255, 0.24);
@@ -81,6 +83,7 @@
   --danger: #e85d70;
   --border: rgba(72, 91, 129, 0.1);
   --border-strong: rgba(72, 91, 129, 0.16);
+  --border-subtle: rgba(72, 91, 129, 0.07);
   --shadow-card: 0 18px 42px rgba(99, 82, 76, 0.1);
   --shadow-soft: 0 10px 24px rgba(99, 82, 76, 0.08);
   --nav-active: rgba(43, 150, 243, 0.12);

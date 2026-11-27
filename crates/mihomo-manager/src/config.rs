@@ -242,6 +242,8 @@ pub fn render_direct_profile_with(
             "mode: rule\n",
             "log-level: {log_level}\n",
             "ipv6: {ipv6}\n",
+            "unified-delay: {unified_delay}\n",
+            "tcp-concurrent: {tcp_concurrent}\n",
             "mixed-port: {proxy_port}\n",
             "listeners: []\n",
             "tun:\n",
@@ -259,6 +261,8 @@ pub fn render_direct_profile_with(
         proxy_port = proxy_port,
         log_level = preferences.log_level.as_wire_value(),
         ipv6 = preferences.ipv6,
+        unified_delay = preferences.unified_delay,
+        tcp_concurrent = preferences.tcp_concurrent,
     ))
 }
 

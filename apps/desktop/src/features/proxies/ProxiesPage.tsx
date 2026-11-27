@@ -8,10 +8,8 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useAppSettings } from "../../app/settings/settingsContext";
 import { useRuntime } from "../../app/runtime/runtimeContext";
 import { useBridgeResource } from "../../app/runtime/useBridgeResource";
-import { isValidProbeUrl, normalizeDelayTimeout } from "../../shared/delayProbe";
 import {
   getSubscriptionSnapshot,
   type ProxyNode,
@@ -54,11 +52,6 @@ export function ProxiesPage() {
     lastError,
     isLoading,
   } = useRuntime();
-  const { settings, updateDelayProbe } = useAppSettings();
-  const [probeUrl, setProbeUrl] = useState(settings.delayProbeUrl);
-  const [probeTimeout, setProbeTimeout] = useState(settings.delayTimeoutMs);
-  const [savingProbe, setSavingProbe] = useState(false);
-
   const [pendingSelection, setPendingSelection] = useState<string | null>(null);
   const [pendingDelay, setPendingDelay] = useState<string | null>(null);
   const [pendingGroup, setPendingGroup] = useState<string | null>(null);
@@ -131,19 +124,6 @@ export function ProxiesPage() {
     }
   };
 
-  const saveProbe = async () => {
-    if (savingProbe || !isValidProbeUrl(probeUrl)) {
-      return;
-    }
-
-    setSavingProbe(true);
-    try {
-      await updateDelayProbe(probeUrl, normalizeDelayTimeout(probeTimeout));
-    } finally {
-      setSavingProbe(false);
-    }
-  };
-
   return (
     <WorkspacePage
       eyebrow={t("proxies.eyebrow")}
@@ -160,17 +140,21 @@ export function ProxiesPage() {
           </div>
         </div>
         {isConnected ? (
-          <div className="proxy-mode-options" role="group" aria-label={t("proxies.mode")}>
+          <div
+            className="workspace-option-grid"
+            role="group"
+            aria-label={t("proxies.mode")}
+          >
             {modeOptions.map(({ id, labelKey, hintKey }) => (
               <button
                 key={id}
                 type="button"
-                className="proxy-mode-option"
+                className="workspace-option"
                 aria-pressed={activeMode === id}
                 disabled={pendingMode !== null}
                 onClick={() => void changeMode(id)}
               >
-                <span className="proxy-mode-radio" aria-hidden="true">
+                <span className="workspace-radio" aria-hidden="true">
                   {activeMode === id ? <span /> : null}
                 </span>
                 <span>
@@ -183,55 +167,7 @@ export function ProxiesPage() {
         ) : (
           <p className="workspace-hint">{t("proxies.prefsUnavailable")}</p>
         )}
-
-        <div className="delay-probe">
-          <label className="subscription-field">
-            <span>{t("proxies.probeUrl")}</span>
-            <input
-              type="url"
-              value={probeUrl}
-              spellCheck={false}
-              autoComplete="off"
-              onChange={(event) => setProbeUrl(event.target.value)}
-              onBlur={() => {
-                if (
-                  probeUrl !== settings.delayProbeUrl &&
-                  isValidProbeUrl(probeUrl)
-                ) {
-                  void saveProbe();
-                }
-              }}
-            />
-          </label>
-          <label className="subscription-field delay-probe-timeout">
-            <span>{t("proxies.probeTimeout")}</span>
-            <input
-              type="number"
-              min={1000}
-              max={10000}
-              step={500}
-              value={probeTimeout}
-              onChange={(event) =>
-                setProbeTimeout(Number(event.target.value) || 0)
-              }
-              onBlur={() => {
-                const normalized = normalizeDelayTimeout(probeTimeout);
-                setProbeTimeout(normalized);
-                if (
-                  normalized !== settings.delayTimeoutMs ||
-                  probeUrl !== settings.delayProbeUrl
-                ) {
-                  void saveProbe();
-                }
-              }}
-            />
-          </label>
-        </div>
-        {!isValidProbeUrl(probeUrl) ? (
-          <p className="settings-inline-hint" role="alert">
-            {t("proxies.probeUrlInvalid")}
-          </p>
-        ) : null}
+        <p className="workspace-hint">{t("proxies.probeSettingsMoved")}</p>
       </section>
 
       {!isConnected ? (

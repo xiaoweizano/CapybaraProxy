@@ -1,21 +1,61 @@
 import {
+  Activity,
   Check,
+  Database,
   Languages,
   RadioTower,
+  ScrollText,
   ShieldCheck,
+  SlidersHorizontal,
   SunMedium,
+  Timer,
   Waves,
+  Wifi,
   ZoomIn,
 } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppSettings } from "../../app/settings/settingsContext";
 import { useRuntime } from "../../app/runtime/runtimeContext";
 import { useSystemIntegration } from "../../app/systemIntegration/systemIntegrationContext";
 import type { CloseBehavior } from "../../shared/closeBehavior";
+import { isValidProbeUrl, normalizeDelayTimeout } from "../../shared/delayProbe";
 import { UI_SCALE_STEPS } from "../../shared/uiScale";
 import type { LanguageId } from "../../i18n/language";
 import type { CoreLogLevel } from "../../platform/runtime";
+import {
+  importSubStoreSubscription,
+  listSubStoreSubscriptions,
+  openLogDirectory,
+  clearLogFiles,
+  type SubStoreSubscription,
+} from "../../platform/runtime";
+import {
+  DEFAULT_LOG_RETENTION_DAYS,
+  LOG_RETENTION_OPTIONS,
+  normalizeProxyPort,
+} from "../../shared/settingsLimits";
+import type { TraySpeedDisplay } from "../../platform/settings";
+import type { MotionPreference } from "../../shared/motion";
 import { MihomoCorePanel } from "../runtime/MihomoCorePanel";
+import {
+  ResourceFeedback,
+  WorkspacePage,
+} from "../workspace/WorkspaceUi";
+import {
+  SettingsOption,
+  SettingsSection,
+  SettingsSubheading,
+  SettingsSwitchRow,
+} from "./SettingsSection";
+import {
+  settingsModeCaptionKey,
+  settingsModeLabelKey,
+  settingsSection,
+  SETTINGS_MODES,
+  visibleSections,
+  type SettingsSectionId,
+} from "./settingsSections";
 
 const themeOptions = [
   {
@@ -67,10 +107,24 @@ const closeOptions: Array<{
 ];
 
 const logLevelOptions: Array<{ id: CoreLogLevel; labelKey: string }> = [
+  { id: "silent", labelKey: "settings.logSilent" },
   { id: "error", labelKey: "settings.logError" },
   { id: "warning", labelKey: "settings.logWarning" },
   { id: "info", labelKey: "settings.logInfo" },
   { id: "debug", labelKey: "settings.logDebug" },
+];
+
+const autoUpdateOptions = [0, 6, 12, 24] as const;
+
+const traySpeedOptions: Array<{ id: TraySpeedDisplay; labelKey: string }> = [
+  { id: "icon", labelKey: "settings.traySpeedIcon" },
+  { id: "tooltip", labelKey: "settings.traySpeedTooltip" },
+  { id: "off", labelKey: "settings.traySpeedOff" },
+];
+
+const motionOptions: Array<{ id: MotionPreference; labelKey: string }> = [
+  { id: "full", labelKey: "settings.motionFull" },
+  { id: "reduced", labelKey: "settings.motionReduced" },
 ];
 
 export function SettingsPage() {
@@ -86,11 +140,16 @@ export function SettingsPage() {
     updateUiScale,
     updateCoreLogLevel,
     updateIpv6,
+    updateSubscriptionUpdateHours,
+    updateUpdateSubscriptionOnLaunch,
+    updateSettingsMode,
+    updateSilentStart,
+    updateMotion,
+    updateTrayShowInfo,
+    updateTraySpeedDisplay,
   } = useAppSettings();
   const runtime = useRuntime();
   const integration = useSystemIntegration();
-  const { theme, closeBehavior, language, uiScale, coreLogLevel, ipv6 } =
-    settings;
   const controlsDisabled = mode === "loading" || isSaving;
   const systemProxyCapability =
     integration.status?.capabilities.system_proxy;
@@ -118,50 +177,66 @@ export function SettingsPage() {
     ? t("settings.checkingCapability")
     : t("settings.integrationUnavailable");
   const tunState = tunCapability?.state;
+  const sections = visibleSections(settings.settingsMode);
+
+  const shows = (id: SettingsSectionId): boolean =>
+    sections.some((section) => section.id === id);
+
+  // The app routes with `HashRouter`, so an `href="#…"` anchor would replace
+  // the route. Scroll the target into view instead.
+  const jumpTo = (id: SettingsSectionId) => {
+    document
+      .getElementById(`settings-${id}`)
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   return (
-    <section className="settings-page" aria-labelledby="settings-title">
-      <div className="page-heading">
-        <div>
-          <span className="page-eyebrow">{t("settings.eyebrow")}</span>
-          <h1 id="settings-title">{t("settings.title")}</h1>
-        </div>
-        <span className="mock-badge">{storageLabel}</span>
-      </div>
+    <WorkspacePage
+      eyebrow={t("settings.eyebrow")}
+      title={t("settings.title")}
+      badge={storageLabel}
+      badgeTone="neutral"
+      className="settings-page"
+    >
+      <nav className="settings-section-nav" aria-label={t("settings.sectionNav")}>
+        {sections.map((section) => (
+          <button
+            key={section.id}
+            type="button"
+            onClick={() => jumpTo(section.id)}
+          >
+            <span className="settings-section-index">{section.index}</span>
+            {t(section.titleKey)}
+          </button>
+        ))}
+      </nav>
 
       {error ? (
-        <p className="settings-feedback settings-error-wide" role="alert">
+        <p className="workspace-feedback workspace-feedback-error" role="alert">
           {error}
         </p>
       ) : null}
 
       {integrationError ? (
-        <p className="settings-feedback settings-error-wide" role="alert">
-          {integrationError}
-        </p>
+        <ResourceFeedback
+          error={{ code: "platform_integration", message: integrationError, retryable: true }}
+          unavailable={false}
+        />
       ) : integration.notice ? (
-        <p className="settings-feedback settings-error-wide">
+        <p className="workspace-feedback" role="status">
           {integration.notice}
         </p>
       ) : null}
 
-      <div className="settings-grid">
-        <section className="settings-panel settings-panel-wide">
-          <div className="settings-panel-heading">
-            <div>
-              <span className="settings-label">{t("settings.appearance")}</span>
-              <h2>{t("settings.theme")}</h2>
-            </div>
-            <span className="settings-index">01</span>
-          </div>
-
+      {shows("appearance") ? (
+        <SettingsSection definition={settingsSection("appearance")}>
           <div className="theme-options">
             {themeOptions.map(({ id, nameKey, captionKey, icon: Icon }) => (
               <button
                 key={id}
                 className={`theme-option theme-option-${id}`}
                 type="button"
-                aria-pressed={theme === id}
+                aria-pressed={settings.theme === id}
                 disabled={controlsDisabled}
                 onClick={() => void updateTheme(id)}
               >
@@ -182,58 +257,48 @@ export function SettingsPage() {
                   </span>
                 </span>
                 <span className="theme-option-check" aria-hidden="true">
-                  {theme === id ? <Check size={13} strokeWidth={2.4} /> : null}
+                  {settings.theme === id ? (
+                    <Check size={13} strokeWidth={2.4} />
+                  ) : null}
                 </span>
               </button>
             ))}
           </div>
 
-          <div className="settings-panel-heading settings-panel-heading-inset">
-            <div>
-              <span className="settings-label">
-                {t("settings.languageCaption")}
-              </span>
-              <h2>{t("settings.language")}</h2>
-            </div>
-            <Languages aria-hidden="true" size={16} />
-          </div>
-
-          <div className="behavior-options">
+          <SettingsSubheading
+            kicker={t("settings.languageCaption")}
+            title={t("settings.language")}
+            icon={<Languages aria-hidden="true" size={16} />}
+          />
+          <div className="workspace-option-list">
             {languageOptions.map(({ id, nameKey, captionKey }) => (
-              <button
+              <SettingsOption
                 key={id}
-                className="behavior-option"
-                type="button"
-                aria-pressed={language === id}
+                pressed={settings.language === id}
                 disabled={controlsDisabled}
                 onClick={() => void updateLanguage(id)}
-              >
-                <span className="behavior-radio" aria-hidden="true">
-                  {language === id ? <span /> : null}
-                </span>
-                <span>
-                  <strong>{t(nameKey)}</strong>
-                  <small>{t(captionKey)}</small>
-                </span>
-              </button>
+                title={t(nameKey)}
+                caption={t(captionKey)}
+              />
             ))}
           </div>
 
-          <div className="settings-panel-heading settings-panel-heading-inset">
-            <div>
-              <span className="settings-label">{t("settings.uiScaleLabel")}</span>
-              <h2>{t("settings.uiScale")}</h2>
-            </div>
-            <ZoomIn aria-hidden="true" size={16} />
-          </div>
-
-          <div className="ui-scale-options" role="group" aria-label={t("settings.uiScale")}>
+          <SettingsSubheading
+            kicker={t("settings.uiScaleLabel")}
+            title={t("settings.uiScale")}
+            icon={<ZoomIn aria-hidden="true" size={16} />}
+          />
+          <div
+            className="ui-scale-options"
+            role="group"
+            aria-label={t("settings.uiScale")}
+          >
             {UI_SCALE_STEPS.map((step) => (
               <button
                 key={step}
                 className="ui-scale-option"
                 type="button"
-                aria-pressed={uiScale === step}
+                aria-pressed={settings.uiScale === step}
                 disabled={controlsDisabled}
                 onClick={() => void updateUiScale(step)}
               >
@@ -242,177 +307,104 @@ export function SettingsPage() {
             ))}
           </div>
           <p className="settings-inline-hint">{t("settings.uiScaleHint")}</p>
-        </section>
 
-        <section className="settings-panel">
-          <div className="settings-panel-heading">
-            <div>
-              <span className="settings-label">{t("settings.core")}</span>
-              <h2>{t("settings.coreLogLevel")}</h2>
-            </div>
-            <span className="settings-index">02</span>
-          </div>
-
-          <div className="behavior-options">
-            {logLevelOptions.map(({ id, labelKey }) => (
-              <button
+          <SettingsSubheading
+            kicker={t("settings.settingsModeCaption")}
+            title={t("settings.settingsMode")}
+            icon={<SlidersHorizontal aria-hidden="true" size={16} />}
+          />
+          <div
+            className="workspace-option-grid"
+            role="group"
+            aria-label={t("settings.settingsMode")}
+          >
+            {SETTINGS_MODES.map((id) => (
+              <SettingsOption
                 key={id}
-                className="behavior-option"
-                type="button"
-                aria-pressed={coreLogLevel === id}
+                pressed={settings.settingsMode === id}
                 disabled={controlsDisabled}
-                onClick={() => void updateCoreLogLevel(id)}
-              >
-                <span className="behavior-radio" aria-hidden="true">
-                  {coreLogLevel === id ? <span /> : null}
-                </span>
-                <span>
-                  <strong>{t(labelKey)}</strong>
-                </span>
-              </button>
+                onClick={() => void updateSettingsMode(id)}
+                title={t(settingsModeLabelKey(id))}
+                caption={t(settingsModeCaptionKey(id))}
+              />
             ))}
           </div>
-          <p className="settings-inline-hint">
-            {runtime.snapshot?.state === "connected"
-              ? t("settings.restartToApply")
-              : t("settings.appliesOnNextStart")}
-          </p>
+          <p className="settings-inline-hint">{t("settings.settingsModeHint")}</p>
+        </SettingsSection>
+      ) : null}
 
-          <div className="integration-list">
-            <div className="integration-row">
-              <span className="integration-icon">
-                <ShieldCheck aria-hidden="true" size={16} />
-              </span>
-              <span className="integration-copy">
-                <strong>{t("settings.ipv6")}</strong>
-                <small>{t("settings.ipv6Hint")}</small>
-              </span>
-              <button
-                className="integration-switch"
-                type="button"
-                role="switch"
-                aria-label={t("settings.ipv6")}
-                aria-checked={ipv6}
-                disabled={controlsDisabled}
-                onClick={() => void updateIpv6(!ipv6)}
-              >
-                <span aria-hidden="true" />
-              </button>
-            </div>
-          </div>
-        </section>
-
-        <MihomoCorePanel />
-
-        <section className="settings-panel">
-          <div className="settings-panel-heading">
-            <div>
-              <span className="settings-label">{t("settings.window")}</span>
-              <h2>{t("settings.closeButton")}</h2>
-            </div>
-            <span className="settings-index">03</span>
-          </div>
-
-          <div className="behavior-options">
+      {shows("window") ? (
+        <SettingsSection definition={settingsSection("window")}>
+          <div className="workspace-option-list">
             {closeOptions.map(({ id, labelKey, captionKey }) => (
-              <button
+              <SettingsOption
                 key={id}
-                className="behavior-option"
-                type="button"
-                aria-pressed={closeBehavior === id}
+                pressed={settings.closeBehavior === id}
                 disabled={controlsDisabled}
                 onClick={() => void updateCloseBehavior(id)}
-              >
-                <span className="behavior-radio" aria-hidden="true">
-                  {closeBehavior === id ? <span /> : null}
-                </span>
-                <span>
-                  <strong>{t(labelKey)}</strong>
-                  <small>{t(captionKey)}</small>
-                </span>
-              </button>
+                title={t(labelKey)}
+                caption={t(captionKey)}
+              />
             ))}
           </div>
-        </section>
 
-        <section className="settings-panel">
-          <div className="settings-panel-heading">
-            <div>
-              <span className="settings-label">{t("settings.network")}</span>
-              <h2>{t("settings.integration")}</h2>
-            </div>
-            <span className="settings-index">04</span>
+          <SettingsSubheading
+            kicker={t("settings.startupKicker")}
+            title={t("settings.startup")}
+            icon={<Wifi aria-hidden="true" size={16} />}
+          />
+          <div className="workspace-option-list">
+            <SettingsSwitchRow
+              title={t("settings.silentStart")}
+              caption={t("settings.silentStartCaption")}
+              checked={settings.silentStart}
+              disabled={controlsDisabled}
+              onChange={(checked) => void updateSilentStart(checked)}
+            />
+            <SettingsSwitchRow
+              icon={<RadioTower aria-hidden="true" size={16} />}
+              title={t("settings.launchAtLogin")}
+              caption={
+                launchAtLoginCapability?.message ?? capabilityFallback
+              }
+              checked={launchAtLoginEnabled}
+              disabled={launchAtLoginDisabled}
+              onChange={(checked) =>
+                void integration.setLaunchAtLoginEnabled(checked)
+              }
+            />
           </div>
+        </SettingsSection>
+      ) : null}
 
-          <div className="integration-list">
-            <div className="integration-row">
-              <span className="integration-icon">
-                <RadioTower aria-hidden="true" size={16} />
-              </span>
-              <span className="integration-copy">
-                <strong>{t("settings.systemProxy")}</strong>
-                <small>
-                  {systemProxyCapability?.message ?? capabilityFallback}
-                </small>
-              </span>
-              <button
-                className="integration-switch"
-                type="button"
-                role="switch"
-                aria-label={t("settings.systemProxy")}
-                aria-checked={systemProxyEnabled}
-                disabled={systemProxyDisabled}
-                onClick={() =>
-                  void integration.setSystemProxyEnabled(!systemProxyEnabled)
-                }
-              >
-                <span aria-hidden="true" />
-              </button>
-            </div>
-            <div className="integration-row">
-              <span className="integration-icon">
-                <RadioTower aria-hidden="true" size={16} />
-              </span>
-              <span className="integration-copy">
-                <strong>{t("settings.launchAtLogin")}</strong>
-                <small>
-                  {launchAtLoginCapability?.message ?? capabilityFallback}
-                </small>
-              </span>
-              <button
-                className="integration-switch"
-                type="button"
-                role="switch"
-                aria-label={t("settings.launchAtLogin")}
-                aria-checked={launchAtLoginEnabled}
-                disabled={launchAtLoginDisabled}
-                onClick={() =>
-                  void integration.setLaunchAtLoginEnabled(
-                    !launchAtLoginEnabled,
-                  )
-                }
-              >
-                <span aria-hidden="true" />
-              </button>
-            </div>
-            <div className="integration-row">
-              <span className="integration-icon">
+      {shows("network") ? (
+        <SettingsSection definition={settingsSection("network")}>
+          <div className="workspace-option-list">
+            <SettingsSwitchRow
+              icon={<RadioTower aria-hidden="true" size={16} />}
+              title={t("settings.systemProxy")}
+              caption={systemProxyCapability?.message ?? capabilityFallback}
+              checked={systemProxyEnabled}
+              disabled={systemProxyDisabled}
+              onChange={(checked) =>
+                void integration.setSystemProxyEnabled(checked)
+              }
+            />
+            <div className="workspace-setting-row">
+              <span className="workspace-setting-icon">
                 <ShieldCheck aria-hidden="true" size={16} />
               </span>
-              <span className="integration-copy">
+              <span>
                 <strong>{t("settings.tunInterface")}</strong>
                 <small>{t("settings.detectionOnly")}</small>
-                <span className="integration-detail">
+                <span className="workspace-setting-detail">
                   {tunCapability?.message ??
                     (integration.isLoading
                       ? t("settings.checkingElevation")
                       : t("settings.tunDisabled"))}
                 </span>
               </span>
-              <span
-                className="integration-status"
-                data-state={tunState ?? "unverified"}
-              >
+              <span className="workspace-status-pill" data-state={tunState ?? "unverified"}>
                 {tunState === "available"
                   ? t("common.ready")
                   : tunState === "blocked"
@@ -423,8 +415,547 @@ export function SettingsPage() {
               </span>
             </div>
           </div>
-        </section>
+        </SettingsSection>
+      ) : null}
+
+      {shows("subscription") ? (
+        <SettingsSection definition={settingsSection("subscription")}>
+          <div className="workspace-option-list">
+            <SettingsSwitchRow
+              icon={<Timer aria-hidden="true" size={16} />}
+              title={t("settings.updateOnLaunch")}
+              caption={t("settings.updateOnLaunchCaption")}
+              checked={settings.updateSubscriptionOnLaunch}
+              disabled={controlsDisabled}
+              onChange={(checked) =>
+                void updateUpdateSubscriptionOnLaunch(checked)
+              }
+            />
+          </div>
+
+          <SettingsSubheading
+            kicker={t("settings.autoUpdateKicker")}
+            title={t("settings.autoUpdate")}
+            icon={<Timer aria-hidden="true" size={16} />}
+          />
+          <div className="choice-chips" role="group" aria-label={t("settings.autoUpdate")}>
+            {autoUpdateOptions.map((hours) => (
+              <button
+                key={hours}
+                type="button"
+                className="choice-chip"
+                aria-pressed={settings.subscriptionUpdateHours === hours}
+                disabled={controlsDisabled}
+                onClick={() => void updateSubscriptionUpdateHours(hours)}
+              >
+                {hours === 0
+                  ? t("settings.autoUpdateOff")
+                  : t("settings.autoUpdateHours", { hours })}
+              </button>
+            ))}
+          </div>
+          <p className="settings-inline-hint">{t("settings.autoUpdateHint")}</p>
+        </SettingsSection>
+      ) : null}
+
+      {shows("logs") ? <LogSection controlsDisabled={controlsDisabled} /> : null}
+
+      {shows("core") ? (
+        <SettingsSection definition={settingsSection("core")}>
+          <div className="workspace-option-list">
+            {logLevelOptions.map(({ id, labelKey }) => (
+              <SettingsOption
+                key={id}
+                pressed={settings.coreLogLevel === id}
+                disabled={controlsDisabled}
+                onClick={() => void updateCoreLogLevel(id)}
+                title={t(labelKey)}
+              />
+            ))}
+          </div>
+          <p className="settings-inline-hint">
+            {runtime.snapshot?.state === "connected"
+              ? t("settings.restartToApply")
+              : t("settings.appliesOnNextStart")}
+          </p>
+
+          <div className="workspace-option-list">
+            <SettingsSwitchRow
+              icon={<ShieldCheck aria-hidden="true" size={16} />}
+              title={t("settings.ipv6")}
+              caption={t("settings.ipv6Hint")}
+              checked={settings.ipv6}
+              disabled={controlsDisabled}
+              onChange={(checked) => void updateIpv6(checked)}
+            />
+          </div>
+        </SettingsSection>
+      ) : null}
+
+      {shows("core") ? <MihomoCorePanel /> : null}
+
+      {shows("tray") ? (
+        <SettingsSection definition={settingsSection("tray")}>
+          <div className="workspace-option-list">
+            <SettingsSwitchRow
+              icon={<Activity aria-hidden="true" size={16} />}
+              title={t("settings.trayShowInfo")}
+              caption={t("settings.trayShowInfoCaption")}
+              checked={settings.trayShowInfo}
+              disabled={controlsDisabled}
+              onChange={(checked) => void updateTrayShowInfo(checked)}
+            />
+          </div>
+
+          <SettingsSubheading
+            kicker={t("settings.traySpeedKicker")}
+            title={t("settings.traySpeedDisplay")}
+            icon={<Activity aria-hidden="true" size={16} />}
+          />
+          <div
+            className="workspace-option-grid"
+            role="group"
+            aria-label={t("settings.traySpeedDisplay")}
+          >
+            {traySpeedOptions.map(({ id, labelKey }) => (
+              <SettingsOption
+                key={id}
+                pressed={settings.traySpeedDisplay === id}
+                disabled={controlsDisabled}
+                onClick={() => void updateTraySpeedDisplay(id)}
+                title={t(labelKey)}
+              />
+            ))}
+          </div>
+
+          <SettingsSubheading
+            kicker={t("settings.motionCaption")}
+            title={t("settings.motion")}
+            icon={<Waves aria-hidden="true" size={16} />}
+          />
+          <div
+            className="workspace-option-grid"
+            role="group"
+            aria-label={t("settings.motion")}
+          >
+            {motionOptions.map(({ id, labelKey }) => (
+              <SettingsOption
+                key={id}
+                pressed={settings.motion === id}
+                disabled={controlsDisabled}
+                onClick={() => void updateMotion(id)}
+                title={t(labelKey)}
+              />
+            ))}
+          </div>
+        </SettingsSection>
+      ) : null}
+
+      {shows("advanced") ? (
+        <AdvancedCoreSection controlsDisabled={controlsDisabled} />
+      ) : null}
+
+      {shows("substore") ? (
+        <SubStoreSection controlsDisabled={controlsDisabled} />
+      ) : null}
+    </WorkspacePage>
+  );
+}
+
+function LogSection({ controlsDisabled }: { controlsDisabled: boolean }) {
+  const { t } = useTranslation();
+  const { settings, updateLogToFile, updateLogRetentionDays } = useAppSettings();
+  const [status, setStatus] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+
+  const openDirectory = async () => {
+    setPending(true);
+    setStatus(null);
+    try {
+      const result = await openLogDirectory();
+      if (result.status === "error") {
+        setStatus(result.error.message);
+      }
+    } finally {
+      setPending(false);
+    }
+  };
+
+  const clearFiles = async () => {
+    setPending(true);
+    setStatus(null);
+    try {
+      const result = await clearLogFiles();
+      if (result.status === "ok") {
+        setStatus(t("settings.logsCleared", { count: result.data }));
+      } else if (result.status === "error") {
+        setStatus(result.error.message);
+      }
+    } finally {
+      setPending(false);
+    }
+  };
+
+  return (
+    <SettingsSection
+      definition={settingsSection("logs")}
+      actions={
+        <>
+          <button
+            className="workspace-action-button"
+            type="button"
+            disabled={pending}
+            onClick={() => void openDirectory()}
+          >
+            <ScrollText aria-hidden="true" size={14} />
+            {t("settings.openLogDirectory")}
+          </button>
+          <button
+            className="workspace-action-button"
+            type="button"
+            disabled={pending}
+            onClick={() => void clearFiles()}
+          >
+            {t("settings.clearLogFiles")}
+          </button>
+        </>
+      }
+    >
+      <div className="workspace-option-list">
+        <SettingsSwitchRow
+          icon={<ScrollText aria-hidden="true" size={16} />}
+          title={t("settings.logToFile")}
+          caption={t("settings.logToFileCaption")}
+          checked={settings.logToFile}
+          disabled={controlsDisabled}
+          onChange={(checked) => void updateLogToFile(checked)}
+        />
       </div>
-    </section>
+
+      <SettingsSubheading
+        kicker={t("settings.logRetentionKicker")}
+        title={t("settings.logRetention")}
+        icon={<Database aria-hidden="true" size={16} />}
+      />
+      <div
+        className="choice-chips"
+        role="group"
+        aria-label={t("settings.logRetention")}
+      >
+        {LOG_RETENTION_OPTIONS.map((days) => (
+          <button
+            key={days}
+            type="button"
+            className="choice-chip"
+            aria-pressed={settings.logRetentionDays === days}
+            disabled={controlsDisabled || !settings.logToFile}
+            onClick={() => void updateLogRetentionDays(days)}
+          >
+            {days === DEFAULT_LOG_RETENTION_DAYS
+              ? t("settings.logRetentionDaysDefault", { days })
+              : t("settings.logRetentionDays", { days })}
+          </button>
+        ))}
+      </div>
+      {status ? (
+        <p className="settings-inline-hint" role="status">
+          {status}
+        </p>
+      ) : null}
+    </SettingsSection>
+  );
+}
+
+function AdvancedCoreSection({
+  controlsDisabled,
+}: {
+  controlsDisabled: boolean;
+}) {
+  const { t } = useTranslation();
+  const {
+    settings,
+    updateDelayProbe,
+    updateUnifiedDelay,
+    updateTcpConcurrent,
+    updateFixedProxyPort,
+  } = useAppSettings();
+  const [probeUrl, setProbeUrl] = useState(settings.delayProbeUrl);
+  const [probeTimeout, setProbeTimeout] = useState(settings.delayTimeoutMs);
+  const [port, setPort] = useState(
+    settings.fixedProxyPort === null ? "" : String(settings.fixedProxyPort),
+  );
+  const [portError, setPortError] = useState<string | null>(null);
+
+  const saveProbe = () => {
+    if (!isValidProbeUrl(probeUrl)) {
+      return;
+    }
+    void updateDelayProbe(probeUrl, normalizeDelayTimeout(probeTimeout));
+  };
+
+  const savePort = () => {
+    const trimmed = port.trim();
+    if (trimmed === "") {
+      setPortError(null);
+      if (settings.fixedProxyPort !== null) {
+        void updateFixedProxyPort(null);
+      }
+      return;
+    }
+    const parsed = Number.parseInt(trimmed, 10);
+    const normalized = normalizeProxyPort(Number.isFinite(parsed) ? parsed : null);
+    if (normalized === null) {
+      setPortError(t("settings.fixedProxyPortInvalid"));
+      return;
+    }
+    setPortError(null);
+    if (normalized !== settings.fixedProxyPort) {
+      void updateFixedProxyPort(normalized);
+    }
+  };
+
+  return (
+    <SettingsSection
+      definition={settingsSection("advanced")}
+    >
+      <div className="workspace-option-list">
+        <SettingsSwitchRow
+          icon={<Timer aria-hidden="true" size={16} />}
+          title={t("settings.unifiedDelay")}
+          caption={t("settings.unifiedDelayHint")}
+          checked={settings.unifiedDelay}
+          disabled={controlsDisabled}
+          onChange={(checked) => void updateUnifiedDelay(checked)}
+        />
+        <SettingsSwitchRow
+          icon={<Activity aria-hidden="true" size={16} />}
+          title={t("settings.tcpConcurrent")}
+          caption={t("settings.tcpConcurrentHint")}
+          checked={settings.tcpConcurrent}
+          disabled={controlsDisabled}
+          onChange={(checked) => void updateTcpConcurrent(checked)}
+        />
+      </div>
+
+      <SettingsSubheading
+        kicker={t("settings.proxyPortKicker")}
+        title={t("settings.fixedProxyPort")}
+        icon={<Wifi aria-hidden="true" size={16} />}
+      />
+      <div className="delay-probe">
+        <label className="subscription-field">
+          <span>{t("settings.fixedProxyPort")}</span>
+          <input
+            type="number"
+            min={1024}
+            max={65535}
+            step={1}
+            value={port}
+            placeholder={t("settings.fixedProxyPortAuto")}
+            disabled={controlsDisabled}
+            onChange={(event) => setPort(event.target.value)}
+            onBlur={savePort}
+          />
+        </label>
+      </div>
+      {portError ? (
+        <p className="settings-inline-hint" role="alert">
+          {portError}
+        </p>
+      ) : (
+        <p className="settings-inline-hint">{t("settings.fixedProxyPortHint")}</p>
+      )}
+
+      <SettingsSubheading
+        kicker={t("settings.delayProbeKicker")}
+        title={t("settings.delayProbe")}
+        icon={<Timer aria-hidden="true" size={16} />}
+      />
+      <div className="delay-probe">
+        <label className="subscription-field">
+          <span>{t("settings.probeUrl")}</span>
+          <input
+            type="url"
+            value={probeUrl}
+            spellCheck={false}
+            autoComplete="off"
+            disabled={controlsDisabled}
+            onChange={(event) => setProbeUrl(event.target.value)}
+            onBlur={() => {
+              if (
+                probeUrl !== settings.delayProbeUrl &&
+                isValidProbeUrl(probeUrl)
+              ) {
+                saveProbe();
+              }
+            }}
+          />
+        </label>
+        <label className="subscription-field delay-probe-timeout">
+          <span>{t("settings.probeTimeout")}</span>
+          <input
+            type="number"
+            min={1000}
+            max={10000}
+            step={500}
+            value={probeTimeout}
+            disabled={controlsDisabled}
+            onChange={(event) =>
+              setProbeTimeout(Number(event.target.value) || 0)
+            }
+            onBlur={() => {
+              const normalized = normalizeDelayTimeout(probeTimeout);
+              setProbeTimeout(normalized);
+              if (
+                normalized !== settings.delayTimeoutMs ||
+                probeUrl !== settings.delayProbeUrl
+              ) {
+                saveProbe();
+              }
+            }}
+          />
+        </label>
+      </div>
+      {!isValidProbeUrl(probeUrl) ? (
+        <p className="settings-inline-hint" role="alert">
+          {t("settings.probeUrlInvalid")}
+        </p>
+      ) : null}
+    </SettingsSection>
+  );
+}
+
+function SubStoreSection({ controlsDisabled }: { controlsDisabled: boolean }) {
+  const { t } = useTranslation();
+  const { settings, updateSubStore } = useAppSettings();
+  const [url, setUrl] = useState(settings.substoreUrl);
+  const [token, setToken] = useState(settings.substoreToken);
+  const [pending, setPending] = useState(false);
+  const [importing, setImporting] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
+  const [subscriptions, setSubscriptions] = useState<
+    SubStoreSubscription[] | null
+  >(null);
+
+  const connect = async () => {
+    setPending(true);
+    setStatus(null);
+    try {
+      const result = await listSubStoreSubscriptions(url, token);
+      if (result.status === "unavailable") {
+        setStatus(t("settings.substoreBridgeUnavailable"));
+        return;
+      }
+      if (result.status === "error") {
+        setStatus(result.error.message);
+        return;
+      }
+      setSubscriptions(result.data);
+      // Persisting here means the address is ready the next time the page
+      // opens, which is the point of the connection test.
+      void updateSubStore(url, token);
+    } finally {
+      setPending(false);
+    }
+  };
+
+  const importOne = async (subscription: SubStoreSubscription) => {
+    setImporting(subscription.url);
+    setStatus(null);
+    try {
+      const result = await importSubStoreSubscription(
+        subscription.name,
+        subscription.url,
+      );
+      if (result.status === "unavailable") {
+        setStatus(t("settings.substoreBridgeUnavailable"));
+      } else if (result.status === "error") {
+        setStatus(result.error.message);
+      } else {
+        setStatus(t("settings.substoreImported", { name: subscription.name }));
+      }
+    } finally {
+      setImporting(null);
+    }
+  };
+
+  return (
+    <SettingsSection
+      definition={settingsSection("substore")}
+    >
+      <p className="workspace-hint">{t("settings.substoreHint")}</p>
+      <div className="substore-form">
+        <label className="subscription-field">
+          <span>{t("settings.substoreUrl")}</span>
+          <input
+            type="url"
+            value={url}
+            spellCheck={false}
+            autoComplete="off"
+            placeholder="https://substore.example.com"
+            disabled={controlsDisabled || pending}
+            onChange={(event) => setUrl(event.target.value)}
+          />
+        </label>
+        <label className="subscription-field">
+          <span>{t("settings.substoreToken")}</span>
+          <input
+            type="password"
+            value={token}
+            spellCheck={false}
+            autoComplete="off"
+            disabled={controlsDisabled || pending}
+            onChange={(event) => setToken(event.target.value)}
+          />
+        </label>
+      </div>
+
+      <div className="subscription-actions">
+        <span className="subscription-actions-note">
+          {t("settings.substoreNote")}
+        </span>
+        <button
+          type="button"
+          className="workspace-primary-button"
+          disabled={controlsDisabled || pending || url.trim() === ""}
+          onClick={() => void connect()}
+        >
+          {pending ? t("settings.substoreConnecting") : t("settings.substoreConnect")}
+        </button>
+      </div>
+
+      {status ? (
+        <p className="settings-inline-hint" role="status">
+          {status}
+        </p>
+      ) : null}
+
+      {subscriptions !== null ? (
+        subscriptions.length === 0 ? (
+          <p className="substore-empty">{t("settings.substoreEmpty")}</p>
+        ) : (
+          <div className="substore-list">
+            {subscriptions.map((subscription) => (
+              <div className="substore-row" key={`${subscription.name}-${subscription.url}`}>
+                <span className="substore-row-copy">
+                  <strong>{subscription.name}</strong>
+                  <small>{subscription.url}</small>
+                </span>
+                <button
+                  type="button"
+                  className="workspace-action-button"
+                  disabled={controlsDisabled || importing !== null}
+                  onClick={() => void importOne(subscription)}
+                >
+                  {importing === subscription.url
+                    ? t("settings.substoreImporting")
+                    : t("settings.substoreImport")}
+                </button>
+              </div>
+            ))}
+          </div>
+        )
+      ) : null}
+    </SettingsSection>
   );
 }

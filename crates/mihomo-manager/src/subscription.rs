@@ -119,8 +119,7 @@ pub fn prepare_profile_with(
     output.push_str("allow-lan: false\n");
     output.push_str("bind-address: 127.0.0.1\n");
 
-    let default_preferences = StartupPreferences::default();
-    let overrides: Vec<(&str, String)> = if preferences == default_preferences {
+    let overrides: Vec<(&str, String)> = if preferences.is_default() {
         Vec::new()
     } else {
         vec![
@@ -129,6 +128,8 @@ pub fn prepare_profile_with(
                 preferences.log_level.as_wire_value().to_owned(),
             ),
             ("ipv6", preferences.ipv6.to_string()),
+            ("unified-delay", preferences.unified_delay.to_string()),
+            ("tcp-concurrent", preferences.tcp_concurrent.to_string()),
         ]
     };
     let overridden_keys: Vec<&str> = overrides.iter().map(|(key, _)| *key).collect();
@@ -367,6 +368,49 @@ rules:
         let error = prepare_profile("rules:\n  - MATCH,DIRECT\n", 1000)
             .expect_err("document without proxies must be rejected");
         assert!(error.message.contains("proxies"));
+    }
+
+    #[test]
+    fn startup_preferences_override_core_keys_and_win_over_the_subscription() {
+        use flowproxy_contracts::{LogLevel, StartupPreferences};
+
+        let yaml = "\
+proxies:
+  - name: A
+    type: ss
+unified-delay: false
+tcp-concurrent: false
+log-level: debug
+";
+        let preferences = StartupPreferences {
+            log_level: LogLevel::Warning,
+            ipv6: true,
+            unified_delay: true,
+            tcp_concurrent: true,
+            proxy_port: 0,
+        };
+        let prepared =
+            super::prepare_profile_with(yaml, 1000, preferences).expect("profile should prepare");
+
+        assert!(prepared.profile.contains("unified-delay: true"));
+        assert!(prepared.profile.contains("tcp-concurrent: true"));
+        assert!(prepared.profile.contains("ipv6: true"));
+        assert!(!prepared.profile.contains("unified-delay: false"));
+        assert!(!prepared.profile.contains("tcp-concurrent: false"));
+        assert!(!prepared.profile.contains("log-level: debug"));
+        assert_eq!(prepared.profile.matches("unified-delay:").count(), 1);
+    }
+
+    #[test]
+    fn default_preferences_keep_the_providers_values() {
+        let yaml = "\
+proxies:
+  - name: A
+    type: ss
+unified-delay: false
+";
+        let prepared = prepare_profile(yaml, 1000).expect("profile should prepare");
+        assert!(prepared.profile.contains("unified-delay: false"));
     }
 
     #[test]

@@ -151,6 +151,21 @@ describe("SettingsProvider", () => {
       delay_probe_url: "http://www.gstatic.com/generate_204",
       delay_timeout_ms: 5000,
       subscription_update_hours: 0,
+      update_subscription_on_launch: false,
+      settings_mode: "standard",
+      silent_start: false,
+      motion: "full",
+      tray_show_info: true,
+      tray_speed_display: "icon",
+      log_to_file: true,
+      log_retention_days: 7,
+      unified_delay: true,
+      tcp_concurrent: true,
+      fixed_proxy_port: null,
+      substore_url: "",
+      substore_token: "",
+      window_width: null,
+      window_height: null,
     });
     expect(localStorage.getItem(SETTINGS_MIGRATION_KEY)).toBe("1");
   });

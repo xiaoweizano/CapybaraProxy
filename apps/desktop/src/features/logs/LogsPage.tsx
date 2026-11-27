@@ -1,7 +1,8 @@
-import { ScrollText } from "lucide-react";
+import { FolderOpen, ScrollText } from "lucide-react";
 import { useDeferredValue, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useRuntime } from "../../app/runtime/runtimeContext";
+import { openLogDirectory } from "../../platform/runtime";
 import type { RuntimeLogLevel } from "../../platform/runtime";
 import { WorkspacePage } from "../workspace/WorkspaceUi";
 
@@ -11,6 +12,7 @@ export function LogsPage() {
   const { t, i18n } = useTranslation();
   const { logs } = useRuntime();
   const [filter, setFilter] = useState<LogFilter>("all");
+  const [openPending, setOpenPending] = useState(false);
   const deferredFilter = useDeferredValue(filter);
   const visibleLogs =
     deferredFilter === "all"
@@ -21,6 +23,15 @@ export function LogsPage() {
     minute: "2-digit",
     second: "2-digit",
   });
+
+  const openDirectory = async () => {
+    setOpenPending(true);
+    try {
+      await openLogDirectory();
+    } finally {
+      setOpenPending(false);
+    }
+  };
 
   return (
     <WorkspacePage
@@ -34,17 +45,28 @@ export function LogsPage() {
             <span className="workspace-kicker">{t("logs.kicker")}</span>
             <h2>{t("logs.heading")}</h2>
           </div>
-          <div className="workspace-segmented" aria-label={t("logs.filter")}>
-            {(["all", "info", "warn", "error"] as const).map((level) => (
-              <button
-                key={level}
-                type="button"
-                aria-pressed={filter === level}
-                onClick={() => setFilter(level)}
-              >
-                {level}
-              </button>
-            ))}
+          <div className="workspace-panel-actions">
+            <button
+              className="workspace-action-button"
+              type="button"
+              disabled={openPending}
+              onClick={() => void openDirectory()}
+            >
+              <FolderOpen aria-hidden="true" size={14} />
+              {t("logs.openDirectory")}
+            </button>
+            <div className="workspace-segmented" aria-label={t("logs.filter")}>
+              {(["all", "info", "warn", "error"] as const).map((level) => (
+                <button
+                  key={level}
+                  type="button"
+                  aria-pressed={filter === level}
+                  onClick={() => setFilter(level)}
+                >
+                  {level}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 

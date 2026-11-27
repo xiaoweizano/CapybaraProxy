@@ -2,7 +2,12 @@ import { createContext, useContext } from "react";
 import type { ThemeId } from "../theme/theme";
 import type { CloseBehavior } from "../../shared/closeBehavior";
 import type { LanguageId } from "../../i18n/language";
+import type { MotionPreference } from "../../shared/motion";
 import type { CoreLogLevel } from "../../platform/runtime";
+import type {
+  SettingsMode,
+  TraySpeedDisplay,
+} from "../../platform/settings";
 
 export const SETTINGS_MIGRATION_KEY = "flowproxy.settings.migrated.v1";
 
@@ -22,6 +27,36 @@ export type AppPreferences = {
   delayTimeoutMs: number;
   /** Automatic subscription refresh interval in hours; 0 disables it. */
   subscriptionUpdateHours: number;
+  /** Refresh the stored subscription once, right after launch. */
+  updateSubscriptionOnLaunch: boolean;
+  /** How many settings groups the Settings page shows. */
+  settingsMode: SettingsMode;
+  /** Start with the main window hidden so only the tray icon appears. */
+  silentStart: boolean;
+  /** Interface animation preference. */
+  motion: MotionPreference;
+  /** Show the connection state and current node in the tray. */
+  trayShowInfo: boolean;
+  /** What the tray icon does with the live transfer rate. */
+  traySpeedDisplay: TraySpeedDisplay;
+  /** Mirror Runtime events into a rotating log file. */
+  logToFile: boolean;
+  /** How many days of log files are kept. */
+  logRetentionDays: number;
+  /** Merge latency measurements before displaying them. */
+  unifiedDelay: boolean;
+  /** Allow several parallel connections to one host. */
+  tcpConcurrent: boolean;
+  /** Fixed mixed-port; `null` picks a free port on every start. */
+  fixedProxyPort: number | null;
+  /** Base URL of an external Sub-Store backend. */
+  substoreUrl: string;
+  /** Token sent to the Sub-Store backend as `x-api-token`. */
+  substoreToken: string;
+  /** Remembered window size, carried through unchanged when any other
+   * preference is saved. */
+  windowWidth: number | null;
+  windowHeight: number | null;
 };
 
 export type SettingsStorageMode = "loading" | "native" | "preview";
@@ -46,10 +81,29 @@ export type AppSettingsContextValue = {
   updateDelayProbe: (
     url: string,
     timeoutMs: number,
-) => Promise<SettingsUpdateResult>;
+  ) => Promise<SettingsUpdateResult>;
   updateSubscriptionUpdateHours: (
     hours: number,
-) => Promise<SettingsUpdateResult>;
+  ) => Promise<SettingsUpdateResult>;
+  updateUpdateSubscriptionOnLaunch: (
+    enabled: boolean,
+  ) => Promise<SettingsUpdateResult>;
+  updateSettingsMode: (mode: SettingsMode) => Promise<SettingsUpdateResult>;
+  updateSilentStart: (enabled: boolean) => Promise<SettingsUpdateResult>;
+  updateMotion: (motion: MotionPreference) => Promise<SettingsUpdateResult>;
+  updateTrayShowInfo: (enabled: boolean) => Promise<SettingsUpdateResult>;
+  updateTraySpeedDisplay: (
+    display: TraySpeedDisplay,
+  ) => Promise<SettingsUpdateResult>;
+  updateLogToFile: (enabled: boolean) => Promise<SettingsUpdateResult>;
+  updateLogRetentionDays: (days: number) => Promise<SettingsUpdateResult>;
+  updateUnifiedDelay: (enabled: boolean) => Promise<SettingsUpdateResult>;
+  updateTcpConcurrent: (enabled: boolean) => Promise<SettingsUpdateResult>;
+  updateFixedProxyPort: (port: number | null) => Promise<SettingsUpdateResult>;
+  updateSubStore: (
+    url: string,
+    token: string,
+  ) => Promise<SettingsUpdateResult>;
   clearError: () => void;
 };
 

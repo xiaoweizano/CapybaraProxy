@@ -92,12 +92,12 @@ export function MihomoCorePanel() {
 
   return (
     <section
-      className="settings-panel settings-panel-wide mihomo-core-panel"
+      className="workspace-panel mihomo-core-panel"
       aria-labelledby="mihomo-core-title"
     >
-      <div className="settings-panel-heading mihomo-core-heading">
+      <div className="workspace-panel-heading mihomo-core-heading">
         <div>
-          <span className="settings-label">{t("core.kicker")}</span>
+          <span className="workspace-kicker">{t("core.kicker")}</span>
           <h2 id="mihomo-core-title">{t("core.title")}</h2>
         </div>
         <span
@@ -187,7 +187,7 @@ export function MihomoCorePanel() {
 
           <div className="mihomo-platform-boundary">
             <div>
-              <span className="integration-icon">
+              <span className="workspace-setting-icon">
                 <RadioTower aria-hidden="true" size={16} />
               </span>
               <span>
@@ -198,7 +198,7 @@ export function MihomoCorePanel() {
               </span>
             </div>
             <div>
-              <span className="integration-icon">
+              <span className="workspace-setting-icon">
                 <ShieldCheck aria-hidden="true" size={16} />
               </span>
               <span>

@@ -1,20 +1,27 @@
+mod logging;
 mod settings;
-mod tray_strings;
+mod speed_icon;
+mod substore;
 mod system_integration;
+mod tray_strings;
+mod tray_summary;
 
 use flowproxy_contracts::{
-    CommandResult, ConnectionPage, CoreInfo, CorePreferences, GroupDelayResult, LogLevel,
-    ProfileInfo, ProxyGroup, RoutingMode, RuleItem, RuntimeBackend, RuntimeError, RuntimeErrorCode,
-    DelayProbeSettings, RuntimeLogEntry, RuntimeSnapshot, StartupPreferences, SubscriptionSnapshot,
+    CommandResult, ConnectionPage, CoreInfo, CorePreferences, DelayProbeSettings, GroupDelayResult,
+    LogLevel, ProfileInfo, ProxyGroup, RoutingMode, RuleItem, RuntimeBackend, RuntimeError,
+    RuntimeErrorCode, RuntimeLogEntry, RuntimeSnapshot, StartupPreferences, SubscriptionSnapshot,
     TelemetrySnapshot,
 };
 use flowproxy_mihomo_manager::{MihomoAdapter, MihomoCoreAdapter, UnavailableMihomoAdapter};
 use flowproxy_runtime::{RuntimeChange, RuntimeFailure, RuntimeManager};
-use settings::{CloseBehavior, DesktopSettings, SettingsStore, SettingsStoreError};
+use logging::LogFileStore;
+use settings::{
+    CloseBehavior, DesktopSettings, SettingsStore, SettingsStoreError, TraySpeedDisplay,
+};
 use std::fmt::Display;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::sync::{Arc, Mutex, OnceLock};
+use std::time::{Duration, Instant};
 use system_integration::{
     IntegrationFailure, NativePlatform, SystemIntegration, SystemIntegrationEvent,
     SystemIntegrationStatus,
@@ -24,10 +31,13 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     Emitter, Manager, State, WindowEvent,
 };
+use tray_summary::TraySummary;
 
 const MAIN_WINDOW_LABEL: &str = "main";
 const TRAY_ID: &str = "flowproxy";
 const TRAY_TOGGLE_CONNECTION_ID: &str = "toggle-connection";
+const TRAY_STATUS_ID: &str = "tray-status";
+const TRAY_NODE_ID: &str = "tray-node";
 const APP_VISIBILITY_EVENT: &str = "app-visibility";
 const RUNTIME_STATE_EVENT: &str = "runtime-state-changed";
 const RUNTIME_LOG_EVENT: &str = "runtime-log";
@@ -49,6 +59,9 @@ struct AppState {
     settings_store: SettingsStore,
     settings: Mutex<DesktopSettings>,
     exit_gate: ExitGate,
+    logs: Arc<LogFileStore>,
+    /// Summary last rendered into the tray, used to skip redundant rebuilds.
+    tray_summary: Mutex<Option<TraySummary>>,
 }
 
 impl AppState {
@@ -57,13 +70,17 @@ impl AppState {
         system_integration: Arc<DesktopIntegration>,
         settings_store: SettingsStore,
         settings: DesktopSettings,
+        logs: Arc<LogFileStore>,
     ) -> Self {
+        logs.configure(settings.log_to_file, settings.log_retention_days);
         Self {
             runtime,
             system_integration,
             settings_store,
             settings: Mutex::new(settings),
             exit_gate: ExitGate::default(),
+            logs,
+            tray_summary: Mutex::new(None),
         }
     }
 
@@ -94,10 +111,91 @@ impl AppState {
         *current = settings.clone();
         // The core's log level and IPv6 switch are baked into the profile, so
         // the adapter needs them before the next start or restart.
-        self.runtime.apply_startup_preferences(startup_preferences(&settings));
-        self.runtime.apply_delay_probe(delay_probe_settings(&settings));
+        self.runtime
+            .apply_startup_preferences(startup_preferences(&settings));
+        self.runtime
+            .apply_delay_probe(delay_probe_settings(&settings));
+        self.logs
+            .configure(settings.log_to_file, settings.log_retention_days);
         Ok(settings)
     }
+
+    /// Reads the tray summary from the Runtime.
+    ///
+    /// Rates come from the Runtime's telemetry sample, the same one the
+    /// Overview page uses. Asking for it here keeps the tray in sync when the
+    /// window is hidden and the webview has stopped sampling; while the window
+    /// is visible the two callers alternate and the rates are measured over
+    /// whichever window happened since the previous call, so the value stays
+    /// correct but is a little noisier than a single sampler.
+    ///
+    /// The current node costs a `/proxies` request and the rates cost a
+    /// `/connections` request, so each is only fetched when something shows
+    /// it: `refresh_node` for the node (callers clear it when nothing could
+    /// have changed), and the tray display settings for the rates.
+    fn read_tray_summary(&self, refresh_node: bool) -> TraySummary {
+        let snapshot = self.runtime.snapshot();
+        let settings = self.settings();
+        let shows_node = settings.tray_show_info;
+        let shows_rates = settings.tray_show_info
+            || !matches!(settings.tray_speed_display, TraySpeedDisplay::Off);
+        // Reuse the cached node unless the caller knows it may have moved.
+        let cached_node = if refresh_node {
+            None
+        } else {
+            self.stored_tray_summary().and_then(|cached| cached.node)
+        };
+        let mut summary = TraySummary {
+            state: snapshot.state,
+            node: if shows_node { cached_node } else { None },
+            upload_bps: None,
+            download_bps: None,
+        };
+        if !summary.is_running() {
+            // A stopped core has no selected node; keeping the last one would
+            // make the tray claim a route that is not in effect.
+            summary.node = None;
+            return summary;
+        }
+
+        if shows_node && summary.node.is_none() {
+            if let Ok(groups) = self.runtime.proxy_groups() {
+                summary.node = groups
+                    .iter()
+                    .find(|group| !group.selected.is_empty())
+                    .map(|group| group.selected.clone());
+            }
+        }
+        if shows_rates {
+            if let Ok(telemetry) = self.runtime.telemetry() {
+                summary.upload_bps = Some(telemetry.upload_bps);
+                summary.download_bps = Some(telemetry.download_bps);
+            }
+        }
+        summary
+    }
+
+    fn stored_tray_summary(&self) -> Option<TraySummary> {
+        self.tray_summary
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clone()
+    }
+
+    fn store_tray_summary(&self, summary: TraySummary) {
+        *self
+            .tray_summary
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(summary);
+    }
+}
+
+/// Process-wide log sink so `log_native_error`, which has no `AppState`, still
+/// reaches the file. Installed once during `setup`.
+static LOG_SINK: OnceLock<Arc<LogFileStore>> = OnceLock::new();
+
+fn install_log_sink(logs: Arc<LogFileStore>) {
+    let _ = LOG_SINK.set(logs);
 }
 
 /// Maps persisted desktop settings onto the values the adapter bakes into the
@@ -120,6 +218,9 @@ fn startup_preferences(settings: &DesktopSettings) -> StartupPreferences {
             settings::CoreLogLevel::Debug => LogLevel::Debug,
         },
         ipv6: settings.ipv6,
+        unified_delay: settings.unified_delay,
+        tcp_concurrent: settings.tcp_concurrent,
+        proxy_port: settings.fixed_proxy_port.unwrap_or(0),
     }
 }
 #[derive(Default)]
@@ -140,7 +241,11 @@ impl ExitGate {
 }
 
 fn log_native_error(action: &str, error: impl Display) {
-    eprintln!("FlowProxy native window error while {action}: {error}");
+    let message = error.to_string();
+    eprintln!("FlowProxy native window error while {action}: {message}");
+    if let Some(logs) = LOG_SINK.get() {
+        logs.write_native_error(action, &message);
+    }
 }
 
 #[cfg(any(debug_assertions, test))]
@@ -175,6 +280,9 @@ fn emit_runtime_change(app: &tauri::AppHandle, change: &RuntimeChange) {
         log_native_error("publishing the Runtime state", error);
     }
     for entry in &change.logs {
+        if let Some(state) = app.try_state::<AppState>() {
+            state.logs.write(entry.level, &entry.message);
+        }
         if let Err(error) = app.emit(RUNTIME_LOG_EVENT, entry) {
             log_native_error("publishing a Runtime log entry", error);
         }
@@ -345,34 +453,151 @@ fn remember_window_size(window: &tauri::Window) {
     }
 }
 
-fn build_tray_menu(app: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
+/// Builds the tray menu.
+///
+/// The state and current-node lines are disabled items: they report, they do
+/// not act. They are only rebuilt when the state or the node changes (see
+/// [`refresh_tray`]), so the every-tick path costs one tooltip update.
+fn build_tray_menu(
+    app: &tauri::AppHandle,
+    summary: &TraySummary,
+) -> tauri::Result<Menu<tauri::Wry>> {
     let state = app.state::<AppState>();
-    let runtime = state.runtime.snapshot();
-    let language = state.settings().language;
+    let settings = state.settings();
+    let language = settings.language;
     let strings = tray_strings::tray_strings(language);
     let (connection_label, connection_enabled) =
-        tray_strings::connection_label(language, runtime.state);
-    let connection = MenuItem::with_id(
+        tray_strings::connection_label(language, summary.state);
+
+    let mut items: Vec<MenuItem<tauri::Wry>> = Vec::with_capacity(6);
+    if settings.tray_show_info {
+        let status = format!(
+            "{}: {}",
+            strings.status,
+            tray_strings::state_label(language, summary.state)
+        );
+        items.push(MenuItem::with_id(
+            app,
+            TRAY_STATUS_ID,
+            status,
+            false,
+            None::<&str>,
+        )?);
+        let node = summary.node.as_deref().unwrap_or(strings.no_node);
+        items.push(MenuItem::with_id(
+            app,
+            TRAY_NODE_ID,
+            format!("{}: {node}", strings.node),
+            false,
+            None::<&str>,
+        )?);
+    }
+
+    items.push(MenuItem::with_id(
         app,
         TRAY_TOGGLE_CONNECTION_ID,
         connection_label,
         connection_enabled,
         None::<&str>,
-    )?;
-    let show = MenuItem::with_id(app, "show", strings.show, true, None::<&str>)?;
-    let exit = MenuItem::with_id(app, "exit", strings.exit, true, None::<&str>)?;
-    Menu::with_items(app, &[&connection, &show, &exit])
+    )?);
+    items.push(MenuItem::with_id(
+        app,
+        "show",
+        strings.show,
+        true,
+        None::<&str>,
+    )?);
+    items.push(MenuItem::with_id(
+        app,
+        "exit",
+        strings.exit,
+        true,
+        None::<&str>,
+    )?);
+
+    let references: Vec<&dyn tauri::menu::IsMenuItem<tauri::Wry>> =
+        items.iter().map(|item| item as _).collect();
+    Menu::with_items(app, &references)
 }
 
-fn refresh_tray_menu(app: &tauri::AppHandle) {
+/// Updates the tray menu, tooltip and icon from the current Runtime state.
+///
+/// Each of the three is updated independently so a rate change never triggers
+/// a menu rebuild:
+/// - menu: only when the state or node changed;
+/// - tooltip: on every call (it is a cheap `NIM_MODIFY`);
+/// - icon: only when the rendered rate text changed.
+fn refresh_tray(app: &tauri::AppHandle, state: &AppState, summary: TraySummary) {
     let Some(tray) = app.tray_by_id(TRAY_ID) else {
-        eprintln!("FlowProxy native error: the tray icon is unavailable.");
+        log_native_error("reading the tray icon", "the tray icon is unavailable");
         return;
     };
-    match build_tray_menu(app).and_then(|menu| tray.set_menu(Some(menu))) {
-        Ok(()) => {}
-        Err(error) => log_native_error("refreshing the tray menu", error),
+    let settings = state.settings();
+    let language = settings.language;
+    let speed = summary.speed_label();
+
+    let previous = state.stored_tray_summary();
+    let menu_changed = match previous.as_ref() {
+        Some(previous) => previous.needs_menu_refresh(&summary),
+        None => true,
+    };
+    if menu_changed {
+        match build_tray_menu(app, &summary).and_then(|menu| tray.set_menu(Some(menu))) {
+            Ok(()) => {}
+            Err(error) => log_native_error("refreshing the tray menu", error),
+        }
     }
+
+    if settings.tray_show_info {
+        let tooltip = tray_strings::tooltip(
+            language,
+            summary.state,
+            summary.node.as_deref(),
+            speed.as_deref(),
+        );
+        if let Err(error) = tray.set_tooltip(Some(tooltip)) {
+            log_native_error("updating the tray tooltip", error);
+        }
+    } else if let Err(error) = tray.set_tooltip(Some(tray_strings::tray_strings(language).tooltip))
+    {
+        log_native_error("resetting the tray tooltip", error);
+    }
+
+    // The icon is the expensive part of the tick (a bitmap plus a main-thread
+    // round trip), so the icon is only redrawn when the rate text changed and
+    // the operator asked for the icon display. Switching the mode back to
+    // tooltip/off while a speed icon is showing restores the app icon once.
+    let previous_speed = previous
+        .as_ref()
+        .and_then(|previous| previous.speed_label());
+    let wants_speed_icon =
+        matches!(settings.tray_speed_display, TraySpeedDisplay::Icon) && speed.is_some();
+    if wants_speed_icon && previous_speed != speed {
+        let image = speed_icon::render(summary.upload_bps, summary.download_bps);
+        if let Err(error) = tray.set_icon(Some(image)) {
+            log_native_error("updating the tray speed icon", error);
+        }
+    } else if !wants_speed_icon && previous_speed.is_some() {
+        if let Some(icon) = app.default_window_icon() {
+            if let Err(error) = tray.set_icon(Some(icon.clone())) {
+                log_native_error("restoring the tray icon", error);
+            }
+        }
+    }
+
+    state.store_tray_summary(summary);
+}
+
+/// Rebuilds the tray from a fresh read.
+///
+/// Used after a lifecycle or settings change, which is exactly when the
+/// selected node may have moved, so the node is re-read here.
+fn refresh_tray_menu(app: &tauri::AppHandle) {
+    let Some(state) = app.try_state::<AppState>() else {
+        return;
+    };
+    let summary = state.read_tray_summary(true);
+    refresh_tray(app, state.inner(), summary);
 }
 
 fn run_tray_connection_action(app: &tauri::AppHandle, state: &AppState) {
@@ -399,13 +624,20 @@ fn run_tray_connection_action(app: &tauri::AppHandle, state: &AppState) {
 }
 
 fn install_tray(app: &tauri::App) -> tauri::Result<()> {
-    let menu = build_tray_menu(app.handle())?;
+    let initial_summary = app.state::<AppState>().read_tray_summary(true);
+    let menu = build_tray_menu(app.handle(), &initial_summary)?;
     let language = app.state::<AppState>().settings().language;
+    let tooltip = tray_strings::tooltip(
+        language,
+        initial_summary.state,
+        initial_summary.node.as_deref(),
+        initial_summary.speed_label().as_deref(),
+    );
 
     let mut builder = TrayIconBuilder::with_id(TRAY_ID)
         .menu(&menu)
         .show_menu_on_left_click(false)
-        .tooltip(tray_strings::tray_strings(language).tooltip)
+        .tooltip(tooltip)
         .on_menu_event(|app, event| match event.id().as_ref() {
             TRAY_TOGGLE_CONNECTION_ID => {
                 let state = app.state::<AppState>();
@@ -572,7 +804,13 @@ fn select_proxy(
     {
         return CommandResult::failure(error);
     }
-    run_data_command(&app, state.runtime.select_proxy(&group, &proxy))
+    let result = run_data_command(&app, state.runtime.select_proxy(&group, &proxy));
+    // The tray shows the selected node, so a successful switch has to reach it
+    // without waiting for the next state change.
+    if matches!(result, CommandResult::Success(_)) {
+        refresh_tray_menu(&app);
+    }
+    result
 }
 
 #[tauri::command]
@@ -631,10 +869,7 @@ fn set_core_preferences(
     mode: Option<RoutingMode>,
     log_level: Option<LogLevel>,
 ) -> CommandResult<CorePreferences> {
-    run_data_command(
-        &app,
-        state.runtime.update_core_preferences(mode, log_level),
-    )
+    run_data_command(&app, state.runtime.update_core_preferences(mode, log_level))
 }
 
 #[tauri::command]
@@ -931,11 +1166,15 @@ fn request_controlled_exit(app: &tauri::AppHandle, state: &AppState) -> Result<(
 }
 
 fn spawn_runtime_health_loop(app: tauri::AppHandle) {
+    let launch_refresh_pending = app
+        .state::<AppState>()
+        .settings()
+        .update_subscription_on_launch;
     let result = std::thread::Builder::new()
         .name("flowproxy-runtime-health".to_owned())
         .spawn(move || {
-            let mut last_subscription_refresh =
-                std::time::Instant::now() - AUTO_REFRESH_INITIAL_DELAY;
+            let mut last_subscription_refresh = Instant::now() - AUTO_REFRESH_INITIAL_DELAY;
+            let mut launch_refresh_pending = launch_refresh_pending;
             loop {
                 let window_visible = app
                     .get_webview_window(MAIN_WINDOW_LABEL)
@@ -944,7 +1183,7 @@ fn spawn_runtime_health_loop(app: tauri::AppHandle) {
                 std::thread::sleep(runtime_health_interval(window_visible));
                 let state = app.state::<AppState>();
                 let outcome = state.system_integration.poll_health();
-                let runtime_changed = outcome.runtime_change.is_some();
+                let outcome_state_changed = outcome.runtime_change.is_some();
                 if let Some(change) = outcome.runtime_change {
                     emit_runtime_change(&app, &change);
                 }
@@ -953,8 +1192,22 @@ fn spawn_runtime_health_loop(app: tauri::AppHandle) {
                 } else if outcome.integration_changed {
                     emit_integration_status(&app, state.system_integration.as_ref());
                 }
-                if runtime_changed {
-                    refresh_tray_menu(&app);
+                // Two independent reasons to touch the tray: the core state
+                // changed, or the live rate did. Both are read from the same
+                // cheap summary, so the pipeline runs on every tick and the
+                // menu is only rebuilt when the state or node actually moved.
+                // The node is re-read only when the core state moved; a node
+                // switch from the Proxies page refreshes the tray through
+                // `refresh_tray_menu` instead of a `/proxies` poll per tick.
+                let state_changed = outcome_state_changed;
+                let summary = state.read_tray_summary(state_changed);
+                refresh_tray(&app, state.inner(), summary);
+
+                if launch_refresh_pending {
+                    launch_refresh_pending = false;
+                    if refresh_stored_subscription(&app, state.inner()).is_some() {
+                        last_subscription_refresh = Instant::now();
+                    }
                 }
                 maybe_refresh_subscription(&app, state.inner(), &mut last_subscription_refresh);
             }
@@ -970,36 +1223,26 @@ const AUTO_REFRESH_INITIAL_DELAY: Duration = Duration::from_secs(30);
 /// Minimum spacing between checks, so a short interval cannot spin the loop.
 const AUTO_REFRESH_MIN_SPACING: Duration = Duration::from_secs(60);
 
-/// Re-downloads the stored subscription once its configured interval elapsed.
+/// Downloads the stored subscription again and activates it.
 ///
-/// The check runs from the health loop because that is the only place with a
-/// periodic wake-up; the download itself uses the same fetch path as an import,
-/// so a provider failure surfaces as a Runtime log entry rather than a panic.
-fn maybe_refresh_subscription(
-    app: &tauri::AppHandle,
-    state: &AppState,
-    last_refresh: &mut std::time::Instant,
-) {
-    let settings = state.settings();
-    if settings.subscription_update_hours == 0 {
-        return;
-    }
-    let interval = Duration::from_secs(u64::from(settings.subscription_update_hours) * 60 * 60);
-    if last_refresh.elapsed() < interval.max(AUTO_REFRESH_MIN_SPACING) {
-        return;
-    }
-
-    let Some(url) = state.runtime.subscription_source_url() else {
-        return;
-    };
-    *last_refresh = std::time::Instant::now();
-
-    let Ok(document) = flowproxy_mihomo_manager::subscription_fetch::fetch(&url) else {
-        // A failed refresh keeps the last good document; the next tick retries.
-        return;
+/// Shared by the launch-time refresh and the interval-based one so both take
+/// exactly the same path: same size cap, same validation, same error surface.
+/// Returns the profile name when the document was accepted.
+fn refresh_stored_subscription(app: &tauri::AppHandle, state: &AppState) -> Option<String> {
+    let url = state.runtime.subscription_source_url()?;
+    let document = match flowproxy_mihomo_manager::subscription_fetch::fetch(&url) {
+        Ok(document) => document,
+        Err(error) => {
+            log_native_error("downloading the stored subscription", error);
+            return None;
+        }
     };
     if document.len() > MAX_SUBSCRIPTION_YAML_BYTES {
-        return;
+        log_native_error(
+            "refreshing the stored subscription",
+            "the downloaded document exceeds the size limit",
+        );
+        return None;
     }
 
     let name = state
@@ -1018,12 +1261,128 @@ fn maybe_refresh_subscription(
             if let Err(error) = app.emit(SUBSCRIPTION_UPDATED_EVENT, &name) {
                 log_native_error("publishing the subscription update", error);
             }
+            Some(name)
         }
         Err(failure) => {
             // A stale upstream that produces an invalid document must not
             // replace the working one; the next tick retries.
             log_native_error("refreshing the subscription automatically", &failure.error);
+            None
         }
+    }
+}
+
+/// Re-downloads the stored subscription once its configured interval elapsed.
+///
+/// The check runs from the health loop because that is the only place with a
+/// periodic wake-up; the download itself uses the same fetch path as an import,
+/// so a provider failure surfaces as a Runtime log entry rather than a panic.
+fn maybe_refresh_subscription(
+    app: &tauri::AppHandle,
+    state: &AppState,
+    last_refresh: &mut Instant,
+) {
+    let settings = state.settings();
+    if settings.subscription_update_hours == 0 {
+        return;
+    }
+    let interval = Duration::from_secs(u64::from(settings.subscription_update_hours) * 60 * 60);
+    if last_refresh.elapsed() < interval.max(AUTO_REFRESH_MIN_SPACING) {
+        return;
+    }
+
+    *last_refresh = Instant::now();
+    refresh_stored_subscription(app, state);
+}
+
+/// Lists the subscriptions stored on the configured Sub-Store backend.
+///
+/// Takes the address and token from the caller so the settings page can test a
+/// draft before it is saved; an empty token is allowed by backends that do not
+/// require authentication.
+#[tauri::command]
+fn list_substore_subscriptions(
+    url: String,
+    token: String,
+) -> CommandResult<Vec<substore::SubStoreSubscription>> {
+    match substore::list(&url, &token) {
+        Ok(subscriptions) => CommandResult::success(subscriptions),
+        Err(error) => CommandResult::failure(error),
+    }
+}
+
+/// Imports one of the subscriptions listed by Sub-Store.
+///
+/// The URL comes from the backend's list, so this is the same download path as
+/// an operator-pasted URL; the profile is named after the Sub-Store entry.
+#[tauri::command]
+fn import_substore_subscription(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    name: String,
+    url: String,
+) -> CommandResult<Vec<ProfileInfo>> {
+    if let Err(error) = validate_identifier(
+        "subscription name",
+        &name,
+        RuntimeErrorCode::SubscriptionInvalid,
+    ) {
+        return CommandResult::failure(error);
+    }
+    let document = match flowproxy_mihomo_manager::subscription_fetch::fetch(&url) {
+        Ok(document) => document,
+        Err(error) => return CommandResult::failure(error),
+    };
+    if document.len() > MAX_SUBSCRIPTION_YAML_BYTES {
+        return CommandResult::failure(RuntimeError::new(
+            RuntimeErrorCode::SubscriptionInvalid,
+            format!(
+                "The subscription is larger than the {} MiB limit.",
+                MAX_SUBSCRIPTION_YAML_BYTES / (1024 * 1024)
+            ),
+            false,
+        ));
+    }
+
+    state.runtime.set_pending_subscription_url(Some(url));
+    if let Err(failure) = state.runtime.import_subscription(&name, &document) {
+        emit_runtime_change(&app, &failure.change);
+        return CommandResult::failure(failure.error);
+    }
+
+    let profiles = state.runtime.profiles().unwrap_or_default();
+    // The subscription page refreshes its list on this event, which is also
+    // where the user lands after importing from Settings.
+    if let Err(error) = app.emit(SUBSCRIPTION_UPDATED_EVENT, &name) {
+        log_native_error("publishing the Sub-Store import", error);
+    }
+    CommandResult::success(profiles)
+}
+
+/// Opens the directory that holds the rotating log files.
+#[tauri::command]
+fn open_log_directory(state: State<'_, AppState>) -> CommandResult<String> {
+    let path = state.logs.directory().to_path_buf();
+    match logging::open_directory(&state.logs) {
+        Ok(()) => CommandResult::success(path.to_string_lossy().into_owned()),
+        Err(error) => CommandResult::failure(RuntimeError::new(
+            RuntimeErrorCode::Internal,
+            format!("The log directory could not be opened: {error}"),
+            true,
+        )),
+    }
+}
+
+/// Deletes every log file FlowProxy created and reports how many were removed.
+#[tauri::command]
+fn clear_log_files(state: State<'_, AppState>) -> CommandResult<u32> {
+    match logging::clear(&state.logs) {
+        Ok(removed) => CommandResult::success(removed as u32),
+        Err(error) => CommandResult::failure(RuntimeError::new(
+            RuntimeErrorCode::Internal,
+            format!("The log files could not be removed: {error}"),
+            true,
+        )),
     }
 }
 
@@ -1059,6 +1418,10 @@ pub fn run() {
             set_system_proxy_enabled,
             set_launch_at_login_enabled,
             request_application_exit,
+            list_substore_subscriptions,
+            import_substore_subscription,
+            open_log_directory,
+            clear_log_files,
         ])
         .setup(|app| {
             let config_directory = app.path().app_config_dir()?;
@@ -1088,16 +1451,41 @@ pub fn run() {
             if let Err(error) = system_integration.recover_on_startup() {
                 log_native_error("recovering the system proxy on startup", error);
             }
+            let log_directory = app
+                .path()
+                .app_log_dir()
+                .unwrap_or_else(|_| config_directory.join("logs"));
+            let logs = Arc::new(LogFileStore::new(log_directory));
+            install_log_sink(logs.clone());
             app.manage(AppState::new(
                 runtime,
                 system_integration,
                 settings_store,
                 loaded_settings.settings.clone(),
+                logs,
             ));
+            {
+                let state = app.state::<AppState>();
+                state.logs.prune();
+            }
             install_tray(app)?;
             spawn_runtime_health_loop(app.handle().clone());
             restore_window_preferences(app.handle(), &loaded_settings.settings);
-            show_main_window(app.handle());
+            if loaded_settings.settings.silent_start {
+                if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
+                    if let Err(error) = window.hide() {
+                        log_native_error("hiding the main window on a silent start", error);
+                    }
+                    if let Err(error) = window.emit(APP_VISIBILITY_EVENT, true) {
+                        log_native_error(
+                            "notifying the webview that the window started hidden",
+                            error,
+                        );
+                    }
+                }
+            } else {
+                show_main_window(app.handle());
+            }
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -1182,7 +1570,8 @@ mod tests {
             NativePlatform::new(directory),
             directory.join("FlowProxy.exe"),
         ));
-        AppState::new(runtime, system_integration, store, settings)
+        let logs = Arc::new(crate::logging::LogFileStore::new(directory.join("logs")));
+        AppState::new(runtime, system_integration, store, settings, logs)
     }
 
     #[test]

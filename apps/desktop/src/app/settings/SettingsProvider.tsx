@@ -11,7 +11,14 @@ import {
   getSettings,
   saveSettings,
   type DesktopSettings,
+  type SettingsMode,
+  type TraySpeedDisplay,
 } from "../../platform/settings";
+import {
+  DEFAULT_LOG_RETENTION_DAYS,
+  normalizeLogRetention,
+  normalizeProxyPort,
+} from "../../shared/settingsLimits";
 import {
   readStoredCloseBehavior,
   writeStoredCloseBehavior,
@@ -40,6 +47,11 @@ import {
 } from "../../i18n/language";
 import { applyLanguage } from "../../i18n";
 import {
+  DEFAULT_MOTION,
+  applyMotion,
+  type MotionPreference,
+} from "../../shared/motion";
+import {
   DEFAULT_DELAY_PROBE_URL,
   DEFAULT_DELAY_TIMEOUT_MS,
   normalizeDelayTimeout,
@@ -58,30 +70,44 @@ type PreferencePatch = Partial<AppPreferences>;
 function readPreviewPreferences(): AppPreferences {
   try {
     return {
+      ...DEFAULT_PREFERENCES,
       theme: readStoredTheme(window.localStorage),
       closeBehavior: readStoredCloseBehavior(window.localStorage),
       language: readStoredLanguage(window.localStorage),
       uiScale: readStoredUiScale(window.localStorage),
-      coreLogLevel: "warning",
-      ipv6: false,
-      delayProbeUrl: DEFAULT_DELAY_PROBE_URL,
-      delayTimeoutMs: DEFAULT_DELAY_TIMEOUT_MS,
-      subscriptionUpdateHours: 0,
     };
   } catch {
-    return {
-      theme: "cyber_flow",
-      closeBehavior: "hide_to_tray",
-      language: DEFAULT_LANGUAGE,
-      uiScale: DEFAULT_UI_SCALE,
-      coreLogLevel: "warning",
-      ipv6: false,
-      delayProbeUrl: DEFAULT_DELAY_PROBE_URL,
-      delayTimeoutMs: DEFAULT_DELAY_TIMEOUT_MS,
-      subscriptionUpdateHours: 0,
-    };
+    return DEFAULT_PREFERENCES;
   }
 }
+
+/** Mirrors `DesktopSettings::default()` on the Rust side. */
+const DEFAULT_PREFERENCES: AppPreferences = {
+  theme: "cyber_flow",
+  closeBehavior: "hide_to_tray",
+  language: DEFAULT_LANGUAGE,
+  uiScale: DEFAULT_UI_SCALE,
+  coreLogLevel: "warning",
+  ipv6: false,
+  delayProbeUrl: DEFAULT_DELAY_PROBE_URL,
+  delayTimeoutMs: DEFAULT_DELAY_TIMEOUT_MS,
+  subscriptionUpdateHours: 0,
+  updateSubscriptionOnLaunch: false,
+  settingsMode: "standard",
+  silentStart: false,
+  motion: DEFAULT_MOTION,
+  trayShowInfo: true,
+  traySpeedDisplay: "icon",
+  logToFile: true,
+  logRetentionDays: DEFAULT_LOG_RETENTION_DAYS,
+  unifiedDelay: true,
+  tcpConcurrent: true,
+  fixedProxyPort: null,
+  substoreUrl: "",
+  substoreToken: "",
+  windowWidth: null,
+  windowHeight: null,
+};
 
 function fromNativeSettings(settings: DesktopSettings): AppPreferences {
   return {
@@ -96,6 +122,22 @@ function fromNativeSettings(settings: DesktopSettings): AppPreferences {
     delayProbeUrl: settings.delay_probe_url ?? DEFAULT_DELAY_PROBE_URL,
     delayTimeoutMs: settings.delay_timeout_ms ?? DEFAULT_DELAY_TIMEOUT_MS,
     subscriptionUpdateHours: settings.subscription_update_hours ?? 0,
+    updateSubscriptionOnLaunch: settings.update_subscription_on_launch ?? false,
+    settingsMode: settings.settings_mode ?? "standard",
+    silentStart: settings.silent_start ?? false,
+    motion: settings.motion ?? DEFAULT_MOTION,
+    trayShowInfo: settings.tray_show_info ?? true,
+    traySpeedDisplay: settings.tray_speed_display ?? "icon",
+    logToFile: settings.log_to_file ?? true,
+    logRetentionDays:
+      settings.log_retention_days ?? DEFAULT_LOG_RETENTION_DAYS,
+    unifiedDelay: settings.unified_delay ?? true,
+    tcpConcurrent: settings.tcp_concurrent ?? true,
+    fixedProxyPort: settings.fixed_proxy_port ?? null,
+    substoreUrl: settings.substore_url ?? "",
+    substoreToken: settings.substore_token ?? "",
+    windowWidth: settings.window_width ?? null,
+    windowHeight: settings.window_height ?? null,
   };
 }
 
@@ -111,6 +153,23 @@ function toNativeSettings(settings: AppPreferences): DesktopSettings {
     delay_probe_url: settings.delayProbeUrl,
     delay_timeout_ms: settings.delayTimeoutMs,
     subscription_update_hours: settings.subscriptionUpdateHours,
+    update_subscription_on_launch: settings.updateSubscriptionOnLaunch,
+    settings_mode: settings.settingsMode,
+    silent_start: settings.silentStart,
+    motion: settings.motion,
+    tray_show_info: settings.trayShowInfo,
+    tray_speed_display: settings.traySpeedDisplay,
+    log_to_file: settings.logToFile,
+    log_retention_days: settings.logRetentionDays,
+    unified_delay: settings.unifiedDelay,
+    tcp_concurrent: settings.tcpConcurrent,
+    fixed_proxy_port: settings.fixedProxyPort,
+    substore_url: settings.substoreUrl,
+    substore_token: settings.substoreToken,
+    // Round-tripped so saving any other preference cannot clear the window
+    // size the native side remembered.
+    window_width: settings.windowWidth,
+    window_height: settings.windowHeight,
   };
 }
 
@@ -139,6 +198,7 @@ function hasLegacyPreferences(): boolean {
   }
 }
 
+/** Clamps a retention window to the range the native side accepts. */
 function markSettingsMigrated(): void {
   try {
     window.localStorage.setItem(SETTINGS_MIGRATION_KEY, "1");
@@ -179,6 +239,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     writePreferenceCache(nextSettings);
     applyLanguage(nextSettings.language);
     applyUiScale(nextSettings.uiScale);
+    applyMotion(nextSettings.motion);
   }, []);
 
   useEffect(() => {
@@ -380,6 +441,87 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     [enqueueUpdate],
   );
 
+  const updateUpdateSubscriptionOnLaunch = useCallback(
+    (updateSubscriptionOnLaunch: boolean): Promise<SettingsUpdateResult> =>
+      enqueueUpdate({ updateSubscriptionOnLaunch }),
+    [enqueueUpdate],
+  );
+
+  const updateSettingsMode = useCallback(
+    (settingsMode: SettingsMode): Promise<SettingsUpdateResult> =>
+      enqueueUpdate({ settingsMode }),
+    [enqueueUpdate],
+  );
+
+  const updateSilentStart = useCallback(
+    (silentStart: boolean): Promise<SettingsUpdateResult> =>
+      enqueueUpdate({ silentStart }),
+    [enqueueUpdate],
+  );
+
+  const updateMotion = useCallback(
+    (motion: MotionPreference): Promise<SettingsUpdateResult> => {
+      // Flip the class immediately; the persisted value is re-applied from
+      // `applySettings` once the save completes.
+      applyMotion(motion);
+      return enqueueUpdate({ motion });
+    },
+    [enqueueUpdate],
+  );
+
+  const updateTrayShowInfo = useCallback(
+    (trayShowInfo: boolean): Promise<SettingsUpdateResult> =>
+      enqueueUpdate({ trayShowInfo }),
+    [enqueueUpdate],
+  );
+
+  const updateTraySpeedDisplay = useCallback(
+    (traySpeedDisplay: TraySpeedDisplay): Promise<SettingsUpdateResult> =>
+      enqueueUpdate({ traySpeedDisplay }),
+    [enqueueUpdate],
+  );
+
+  const updateLogToFile = useCallback(
+    (logToFile: boolean): Promise<SettingsUpdateResult> =>
+      enqueueUpdate({ logToFile }),
+    [enqueueUpdate],
+  );
+
+  const updateLogRetentionDays = useCallback(
+    (days: number): Promise<SettingsUpdateResult> =>
+      enqueueUpdate({ logRetentionDays: normalizeLogRetention(days) }),
+    [enqueueUpdate],
+  );
+
+  const updateUnifiedDelay = useCallback(
+    (unifiedDelay: boolean): Promise<SettingsUpdateResult> =>
+      enqueueUpdate({ unifiedDelay }),
+    [enqueueUpdate],
+  );
+
+  const updateTcpConcurrent = useCallback(
+    (tcpConcurrent: boolean): Promise<SettingsUpdateResult> =>
+      enqueueUpdate({ tcpConcurrent }),
+    [enqueueUpdate],
+  );
+
+  const updateFixedProxyPort = useCallback(
+    (port: number | null): Promise<SettingsUpdateResult> =>
+      enqueueUpdate({ fixedProxyPort: normalizeProxyPort(port) }),
+    [enqueueUpdate],
+  );
+
+  const updateSubStore = useCallback(
+    (url: string, token: string): Promise<SettingsUpdateResult> =>
+      enqueueUpdate({
+        substoreUrl: url.trim(),
+        // The native side clears the token when the URL is empty; mirror it
+        // here so the UI and the persisted file agree immediately.
+        substoreToken: url.trim() === "" ? "" : token.trim(),
+      }),
+    [enqueueUpdate],
+  );
+
   const clearError = useCallback(() => setError(null), []);
 
   const value = useMemo(
@@ -396,6 +538,18 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       updateIpv6,
       updateDelayProbe,
       updateSubscriptionUpdateHours,
+      updateUpdateSubscriptionOnLaunch,
+      updateSettingsMode,
+      updateSilentStart,
+      updateMotion,
+      updateTrayShowInfo,
+      updateTraySpeedDisplay,
+      updateLogToFile,
+      updateLogRetentionDays,
+      updateUnifiedDelay,
+      updateTcpConcurrent,
+      updateFixedProxyPort,
+      updateSubStore,
       clearError,
     }),
     [
@@ -411,6 +565,18 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       updateIpv6,
       updateDelayProbe,
       updateSubscriptionUpdateHours,
+      updateUpdateSubscriptionOnLaunch,
+      updateSettingsMode,
+      updateSilentStart,
+      updateMotion,
+      updateTrayShowInfo,
+      updateTraySpeedDisplay,
+      updateLogToFile,
+      updateLogRetentionDays,
+      updateUnifiedDelay,
+      updateTcpConcurrent,
+      updateFixedProxyPort,
+      updateSubStore,
       clearError,
     ],
   );

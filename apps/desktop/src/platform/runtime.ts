@@ -159,6 +159,12 @@ export type SubscriptionSnapshot = {
   updated_at_ms?: number | null;
 };
 
+/** An entry listed by an external Sub-Store backend. */
+export type SubStoreSubscription = {
+  name: string;
+  url: string;
+};
+
 const runtimeStates = new Set<RuntimeState>([
   "stopped",
   "starting",
@@ -384,6 +390,14 @@ function isProfileInfo(value: unknown): value is ProfileInfo {
   );
 }
 
+function isSubStoreSubscription(value: unknown): value is SubStoreSubscription {
+  return isRecord(value) && isString(value.name) && isString(value.url);
+}
+
+function isSubStoreList(value: unknown): value is SubStoreSubscription[] {
+  return Array.isArray(value) && value.every(isSubStoreSubscription);
+}
+
 function invalidRuntimeError(): RuntimeError {
   return {
     code: "internal",
@@ -432,7 +446,11 @@ async function executeRuntimeCommand<T>(
     | "get_subscription_snapshot"
     | "import_subscription"
     | "clear_subscription"
-    | "refresh_subscription",
+    | "refresh_subscription"
+    | "list_substore_subscriptions"
+    | "import_substore_subscription"
+    | "open_log_directory"
+    | "clear_log_files",
   isValidData: (value: unknown) => value is T,
   args?: Record<string, unknown>,
 ): Promise<RuntimeBridgeResult<T>> {
@@ -630,6 +648,41 @@ export function subscribeSubscriptionUpdated(
   listener: () => void,
 ): Promise<() => void> {
   return listenNativeEvent("subscription-updated", () => listener());
+}
+
+/** Lists the subscriptions stored on an external Sub-Store backend. */
+export function listSubStoreSubscriptions(
+  url: string,
+  token: string,
+): Promise<RuntimeBridgeResult<SubStoreSubscription[]>> {
+  return executeRuntimeCommand("list_substore_subscriptions", isSubStoreList, {
+    url,
+    token,
+  });
+}
+
+/** Imports one subscription listed by a Sub-Store backend. */
+export function importSubStoreSubscription(
+  name: string,
+  url: string,
+): Promise<RuntimeBridgeResult<ProfileInfo[]>> {
+  return executeRuntimeCommand("import_substore_subscription", isProfileList, {
+    name,
+    url,
+  });
+}
+
+/** Opens the rotating log directory in the platform file manager. */
+export function openLogDirectory(): Promise<RuntimeBridgeResult<string>> {
+  return executeRuntimeCommand("open_log_directory", isString);
+}
+
+/** Deletes every log file FlowProxy created. */
+export function clearLogFiles(): Promise<RuntimeBridgeResult<number>> {
+  return executeRuntimeCommand(
+    "clear_log_files",
+    (value): value is number => typeof value === "number" && value >= 0,
+  );
 }
 
 export function startRuntime(): Promise<RuntimeBridgeResult<RuntimeSnapshot>> {

@@ -93,3 +93,37 @@ fn an_unsupported_body_reports_the_expected_format() {
     assert!(error.message.contains("no proxies"), "{}", error.message);
     assert!(error.message.contains("share links"), "{}", error.message);
 }
+
+#[test]
+fn plain_text_downloads_carry_headers_and_skip_clash_normalisation() {
+    let body = r#"{"data":[{"name":"Airport","url":"https://example.com/sub"}]}"#;
+    let (port, request_rx, handle) = serve_once(body);
+
+    let text = subscription_fetch::fetch_text(
+        &format!("http://127.0.0.1:{port}/api/subs"),
+        &[("x-api-token", "token-value")],
+        1024 * 1024,
+    )
+    .expect("plain download should succeed");
+
+    handle.join().expect("fixture server");
+    let request = request_rx.recv().expect("capture request");
+    assert!(request.starts_with("GET /api/subs "));
+    assert!(request
+        .to_ascii_lowercase()
+        .contains("x-api-token: token-value"));
+    assert_eq!(text, body);
+}
+
+#[test]
+fn plain_text_downloads_enforce_the_size_cap() {
+    let body = "x".repeat(4096);
+    let (port, _request_rx, handle) = serve_once(&body);
+
+    let error =
+        subscription_fetch::fetch_text(&format!("http://127.0.0.1:{port}/api/subs"), &[], 1024)
+            .expect_err("oversized response must be rejected");
+
+    handle.join().expect("fixture server");
+    assert!(error.message.contains("MiB"));
+}

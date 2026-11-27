@@ -7,21 +7,34 @@ export function WorkspacePage({
   eyebrow,
   title,
   badge,
+  badgeTone = "live",
+  className,
   children,
 }: {
   eyebrow: string;
   title: string;
+  /** Right-hand status pill. */
   badge: string;
+  /** `live` shows the pulsing success dot; `neutral` is for state that is not
+   * a live reading, such as the settings storage backend. */
+  badgeTone?: "live" | "neutral";
+  /** Extra class for a page that needs its own layout rules. */
+  className?: string;
   children: ReactNode;
 }) {
   return (
-    <section className="workspace-page" aria-labelledby="workspace-page-title">
+    <section
+      className={className ? `workspace-page ${className}` : "workspace-page"}
+      aria-labelledby="workspace-page-title"
+    >
       <div className="page-heading">
         <div>
           <span className="page-eyebrow">{eyebrow}</span>
           <h1 id="workspace-page-title">{title}</h1>
         </div>
-        <span className="workspace-live-badge">{badge}</span>
+        <span className="workspace-live-badge" data-tone={badgeTone}>
+          {badge}
+        </span>
       </div>
       {children}
     </section>

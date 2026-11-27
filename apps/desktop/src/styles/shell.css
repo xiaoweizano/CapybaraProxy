@@ -372,8 +372,7 @@
   padding-block: 1px;
 }
 
-.module-page,
-.settings-page {
+.module-page {
   display: flex;
   min-height: 100%;
   flex-direction: column;

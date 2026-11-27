@@ -33,7 +33,11 @@ export type NativeCommandName =
   | "get_system_integration_status"
   | "set_system_proxy_enabled"
   | "set_launch_at_login_enabled"
-  | "request_application_exit";
+  | "request_application_exit"
+  | "list_substore_subscriptions"
+  | "import_substore_subscription"
+  | "open_log_directory"
+  | "clear_log_files";
 
 export type NativeEventName =
   | "app-visibility"

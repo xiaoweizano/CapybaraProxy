@@ -138,3 +138,14 @@ html[data-app-visibility="hidden"] body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* In-app equivalent of the OS setting; written by `shared/motion.ts`. */
+html[data-motion="reduced"] *,
+html[data-motion="reduced"] *::before,
+html[data-motion="reduced"] *::after {
+  scroll-behavior: auto !important;
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
+

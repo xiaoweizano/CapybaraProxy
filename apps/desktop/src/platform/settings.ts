@@ -3,6 +3,10 @@ import type { CloseBehavior } from "../shared/closeBehavior";
 import type { LanguageId } from "../i18n/language";
 import { invokeNativeCommand, type NativeBridgeError } from "./tauri";
 
+export type SettingsMode = "simple" | "standard" | "relaxed";
+export type TraySpeedDisplay = "icon" | "tooltip" | "off";
+export type MotionPreference = "full" | "reduced";
+
 export type DesktopSettings = {
   version: 1;
   theme: ThemeId;
@@ -21,6 +25,32 @@ export type DesktopSettings = {
   delay_timeout_ms?: number;
   /** Automatic subscription refresh interval in hours; 0 disables it. */
   subscription_update_hours?: number;
+  /** Refresh the stored subscription once, right after launch. */
+  update_subscription_on_launch?: boolean;
+  /** How many settings groups the Settings page shows. */
+  settings_mode?: SettingsMode;
+  /** Start with the main window hidden so only the tray icon appears. */
+  silent_start?: boolean;
+  /** Interface animation preference. */
+  motion?: MotionPreference;
+  /** Show the connection state and current node in the tray. */
+  tray_show_info?: boolean;
+  /** What the tray icon does with the live transfer rate. */
+  tray_speed_display?: TraySpeedDisplay;
+  /** Mirror Runtime events into a rotating log file. */
+  log_to_file?: boolean;
+  /** How many days of log files are kept. */
+  log_retention_days?: number;
+  /** Merge latency measurements before displaying them. */
+  unified_delay?: boolean;
+  /** Allow several parallel connections to one host. */
+  tcp_concurrent?: boolean;
+  /** Fixed mixed-port; `null` picks a free port on every start. */
+  fixed_proxy_port?: number | null;
+  /** Base URL of an external Sub-Store backend. */
+  substore_url?: string;
+  /** Token sent to the Sub-Store backend as `x-api-token`. */
+  substore_token?: string;
   /** Remembered window size in physical pixels. */
   window_width?: number | null;
   window_height?: number | null;
@@ -59,6 +89,38 @@ function isDesktopSettings(value: unknown): value is DesktopSettings {
       typeof value.delay_timeout_ms === "number") &&
     (value.subscription_update_hours === undefined ||
       typeof value.subscription_update_hours === "number") &&
+    (value.update_subscription_on_launch === undefined ||
+      typeof value.update_subscription_on_launch === "boolean") &&
+    (value.settings_mode === undefined ||
+      value.settings_mode === "simple" ||
+      value.settings_mode === "standard" ||
+      value.settings_mode === "relaxed") &&
+    (value.silent_start === undefined ||
+      typeof value.silent_start === "boolean") &&
+    (value.motion === undefined ||
+      value.motion === "full" ||
+      value.motion === "reduced") &&
+    (value.tray_show_info === undefined ||
+      typeof value.tray_show_info === "boolean") &&
+    (value.tray_speed_display === undefined ||
+      value.tray_speed_display === "icon" ||
+      value.tray_speed_display === "tooltip" ||
+      value.tray_speed_display === "off") &&
+    (value.log_to_file === undefined ||
+      typeof value.log_to_file === "boolean") &&
+    (value.log_retention_days === undefined ||
+      typeof value.log_retention_days === "number") &&
+    (value.unified_delay === undefined ||
+      typeof value.unified_delay === "boolean") &&
+    (value.tcp_concurrent === undefined ||
+      typeof value.tcp_concurrent === "boolean") &&
+    (value.fixed_proxy_port === undefined ||
+      value.fixed_proxy_port === null ||
+      typeof value.fixed_proxy_port === "number") &&
+    (value.substore_url === undefined ||
+      typeof value.substore_url === "string") &&
+    (value.substore_token === undefined ||
+      typeof value.substore_token === "string") &&
     (value.window_width === undefined ||
       value.window_width === null ||
       typeof value.window_width === "number") &&

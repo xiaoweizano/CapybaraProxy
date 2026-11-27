@@ -197,6 +197,20 @@ pub struct CorePreferences {
 pub struct StartupPreferences {
     pub log_level: LogLevel,
     pub ipv6: bool,
+    /// Merges latency measurements for the same node across groups.
+    pub unified_delay: bool,
+    /// Lets the core open several connections to one host in parallel.
+    pub tcp_concurrent: bool,
+    /// Fixed mixed-port; `0` reserves a free port on every start.
+    pub proxy_port: u16,
+}
+
+impl StartupPreferences {
+    /// True when every value matches the defaults, which lets the profile
+    /// writer leave the subscription's own value in place.
+    pub fn is_default(&self) -> bool {
+        *self == Self::default()
+    }
 }
 
 impl Default for StartupPreferences {
@@ -204,6 +218,9 @@ impl Default for StartupPreferences {
         Self {
             log_level: LogLevel::Warning,
             ipv6: false,
+            unified_delay: true,
+            tcp_concurrent: true,
+            proxy_port: 0,
         }
     }
 }

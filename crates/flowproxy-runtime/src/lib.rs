@@ -1,6 +1,8 @@
 mod log_buffer;
 mod redaction;
 
+pub use redaction::redact_sensitive_text;
+
 use flowproxy_contracts::{
     ConnectionPage, CoreInfo, CorePreferences, DelayProbeSettings, GroupDelayResult, LogLevel,
     ProfileInfo, ProxyGroup, RoutingMode, RuleItem, RuntimeBackend, RuntimeError, RuntimeErrorCode,

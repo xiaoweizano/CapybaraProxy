@@ -9,7 +9,6 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useAppSettings } from "../../app/settings/settingsContext";
 import { useRuntime } from "../../app/runtime/runtimeContext";
 import { useBridgeResource } from "../../app/runtime/useBridgeResource";
 import {
@@ -31,13 +30,9 @@ import {
 
 type ImportMode = "url" | "yaml";
 
-/** Selectable automatic update intervals, in hours; 0 disables it. */
-const AUTO_UPDATE_OPTIONS = [0, 6, 12, 24] as const;
-
 export function ProfilesPage() {
   const { t } = useTranslation();
   const { snapshot, measureGroupDelay } = useRuntime();
-  const { settings, updateSubscriptionUpdateHours } = useAppSettings();
   const profiles = useBridgeResource(getProfiles, true);
   // The stored document carries the group names, which is what the bulk delay
   // test needs; the profile metadata only has counts.
@@ -434,21 +429,9 @@ export function ProfilesPage() {
             <span className="subscription-auto-update-label">
               {t("profiles.autoUpdate")}
             </span>
-            <div className="choice-chips" role="group" aria-label={t("profiles.autoUpdate")}>
-              {AUTO_UPDATE_OPTIONS.map((hours) => (
-                <button
-                  key={hours}
-                  type="button"
-                  className="choice-chip"
-                  aria-pressed={settings.subscriptionUpdateHours === hours}
-                  onClick={() => void updateSubscriptionUpdateHours(hours)}
-                >
-                  {hours === 0
-                    ? t("profiles.autoUpdateOff")
-                    : t("profiles.autoUpdateHours", { hours })}
-                </button>
-              ))}
-            </div>
+            <p className="workspace-hint">
+              {t("profiles.autoUpdateMoved")}
+            </p>
           </div>
         ) : null}
 
